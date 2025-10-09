@@ -1,4 +1,4 @@
-use crate::model::Token;
+use crate::token::Token;
 use regex::Regex;
 use thiserror::Error;
 

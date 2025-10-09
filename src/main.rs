@@ -1,6 +1,6 @@
 mod lex;
-mod model;
 mod parser;
+mod token;
 
 use bpaf::*;
 use lex::Lexer;
