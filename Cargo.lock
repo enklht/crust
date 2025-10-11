@@ -34,15 +34,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "c_compiler"
-version = "0.1.0"
-dependencies = [
- "bpaf",
- "regex",
- "thiserror",
-]
-
-[[package]]
 name = "is_ci"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -53,6 +44,15 @@ name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
+
+[[package]]
+name = "my_cc"
+version = "0.1.0"
+dependencies = [
+ "bpaf",
+ "regex",
+ "thiserror",
+]
 
 [[package]]
 name = "owo-colors"

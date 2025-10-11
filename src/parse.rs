@@ -1,4 +1,5 @@
-use crate::token::Token;
+use crate::models::ast::*;
+use crate::models::token::Token;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -9,37 +10,6 @@ pub enum ParseError {
     UnexpectedEof(String),
     #[error("expected <eof>, found {0:?}")]
     ExpectedEof(Token),
-}
-
-#[derive(Debug)]
-pub enum Program {
-    Function(Function),
-}
-
-#[derive(Debug)]
-pub struct Function {
-    name: Ident,
-    body: Stmt,
-}
-
-#[derive(Debug)]
-pub enum Stmt {
-    Return(Expr),
-}
-
-#[derive(Debug)]
-pub enum Expr {
-    Int(Int),
-}
-
-#[derive(Debug)]
-pub enum Ident {
-    Ident(String),
-}
-
-#[derive(Debug)]
-pub enum Int {
-    Const(i32),
 }
 
 fn expect(expected: Token, tokens: &mut Vec<Token>) -> Result<Token, ParseError> {
@@ -79,7 +49,7 @@ fn parse_function(tokens: &mut Vec<Token>) -> Result<Function, ParseError> {
     let body = parse_stmt(tokens)?;
     expect(Token::RBrace, tokens)?;
 
-    Ok(Function { name, body })
+    Ok(Function::Function { name, body })
 }
 
 fn parse_stmt(tokens: &mut Vec<Token>) -> Result<Stmt, ParseError> {

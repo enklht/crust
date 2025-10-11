@@ -1,13 +1,10 @@
 mod codegen;
 mod lex;
-mod parser;
-mod token;
+mod models;
+mod parse;
 
 use bpaf::*;
-use lex::Lexer;
 use std::{fs, path::PathBuf};
-
-use crate::parser::parse;
 
 #[derive(Debug, Clone, Bpaf)]
 #[bpaf(options)]
@@ -29,17 +26,15 @@ enum CompilerMode {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opts: Options = options().run();
 
-    // Read the input file
     let source = fs::read_to_string(&opts.input)?;
 
-    let lexer = Lexer::new();
-    let tokens = lexer.lex(&source)?;
+    let tokens = lex::lex(&source)?;
 
     if opts.mode == CompilerMode::Lex {
         return Ok(());
     }
 
-    let ast = parse(tokens)?;
+    let _ast = parse::parse(tokens)?;
 
     if opts.mode == CompilerMode::Parse {
         return Ok(());
