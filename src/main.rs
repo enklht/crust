@@ -13,7 +13,7 @@ struct Options {
     #[bpaf(external(compiler_mode), fallback(CompilerMode::Full))]
     mode: CompilerMode,
     #[bpaf(short)]
-    output: PathBuf,
+    output: Option<PathBuf>,
     #[bpaf(positional("file"))]
     input: PathBuf,
 }
@@ -50,6 +50,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let assembly = codeemit::emit(assembly_ast);
-    fs::write(&opts.output, assembly)?;
+    let output = opts.output.unwrap_or(opts.input.with_extension("s"));
+    fs::write(&output, assembly)?;
+
     Ok(())
 }

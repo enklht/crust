@@ -10,4 +10,7 @@ pub enum Token {
     LBrace,
     RBrace,
     Semicolon,
+    UnaryMinus,
+    UnaryNegation,
+    Decrement,
 }
