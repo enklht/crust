@@ -1,7 +1,4 @@
 #!/usr/bin/env fish
-# fish-compiler-driver
-# Usage: ./fish-compiler-driver /path/to/program.c
-# Produces: /path/to/program (executable) on success
 
 # Check args
 if test (count $argv) -ne 1
@@ -39,7 +36,7 @@ end
 
 # Step 2: Compile -> assembly (STUB)
 # Since the real compiler isn't written yet, use gcc -S as a stub to produce .s
-gcc -S -O -fno-asynchronous-unwind-tables -fcf-protection=none "$pre" -o "$asm"
+./target/debug/my_cc "$pre" -o "$asm"
 if test $status -ne 0
     printf "Error: compilation (stub) to assembly failed\n" >&2
     exit 5

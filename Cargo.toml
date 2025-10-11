@@ -5,5 +5,6 @@ edition = "2024"
 
 [dependencies]
 bpaf = { version = "0.9.20", features = ["derive", "dull-color"] }
+derive_more = { version = "2.0.1", features = ["display"] }
 regex = "1.11.3"
 thiserror = "2.0.17"

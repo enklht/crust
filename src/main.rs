@@ -1,3 +1,4 @@
+mod codeemit;
 mod codegen;
 mod lex;
 mod models;
@@ -11,6 +12,8 @@ use std::{fs, path::PathBuf};
 struct Options {
     #[bpaf(external(compiler_mode), fallback(CompilerMode::Full))]
     mode: CompilerMode,
+    #[bpaf(short)]
+    output: PathBuf,
     #[bpaf(positional("file"))]
     input: PathBuf,
 }
@@ -34,11 +37,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let _ast = parse::parse(tokens)?;
+    let program = parse::parse(tokens)?;
 
     if opts.mode == CompilerMode::Parse {
         return Ok(());
     }
 
-    todo!()
+    let assembly_ast = codegen::codegen(program);
+
+    if opts.mode == CompilerMode::Codegen {
+        return Ok(());
+    }
+
+    let assembly = codeemit::emit(assembly_ast);
+    fs::write(&opts.output, assembly)?;
+    Ok(())
 }

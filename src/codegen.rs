@@ -1,41 +1,34 @@
 use crate::models::assembly as asm;
 use crate::models::ast;
-use thiserror::Error;
 
-#[derive(Debug, Error)]
-pub enum CodegenError {
-    #[error("invalid codegen")]
-    CodegenError,
-}
-
-pub fn codegen(program: ast::Program) -> Result<asm::Program, CodegenError> {
+pub fn codegen(program: ast::Program) -> asm::Program {
     match program {
-        ast::Program::Function(function) => Ok(asm::Program {
-            function: codegen_function(function)?,
-        }),
+        ast::Program::Function(function) => asm::Program {
+            function: codegen_function(function),
+        },
     }
 }
 
-fn codegen_function(function: ast::Function) -> Result<asm::Function, CodegenError> {
+fn codegen_function(function: ast::Function) -> asm::Function {
     match function {
         ast::Function::Function {
             name: ast::Ident::Ident(name),
             body,
-        } => Ok(asm::Function {
+        } => asm::Function {
             name,
-            instruction: codegen_stmt(body)?,
-        }),
+            instructions: codegen_stmt(body),
+        },
     }
 }
 
-fn codegen_stmt(stmt: ast::Stmt) -> Result<Vec<asm::Instruction>, CodegenError> {
+fn codegen_stmt(stmt: ast::Stmt) -> Vec<asm::Instruction> {
     match stmt {
-        ast::Stmt::Return(ast::Expr::Int(ast::Int::Const(i))) => Ok(vec![
+        ast::Stmt::Return(ast::Expr::Int(ast::Int::Const(i))) => vec![
             asm::Instruction::Mov {
                 src: asm::Operand::Imm(i),
                 dst: asm::Operand::Register,
             },
             asm::Instruction::Ret,
-        ]),
+        ],
     }
 }
