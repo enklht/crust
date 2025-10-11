@@ -1,3 +1,4 @@
+mod codegen;
 mod lex;
 mod parser;
 mod token;

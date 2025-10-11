@@ -18,7 +18,7 @@ pub enum Program {
 
 #[derive(Debug)]
 pub struct Function {
-    name: String,
+    name: Ident,
     body: Stmt,
 }
 
@@ -29,6 +29,16 @@ pub enum Stmt {
 
 #[derive(Debug)]
 pub enum Expr {
+    Int(Int),
+}
+
+#[derive(Debug)]
+pub enum Ident {
+    Ident(String),
+}
+
+#[derive(Debug)]
+pub enum Int {
     Const(i32),
 }
 
@@ -61,11 +71,7 @@ fn parse_program(tokens: &mut Vec<Token>) -> Result<Program, ParseError> {
 
 fn parse_function(tokens: &mut Vec<Token>) -> Result<Function, ParseError> {
     expect(Token::KeywordInt, tokens)?;
-    let name = match tokens.pop() {
-        Some(Token::Ident(name)) => name,
-        Some(actual) => return Err(ParseError::UnexpectedToken("ident".to_string(), actual)),
-        None => return Err(ParseError::UnexpectedEof("ident".to_string())),
-    };
+    let name = parse_ident(tokens)?;
     expect(Token::LParen, tokens)?;
     expect(Token::KeywordVoid, tokens)?;
     expect(Token::RParen, tokens)?;
@@ -85,8 +91,20 @@ fn parse_stmt(tokens: &mut Vec<Token>) -> Result<Stmt, ParseError> {
 }
 
 fn parse_expr(tokens: &mut Vec<Token>) -> Result<Expr, ParseError> {
+    parse_int(tokens).map(Expr::Int)
+}
+
+fn parse_ident(tokens: &mut Vec<Token>) -> Result<Ident, ParseError> {
     match tokens.pop() {
-        Some(Token::Const(n)) => Ok(Expr::Const(n)),
+        Some(Token::Ident(name)) => Ok(Ident::Ident(name)),
+        Some(actual) => Err(ParseError::UnexpectedToken("ident".to_string(), actual)),
+        None => Err(ParseError::UnexpectedEof("ident".to_string())),
+    }
+}
+
+fn parse_int(tokens: &mut Vec<Token>) -> Result<Int, ParseError> {
+    match tokens.pop() {
+        Some(Token::Const(i)) => Ok(Int::Const(i)),
         Some(actual) => Err(ParseError::UnexpectedToken("const".to_string(), actual)),
         None => Err(ParseError::UnexpectedEof("const".to_string())),
     }
