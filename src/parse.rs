@@ -50,7 +50,7 @@ fn parse_function(tokens: &[Token]) -> ParseResult<'_, Function> {
     let (body, rest) = parse_stmt(rest)?;
     let rest = expect(Token::RBrace, rest)?;
 
-    Ok((Function::Function { name, body }, rest))
+    Ok((Function::Function(name, body), rest))
 }
 
 fn parse_stmt(tokens: &[Token]) -> ParseResult<'_, Stmt> {

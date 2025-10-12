@@ -3,6 +3,7 @@ mod codegen;
 mod lex;
 mod models;
 mod parse;
+mod tacky_gen;
 
 use bpaf::*;
 use std::{fs, path::PathBuf};
@@ -22,6 +23,7 @@ struct Options {
 enum CompilerMode {
     Lex,
     Parse,
+    Tacky,
     Codegen,
     Full,
 }
@@ -43,15 +45,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let assembly_ast = codegen::codegen(program);
+    let tacky = tacky_gen::convert_program(program);
+
+    if opts.mode == CompilerMode::Tacky {
+        return Ok(());
+    }
+
+    let assembly_ast = codegen::codegen(tacky);
 
     if opts.mode == CompilerMode::Codegen {
         return Ok(());
     }
 
-    let assembly = codeemit::emit(assembly_ast);
-    let output = opts.output.unwrap_or(opts.input.with_extension("s"));
-    fs::write(&output, assembly)?;
+    // let assembly = codeemit::emit(assembly_ast);
+    // let output = opts.output.unwrap_or(opts.input.with_extension("s"));
+    // fs::write(&output, assembly)?;
 
     Ok(())
 }

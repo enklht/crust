@@ -1,30 +1,58 @@
+use std::collections::HashMap;
+
 use crate::models::assembly as asm;
-use crate::models::ast;
+use crate::models::tacky;
 
-pub fn codegen(program: ast::Program) -> asm::Program {
+pub fn codegen(program: tacky::Program) -> asm::Program {
+    let program = gen_program(program);
+    program
+}
+
+fn gen_program(program: tacky::Program) -> asm::Program {
     match program {
-        ast::Program::Function(function) => asm::Program::Program(codegen_function(function)),
+        tacky::Program::Program(function) => asm::Program::Program(gen_function(function)),
     }
 }
 
-fn codegen_function(function: ast::Function) -> asm::Function {
+fn gen_function(function: tacky::Function) -> asm::Function {
     match function {
-        ast::Function::Function { name, body } => asm::Function::Function {
-            name,
-            instructions: codegen_stmt(body),
-        },
+        tacky::Function::Function(name, body) => {
+            asm::Function::Function(name, gen_instructions(body))
+        }
     }
 }
 
-fn codegen_stmt(stmt: ast::Stmt) -> Vec<asm::Instruction> {
-    match stmt {
-        ast::Stmt::Return(ast::Expr::Const(i)) => vec![
-            asm::Instruction::Mov {
-                src: asm::Operand::Imm(i),
-                dst: asm::Operand::Register,
-            },
-            asm::Instruction::Ret,
-        ],
-        _ => todo!(),
+pub fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instruction> {
+    let mut assembly_instructions = Vec::new();
+    for instruction in instructions {
+        match instruction {
+            tacky::Instruction::Return(val) => {
+                assembly_instructions.push(asm::Instruction::Mov(
+                    gen_val(val),
+                    asm::Operand::Reg(asm::Reg::AX),
+                ));
+                assembly_instructions.push(asm::Instruction::Ret)
+            }
+            tacky::Instruction::Unary(op, src, dst) => {
+                let dst = gen_val(dst);
+                assembly_instructions.push(asm::Instruction::Mov(gen_val(src), dst.clone()));
+                assembly_instructions.push(asm::Instruction::Unary(gen_op(op), dst))
+            }
+        }
+    }
+    assembly_instructions
+}
+
+fn gen_val(val: tacky::Val) -> asm::Operand {
+    match val {
+        tacky::Val::Const(i) => asm::Operand::Imm(i),
+        tacky::Val::Var(ident) => asm::Operand::Pseudo(ident),
+    }
+}
+
+fn gen_op(op: tacky::UnaryOp) -> asm::UnaryOp {
+    match op {
+        tacky::UnaryOp::Complement => asm::UnaryOp::Not,
+        tacky::UnaryOp::Negate => asm::UnaryOp::Neg,
     }
 }

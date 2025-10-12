@@ -7,24 +7,49 @@ pub enum Program {
 
 #[derive(Debug)]
 pub enum Function {
-    Function {
-        name: String,
-        instructions: Vec<Instruction>,
-    },
+    Function(String, Vec<Instruction>),
 }
 
 #[derive(Debug, Display)]
 pub enum Instruction {
-    #[display("    movl {}, {}", src, dst)]
-    Mov { src: Operand, dst: Operand },
-    #[display("    ret")]
+    #[display("    movl {_0}, {_1}")]
+    Mov(Operand, Operand),
+    #[display("    {_0} {_1}")]
+    Unary(UnaryOp, Operand),
+    #[display("    subq ${_0}, %rsp")]
+    AllocateStack(usize),
+    #[display(
+        "movq %rbp %rsp
+    popq %rbp
+    ret"
+    )]
     Ret,
 }
 
 #[derive(Debug, Display)]
+pub enum UnaryOp {
+    #[display("negl")]
+    Neg,
+    #[display("notl")]
+    Not,
+}
+
+#[derive(Debug, Display, Clone)]
 pub enum Operand {
     #[display("${_0}")]
     Imm(i32),
+    #[display("{_0}")]
+    Reg(Reg),
+    #[display("pseudo register")]
+    Pseudo(String),
+    #[display("{_0}(%rbp)")]
+    Stack(i32),
+}
+
+#[derive(Debug, Display, Clone)]
+pub enum Reg {
     #[display("%eax")]
-    Register,
+    AX,
+    #[display("%r10d")]
+    R10,
 }

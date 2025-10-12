@@ -5,7 +5,7 @@ pub enum Program {
 
 #[derive(Debug)]
 pub enum Function {
-    Function { name: String, body: Stmt },
+    Function(String, Stmt),
 }
 
 #[derive(Debug)]

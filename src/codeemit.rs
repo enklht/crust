@@ -15,7 +15,7 @@ fn emit_program(program: Program, acc: &mut String) {
 
 fn emit_function(function: Function, acc: &mut String) {
     match function {
-        Function::Function { name, instructions } => acc.push_str(&format!(
+        Function::Function(name, instructions) => acc.push_str(&format!(
             "    .global {}
 {}:
 {}
