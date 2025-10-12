@@ -31,6 +31,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instructi
                 assembly_instructions.push(asm::Instruction::Mov(gen_val(src), dst.clone()));
                 assembly_instructions.push(asm::Instruction::Unary(gen_op(op), dst))
             }
+            _ => todo!(),
         }
     }
     assembly_instructions

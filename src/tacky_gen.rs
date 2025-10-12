@@ -39,13 +39,19 @@ fn emit_expr(expr: ast::Expr, instructions: &mut Vec<tacky::Instruction>) -> tac
         ast::Expr::Const(i) => tacky::Val::Const(i),
         ast::Expr::Unary(op, inner) => {
             let src = emit_expr(*inner, instructions);
-            let dst_name = make_temporary();
-            let dst = tacky::Val::Var(dst_name);
+            let dst = tacky::Val::Var(make_temporary());
             let tacky_op = convert_unop(op);
             instructions.push(tacky::Instruction::Unary(tacky_op, src, dst.clone()));
             dst
         }
-        _ => todo!(),
+        ast::Expr::Binary(op, e1, e2) => {
+            let v1 = emit_expr(*e1, instructions);
+            let v2 = emit_expr(*e2, instructions);
+            let dst = tacky::Val::Var(make_temporary());
+            let tacky_op = convert_binop(op);
+            instructions.push(tacky::Instruction::Binary(tacky_op, v1, v2, dst.clone()));
+            dst
+        }
     }
 }
 
@@ -53,5 +59,15 @@ fn convert_unop(op: ast::UnaryOp) -> tacky::UnaryOp {
     match op {
         ast::UnaryOp::Complement => tacky::UnaryOp::Complement,
         ast::UnaryOp::Negate => tacky::UnaryOp::Negate,
+    }
+}
+
+fn convert_binop(op: ast::BinaryOp) -> tacky::BinaryOp {
+    match op {
+        ast::BinaryOp::Add => tacky::BinaryOp::Add,
+        ast::BinaryOp::Subtract => tacky::BinaryOp::Subtract,
+        ast::BinaryOp::Multiply => tacky::BinaryOp::Multiply,
+        ast::BinaryOp::Divide => tacky::BinaryOp::Divide,
+        ast::BinaryOp::Remainder => tacky::BinaryOp::Remainder,
     }
 }

@@ -54,16 +54,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let assembly_ast = backend::codegen(tacky);
+    let asm_ast = backend::codegen(tacky);
 
     if opts.mode == CompilerMode::Codegen {
-        println!("{:?}", assembly_ast);
+        println!("{:?}", asm_ast);
         return Ok(());
     }
 
-    let assembly = emit::emit(assembly_ast);
+    let asm_text = emit::emit(asm_ast);
     let output = opts.output.unwrap_or(opts.input.with_extension("s"));
-    fs::write(&output, assembly)?;
+    fs::write(&output, asm_text)?;
 
     Ok(())
 }
