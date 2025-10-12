@@ -28,6 +28,9 @@ fn fixup_instruction(
             acc.push(asm::Instruction::Mov(asm::Operand::Reg(asm::Reg::R10), dst));
             acc
         }
-        _ => acc,
+        other => {
+            acc.push(other);
+            acc
+        }
     }
 }

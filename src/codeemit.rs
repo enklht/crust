@@ -16,12 +16,12 @@ fn emit_program(program: Program, acc: &mut String) {
 fn emit_function(function: Function, acc: &mut String) {
     match function {
         Function::Function(name, instructions) => acc.push_str(&format!(
-            "    .global {}
-{}:
+            "    .global {name}
+{name}:
+    pushq %rbp
+    movq %rsp, %rbp
 {}
 ",
-            name,
-            name,
             instructions_to_string(instructions)
         )),
     }

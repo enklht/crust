@@ -19,7 +19,7 @@ pub enum Instruction {
     #[display("    subq ${_0}, %rsp")]
     AllocateStack(usize),
     #[display(
-        "movq %rbp %rsp
+        "    movq %rbp, %rsp
     popq %rbp
     ret"
     )]
@@ -40,7 +40,7 @@ pub enum Operand {
     Imm(i64),
     #[display("{_0}")]
     Reg(Reg),
-    #[display("pseudo register")]
+    #[display("<pseudo register will never be emit>")]
     Pseudo(String),
     #[display("{_0}(%rbp)")]
     Stack(isize),

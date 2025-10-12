@@ -36,30 +36,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tokens = lex::lex(&source)?;
 
     if opts.mode == CompilerMode::Lex {
+        println!("{:?}", tokens);
         return Ok(());
     }
 
-    let program = parse::parse(tokens)?;
+    let ast = parse::parse(tokens)?;
 
     if opts.mode == CompilerMode::Parse {
+        println!("{:?}", ast);
         return Ok(());
     }
 
-    let tacky = tacky_gen::convert_program(program);
+    let tacky = tacky_gen::convert_program(ast);
 
     if opts.mode == CompilerMode::Tacky {
+        println!("{:?}", tacky);
         return Ok(());
     }
 
     let assembly_ast = backend::codegen(tacky);
 
     if opts.mode == CompilerMode::Codegen {
+        println!("{:?}", assembly_ast);
         return Ok(());
     }
 
-    // let assembly = codeemit::emit(assembly_ast);
-    // let output = opts.output.unwrap_or(opts.input.with_extension("s"));
-    // fs::write(&output, assembly)?;
+    let assembly = codeemit::emit(assembly_ast);
+    let output = opts.output.unwrap_or(opts.input.with_extension("s"));
+    fs::write(&output, assembly)?;
 
     Ok(())
 }
