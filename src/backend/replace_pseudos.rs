@@ -48,9 +48,9 @@ fn replace_pseudos_in_instruction(
             let dst = replace_operand(dst, state);
             asm::Instruction::Mov(src, dst)
         }
-        asm::Instruction::Unary(op, val) => {
-            let val = replace_operand(val, state);
-            asm::Instruction::Unary(op, val)
+        asm::Instruction::Unary(operator, operand) => {
+            let operand = replace_operand(operand, state);
+            asm::Instruction::Unary(operator, operand)
         }
         asm::Instruction::Ret => asm::Instruction::Ret,
         asm::Instruction::AllocateStack(_) => unreachable!(),

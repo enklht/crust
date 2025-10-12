@@ -15,22 +15,23 @@ fn emit_program(program: Program, acc: &mut String) {
 
 fn emit_function(function: Function, acc: &mut String) {
     match function {
-        Function::Function(name, instructions) => acc.push_str(&format!(
-            "    .global {name}
-{name}:
-    pushq %rbp
-    movq %rsp, %rbp
-{}
-",
-            instructions_to_string(instructions)
-        )),
+        Function::Function(name, instructions) => {
+            acc.push_str(&format!(
+                "    .global {name}\n{name}:\n    pushq %rbp\n    movq %rsp, %rbp\n"
+            ));
+            emit_instructions(instructions, acc)
+        }
     }
 }
 
-fn instructions_to_string(instructions: Vec<Instruction>) -> String {
-    instructions
-        .iter()
-        .map(|i| i.to_string())
-        .collect::<Vec<_>>()
-        .join("\n")
+fn emit_instructions(instructions: Vec<Instruction>, acc: &mut String) {
+    for instruction in instructions {
+        let fixed = match instruction {
+            Instruction::Mov(src, dst) => format!("    movl {src}, {dst}\n"),
+            Instruction::Unary(operator, operand) => format!("    {operator} {operand}\n"),
+            Instruction::AllocateStack(size) => format!("    subq ${size}, %rsp\n"),
+            Instruction::Ret => "    movq %rbp, %rsp\n    popq %rbp\n    ret\n".to_string(),
+        };
+        acc.push_str(&fixed);
+    }
 }

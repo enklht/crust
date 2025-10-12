@@ -10,19 +10,11 @@ pub enum Function {
     Function(String, Vec<Instruction>),
 }
 
-#[derive(Debug, Display)]
+#[derive(Debug)]
 pub enum Instruction {
-    #[display("    movl {_0}, {_1}")]
     Mov(Operand, Operand),
-    #[display("    {_0} {_1}")]
     Unary(UnaryOp, Operand),
-    #[display("    subq ${_0}, %rsp")]
     AllocateStack(usize),
-    #[display(
-        "    movq %rbp, %rsp
-    popq %rbp
-    ret"
-    )]
     Ret,
 }
 
