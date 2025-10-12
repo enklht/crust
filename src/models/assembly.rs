@@ -1,14 +1,16 @@
 use derive_more::Display;
 
 #[derive(Debug)]
-pub struct Program {
-    pub function: Function,
+pub enum Program {
+    Function(Function),
 }
 
 #[derive(Debug)]
-pub struct Function {
-    pub name: String,
-    pub instructions: Vec<Instruction>,
+pub enum Function {
+    Function {
+        name: String,
+        instructions: Vec<Instruction>,
+    },
 }
 
 #[derive(Debug, Display)]

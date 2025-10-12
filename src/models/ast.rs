@@ -26,4 +26,11 @@ pub enum Ident {
 #[derive(Debug)]
 pub enum Int {
     Const(i32),
+    Unary(UnaryOperator, Box<Expr>),
+}
+
+#[derive(Debug)]
+pub enum UnaryOperator {
+    Complement,
+    Negate,
 }
