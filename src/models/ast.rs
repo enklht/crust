@@ -5,7 +5,7 @@ pub enum Program {
 
 #[derive(Debug)]
 pub enum Function {
-    Function { name: Ident, body: Stmt },
+    Function { name: String, body: Stmt },
 }
 
 #[derive(Debug)]
@@ -15,22 +15,12 @@ pub enum Stmt {
 
 #[derive(Debug)]
 pub enum Expr {
-    Int(Int),
-}
-
-#[derive(Debug)]
-pub enum Ident {
-    Ident(String),
-}
-
-#[derive(Debug)]
-pub enum Int {
     Const(i32),
-    Unary(UnaryOperator, Box<Expr>),
+    Unary(UnaryOp, Box<Expr>),
 }
 
 #[derive(Debug)]
-pub enum UnaryOperator {
+pub enum UnaryOp {
     Complement,
     Negate,
 }

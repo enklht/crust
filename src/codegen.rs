@@ -9,10 +9,7 @@ pub fn codegen(program: ast::Program) -> asm::Program {
 
 fn codegen_function(function: ast::Function) -> asm::Function {
     match function {
-        ast::Function::Function {
-            name: ast::Ident::Ident(name),
-            body,
-        } => asm::Function::Function {
+        ast::Function::Function { name, body } => asm::Function::Function {
             name,
             instructions: codegen_stmt(body),
         },
@@ -21,7 +18,7 @@ fn codegen_function(function: ast::Function) -> asm::Function {
 
 fn codegen_stmt(stmt: ast::Stmt) -> Vec<asm::Instruction> {
     match stmt {
-        ast::Stmt::Return(ast::Expr::Int(ast::Int::Const(i))) => vec![
+        ast::Stmt::Return(ast::Expr::Const(i)) => vec![
             asm::Instruction::Mov {
                 src: asm::Operand::Imm(i),
                 dst: asm::Operand::Register,

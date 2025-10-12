@@ -62,33 +62,30 @@ fn parse_stmt(tokens: &[Token]) -> ParseResult<'_, Stmt> {
 }
 
 fn parse_expr(tokens: &[Token]) -> ParseResult<'_, Expr> {
-    if let Ok((int, rest)) = parse_int(tokens) {
-        Ok((Expr::Int(int), rest))
-    } else {
-        match tokens.first() {
-            Some(Token::Tilde) | Some(Token::Minus) => {
-                let (op, rest) = parse_unop(tokens)?;
-                let (expr, rest) = parse_expr(rest)?;
-                Ok((Expr::Int(Int::Unary(op, Box::new(expr))), rest))
-            }
-            Some(Token::LParen) => {
-                let (expr, rest) = parse_expr(&tokens[1..])?;
-                let rest = expect(Token::RParen, rest)?;
-                Ok((expr, rest))
-            }
-            Some(actual) => Err(ParseError::UnexpectedToken(
-                "expr".to_string(),
-                actual.clone(),
-            )),
-            None => Err(ParseError::UnexpectedEof("expr".to_string())),
+    match tokens.first() {
+        Some(Token::Const(i)) => Ok((Expr::Const(*i), &tokens[1..])),
+        Some(Token::Tilde) | Some(Token::Minus) => {
+            let (op, rest) = parse_unop(tokens)?;
+            let (expr, rest) = parse_expr(rest)?;
+            Ok((Expr::Unary(op, Box::new(expr)), rest))
         }
+        Some(Token::LParen) => {
+            let (expr, rest) = parse_expr(&tokens[1..])?;
+            let rest = expect(Token::RParen, rest)?;
+            Ok((expr, rest))
+        }
+        Some(actual) => Err(ParseError::UnexpectedToken(
+            "expr".to_string(),
+            actual.clone(),
+        )),
+        None => Err(ParseError::UnexpectedEof("expr".to_string())),
     }
 }
 
-fn parse_unop(tokens: &[Token]) -> ParseResult<'_, UnaryOperator> {
+fn parse_unop(tokens: &[Token]) -> ParseResult<'_, UnaryOp> {
     match tokens.first() {
-        Some(Token::Tilde) => Ok((UnaryOperator::Complement, &tokens[1..])),
-        Some(Token::Minus) => Ok((UnaryOperator::Negate, &tokens[1..])),
+        Some(Token::Tilde) => Ok((UnaryOp::Complement, &tokens[1..])),
+        Some(Token::Minus) => Ok((UnaryOp::Negate, &tokens[1..])),
         Some(actual) => Err(ParseError::UnexpectedToken(
             "unary operator".to_string(),
             actual.clone(),
@@ -97,24 +94,13 @@ fn parse_unop(tokens: &[Token]) -> ParseResult<'_, UnaryOperator> {
     }
 }
 
-fn parse_ident(tokens: &[Token]) -> ParseResult<'_, Ident> {
+fn parse_ident(tokens: &[Token]) -> ParseResult<'_, String> {
     match tokens.first() {
-        Some(Token::Ident(name)) => Ok((Ident::Ident(name.clone()), &tokens[1..])),
+        Some(Token::Ident(name)) => Ok((name.clone(), &tokens[1..])),
         Some(actual) => Err(ParseError::UnexpectedToken(
             "ident".to_string(),
             actual.clone(),
         )),
         _ => Err(ParseError::UnexpectedEof("ident".to_string())),
-    }
-}
-
-fn parse_int(tokens: &[Token]) -> ParseResult<'_, Int> {
-    match tokens.first() {
-        Some(Token::Const(i)) => Ok((Int::Const(*i), &tokens[1..])),
-        Some(actual) => Err(ParseError::UnexpectedToken(
-            "const".to_string(),
-            actual.clone(),
-        )),
-        _ => Err(ParseError::UnexpectedEof("const".to_string())),
     }
 }
