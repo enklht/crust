@@ -3,9 +3,7 @@ use crate::models::ast;
 
 pub fn codegen(program: ast::Program) -> asm::Program {
     match program {
-        ast::Program::Function(function) => asm::Program {
-            function: codegen_function(function),
-        },
+        ast::Program::Function(function) => asm::Program::Program(codegen_function(function)),
     }
 }
 
@@ -14,7 +12,7 @@ fn codegen_function(function: ast::Function) -> asm::Function {
         ast::Function::Function {
             name: ast::Ident::Ident(name),
             body,
-        } => asm::Function {
+        } => asm::Function::Function {
             name,
             instructions: codegen_stmt(body),
         },
@@ -30,5 +28,6 @@ fn codegen_stmt(stmt: ast::Stmt) -> Vec<asm::Instruction> {
             },
             asm::Instruction::Ret,
         ],
+        _ => todo!(),
     }
 }

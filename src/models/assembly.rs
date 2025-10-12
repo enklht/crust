@@ -2,7 +2,7 @@ use derive_more::Display;
 
 #[derive(Debug)]
 pub enum Program {
-    Function(Function),
+    Program(Function),
 }
 
 #[derive(Debug)]

@@ -6,21 +6,25 @@ pub fn emit(program: Program) -> String {
     acc
 }
 
-fn emit_program(Program { function }: Program, acc: &mut String) {
-    emit_function(function, acc);
+fn emit_program(program: Program, acc: &mut String) {
+    match program {
+        Program::Program(function) => emit_function(function, acc),
+    }
     acc.push_str("    .section .note.GNU-stack,\"\",@progbits\n")
 }
 
-fn emit_function(Function { name, instructions }: Function, acc: &mut String) {
-    acc.push_str(&format!(
-        "    .global {}
+fn emit_function(function: Function, acc: &mut String) {
+    match function {
+        Function::Function { name, instructions } => acc.push_str(&format!(
+            "    .global {}
 {}:
 {}
 ",
-        name,
-        name,
-        instructions_to_string(instructions)
-    ))
+            name,
+            name,
+            instructions_to_string(instructions)
+        )),
+    }
 }
 
 fn instructions_to_string(instructions: Vec<Instruction>) -> String {
