@@ -40,7 +40,7 @@ if test $status -ne 0
 end
 
 # Step 2: Compile -> assembly
-./target/debug/my_cc -o "$asm" $flag "$pre"
+./target/debug/crust -o "$asm" $flag "$pre"
 if test $status -ne 0
     printf "Error: compilation to assembly failed\n" >&2
     exit 5

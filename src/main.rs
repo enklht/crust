@@ -1,5 +1,5 @@
 mod backend;
-mod codeemit;
+mod emit;
 mod lex;
 mod models;
 mod parse;
@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let assembly = codeemit::emit(assembly_ast);
+    let assembly = emit::emit(assembly_ast);
     let output = opts.output.unwrap_or(opts.input.with_extension("s"));
     fs::write(&output, assembly)?;
 
