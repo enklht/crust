@@ -1,5 +1,6 @@
 use crate::models::ast::*;
 use crate::models::token::Token;
+use std::iter::Peekable;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -12,7 +13,8 @@ pub enum ParseError {
     ExpectedEof(Token),
 }
 
-type ParseResult<'a, T> = Result<(T, &'a [Token]), ParseError>;
+type Lexer<'a> = Peekable<logos::Lexer<'a, Token>>;
+type ParseResult<T> = Result<T, ParseError>;
 
 fn precedence(token: &Token) -> Option<u8> {
     match token {
@@ -26,33 +28,34 @@ fn precedence(token: &Token) -> Option<u8> {
     }
 }
 
-fn expect(expected: Token, tokens: &[Token]) -> Result<&[Token], ParseError> {
-    match tokens.first() {
-        Some(token) if token == &expected => Ok(&tokens[1..]),
+fn expect(expected: Token, lexer: &mut Lexer) -> ParseResult<()> {
+    match lexer.peek() {
+        Some(token) if token == Ok(&expected) => Ok(()),
         Some(actual) => Err(ParseError::UnexpectedToken(
             format!("{:?}", expected),
-            actual.clone(),
+            actual.unwrap().clone(),
         )),
         None => Err(ParseError::UnexpectedEof(format!("{:?}", expected))),
     }
 }
 
-pub fn parse(tokens: Vec<Token>) -> Result<Program, ParseError> {
-    let (program, rest) = parse_program(&tokens)?;
-    if !rest.is_empty() {
-        return Err(ParseError::ExpectedEof(rest.first().unwrap().clone()));
+pub fn parse(lexer: &mut Lexer) -> Result<Program, ParseError> {
+    let program = parse_program(lexer)?;
+
+    match lexer.next() {
+        Some(token) => Err(ParseError::ExpectedEof(token.unwrap())),
+        None => Ok(program),
     }
-
-    Ok(program)
 }
 
-fn parse_program(tokens: &[Token]) -> ParseResult<'_, Program> {
-    let (function, rest) = parse_function(tokens)?;
+fn parse_program(lexer: &mut Lexer) -> Result<Program, ParseError> {
+    let function = parse_function(lexer)?;
 
-    Ok((Program::Function(function), rest))
+    Ok(Program::Function(function))
 }
 
-fn parse_function(tokens: &[Token]) -> ParseResult<'_, Function> {
+fn parse_function(tokens: &mut Lexer) -> ParseResult<Function> {
+    todo!();
     let rest = expect(Token::KeywordInt, tokens)?;
     let (name, rest) = parse_ident(rest)?;
     let rest = expect(Token::LParen, rest)?;

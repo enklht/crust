@@ -5,7 +5,9 @@ mod models;
 mod parse;
 mod tacky_gen;
 
+use crate::{lex::LexError, models::token::Token};
 use bpaf::*;
+use logos::Logos;
 use std::{fs, path::PathBuf};
 
 #[derive(Debug, Clone, Bpaf)]
@@ -33,14 +35,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source = fs::read_to_string(&opts.input)?;
 
-    let tokens = lex::lex(&source)?;
+    let lexer = Token::lexer(&source).peekable();
 
     if opts.mode == CompilerMode::Lex {
-        println!("{:?}", tokens);
+        println!("{:?}", lexer);
         return Ok(());
     }
 
-    let ast = parse::parse(tokens)?;
+    let ast = parse::parse(lexer)?;
 
     if opts.mode == CompilerMode::Parse {
         println!("{:?}", ast);
