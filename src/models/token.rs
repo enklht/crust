@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Ident(String),
-    Const(i64),
+    Const(i32),
     KeywordInt,
     KeywordVoid,
     KeywordReturn,
@@ -15,6 +15,11 @@ pub enum Token {
     Plus,
     Star,
     Slash,
+    Ampersand,
+    VerticalBar,
+    Caret,
+    LShift,
+    RShift,
     Percent,
     Decrement,
 }

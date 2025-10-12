@@ -69,5 +69,10 @@ fn convert_binop(op: ast::BinaryOp) -> tacky::BinaryOp {
         ast::BinaryOp::Multiply => tacky::BinaryOp::Multiply,
         ast::BinaryOp::Divide => tacky::BinaryOp::Divide,
         ast::BinaryOp::Remainder => tacky::BinaryOp::Remainder,
+        ast::BinaryOp::BitAnd => tacky::BinaryOp::BitAnd,
+        ast::BinaryOp::BitOr => tacky::BinaryOp::BitOr,
+        ast::BinaryOp::BitXor => tacky::BinaryOp::BitXor,
+        ast::BinaryOp::LShift => tacky::BinaryOp::LShift,
+        ast::BinaryOp::RShift => tacky::BinaryOp::RShift,
     }
 }

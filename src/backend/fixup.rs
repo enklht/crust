@@ -29,7 +29,11 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             ]);
         }
         Instruction::Binary(
-            op @ (BinaryOp::Add | BinaryOp::Sub),
+            op @ (BinaryOp::Add
+            | BinaryOp::Subtract
+            | BinaryOp::BitAnd
+            | BinaryOp::BitOr
+            | BinaryOp::BitXor),
             src @ Operand::Stack(_),
             dst @ Operand::Stack(_),
         ) => {
@@ -38,10 +42,10 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Binary(op, Operand::Reg(Reg::R10), dst),
             ]);
         }
-        Instruction::Binary(BinaryOp::Mult, src, dst @ Operand::Stack(_)) => {
+        Instruction::Binary(BinaryOp::Multiply, src, dst @ Operand::Stack(_)) => {
             acc.extend([
                 Instruction::Mov(dst.clone(), Operand::Reg(Reg::R11)),
-                Instruction::Binary(BinaryOp::Mult, src, Operand::Reg(Reg::R11)),
+                Instruction::Binary(BinaryOp::Multiply, src, Operand::Reg(Reg::R11)),
                 Instruction::Mov(Operand::Reg(Reg::R11), dst),
             ]);
         }

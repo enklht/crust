@@ -38,6 +38,11 @@ pub fn lex(mut input: &str) -> Result<Vec<Token>, LexError> {
         (Regex::new(r"^\*").unwrap(), |_| Token::Star),
         (Regex::new(r"^/").unwrap(), |_| Token::Slash),
         (Regex::new(r"^%").unwrap(), |_| Token::Percent),
+        (Regex::new(r"^&").unwrap(), |_| Token::Ampersand),
+        (Regex::new(r"^\|").unwrap(), |_| Token::VerticalBar),
+        (Regex::new(r"^\^").unwrap(), |_| Token::Caret),
+        (Regex::new(r"^<<").unwrap(), |_| Token::LShift),
+        (Regex::new(r"^>>").unwrap(), |_| Token::RShift),
         (Regex::new(r"^--").unwrap(), |_| Token::Decrement),
     ];
     let whitespace = Regex::new(r"^\s+|^//.*?\n|^/\*.*?\*/").unwrap();

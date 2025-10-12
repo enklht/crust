@@ -14,6 +14,18 @@ pub enum ParseError {
 
 type ParseResult<'a, T> = Result<(T, &'a [Token]), ParseError>;
 
+fn precedence(token: &Token) -> Option<u8> {
+    match token {
+        Token::Star | Token::Slash | Token::Percent => Some(3),
+        Token::Plus | Token::Minus => Some(4),
+        Token::LShift | Token::RShift => Some(5),
+        Token::Ampersand => Some(8),
+        Token::Caret => Some(9),
+        Token::VerticalBar => Some(10),
+        _ => None,
+    }
+}
+
 fn expect(expected: Token, tokens: &[Token]) -> Result<&[Token], ParseError> {
     match tokens.first() {
         Some(token) if token == &expected => Ok(&tokens[1..]),
@@ -55,34 +67,26 @@ fn parse_function(tokens: &[Token]) -> ParseResult<'_, Function> {
 
 fn parse_stmt(tokens: &[Token]) -> ParseResult<'_, Stmt> {
     let rest = expect(Token::KeywordReturn, tokens)?;
-    let (val, rest) = parse_expr(rest, 0)?;
+    let (val, rest) = parse_expr(rest, 255)?;
     let rest = expect(Token::Semicolon, rest)?;
 
     Ok((Stmt::Return(val), rest))
 }
 
-fn precedence(token: &Token) -> Option<u8> {
-    match token {
-        Token::Star | Token::Slash | Token::Percent => Some(50),
-        Token::Plus | Token::Minus => Some(45),
-        _ => None,
-    }
-}
+fn parse_expr(tokens: &[Token], max_prec: u8) -> ParseResult<'_, Expr> {
+    let (mut left, mut rest) = parse_factor(tokens)?;
 
-fn parse_expr(tokens: &[Token], min_prec: u8) -> ParseResult<'_, Expr> {
-    let (mut left, mut rest_outer) = parse_factor(tokens)?;
-
-    while let Some(token) = rest_outer.first()
+    while let Some(token) = rest.first()
         && let Some(prec) = precedence(token)
-        && prec > min_prec
+        && prec <= max_prec
     {
-        let (operator, rest) = parse_binop(rest_outer)?;
-        let (right, rest) = parse_expr(rest, precedence(token).unwrap() + 1)?;
-        rest_outer = rest;
+        let (operator, rest_inner) = parse_binop(rest)?;
+        let (right, rest_inner) = parse_expr(rest_inner, prec - 1)?;
+        rest = rest_inner;
         left = Expr::Binary(operator, Box::new(left), Box::new(right));
     }
 
-    Ok((left, rest_outer))
+    Ok((left, rest))
 }
 
 fn parse_factor(tokens: &[Token]) -> ParseResult<'_, Expr> {
@@ -94,7 +98,7 @@ fn parse_factor(tokens: &[Token]) -> ParseResult<'_, Expr> {
             Ok((Expr::Unary(op, Box::new(expr)), rest))
         }
         Some(Token::LParen) => {
-            let (expr, rest) = parse_expr(&tokens[1..], 0)?;
+            let (expr, rest) = parse_expr(&tokens[1..], 255)?;
             let rest = expect(Token::RParen, rest)?;
             Ok((expr, rest))
         }
@@ -119,18 +123,27 @@ fn parse_unop(tokens: &[Token]) -> ParseResult<'_, UnaryOp> {
 }
 
 fn parse_binop(tokens: &[Token]) -> ParseResult<'_, BinaryOp> {
-    match tokens.first() {
-        Some(Token::Plus) => Ok((BinaryOp::Add, &tokens[1..])),
-        Some(Token::Minus) => Ok((BinaryOp::Subtract, &tokens[1..])),
-        Some(Token::Star) => Ok((BinaryOp::Multiply, &tokens[1..])),
-        Some(Token::Slash) => Ok((BinaryOp::Divide, &tokens[1..])),
-        Some(Token::Percent) => Ok((BinaryOp::Remainder, &tokens[1..])),
-        Some(actual) => Err(ParseError::UnexpectedToken(
-            "unary operator".to_string(),
-            actual.clone(),
-        )),
-        None => Err(ParseError::UnexpectedEof("unary operator".to_string())),
-    }
+    let operator = match tokens.first() {
+        Some(Token::Plus) => BinaryOp::Add,
+        Some(Token::Minus) => BinaryOp::Subtract,
+        Some(Token::Star) => BinaryOp::Multiply,
+        Some(Token::Slash) => BinaryOp::Divide,
+        Some(Token::Percent) => BinaryOp::Remainder,
+        Some(Token::Ampersand) => BinaryOp::BitAnd,
+        Some(Token::Caret) => BinaryOp::BitXor,
+        Some(Token::VerticalBar) => BinaryOp::BitOr,
+        Some(Token::LShift) => BinaryOp::LShift,
+        Some(Token::RShift) => BinaryOp::RShift,
+        Some(actual) => {
+            return Err(ParseError::UnexpectedToken(
+                "unary operator".to_string(),
+                actual.clone(),
+            ));
+        }
+        None => return Err(ParseError::UnexpectedEof("unary operator".to_string())),
+    };
+
+    Ok((operator, &tokens[1..]))
 }
 
 fn parse_ident(tokens: &[Token]) -> ParseResult<'_, String> {

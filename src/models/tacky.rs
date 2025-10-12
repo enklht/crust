@@ -17,7 +17,7 @@ pub enum Instruction {
 
 #[derive(Debug, Clone)]
 pub enum Val {
-    Const(i64),
+    Const(i32),
     Var(String),
 }
 
@@ -34,4 +34,9 @@ pub enum BinaryOp {
     Multiply,
     Divide,
     Remainder,
+    BitAnd,
+    BitOr,
+    BitXor,
+    LShift,
+    RShift,
 }

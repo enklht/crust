@@ -33,6 +33,8 @@ fn emit_instructions(instructions: Vec<Instruction>, acc: &mut String) {
             Instruction::Binary(operator, src, dst) => format!("    {operator} {src}, {dst}\n"),
             Instruction::Idiv(op) => format!("    idivl {op}\n"),
             Instruction::Cdq => "    cdq\n".to_string(),
+            Instruction::Shl(dst) => format!("    sall %cl, {dst}\n"),
+            Instruction::Shr(dst) => format!("    sarl %cl, {dst}\n"),
             Instruction::AllocateStack(size) => format!("    subq ${size}, %rsp\n"),
         };
         acc.push_str(&fixed);

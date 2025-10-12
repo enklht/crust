@@ -58,6 +58,14 @@ fn replace_pseudos_in_instruction(instruction: Instruction, state: &mut State) -
             let op = replace_operand(op, state);
             Instruction::Idiv(op)
         }
+        Instruction::Shl(dst) => {
+            let dst = replace_operand(dst, state);
+            Instruction::Shl(dst)
+        }
+        Instruction::Shr(dst) => {
+            let dst = replace_operand(dst, state);
+            Instruction::Shr(dst)
+        }
         Instruction::AllocateStack(_) => unreachable!(),
         other => other,
     }

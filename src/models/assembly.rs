@@ -16,6 +16,8 @@ pub enum Instruction {
     Unary(UnaryOp, Operand),
     Binary(BinaryOp, Operand, Operand),
     Idiv(Operand),
+    Shl(Operand),
+    Shr(Operand),
     Cdq,
     AllocateStack(usize),
     Ret,
@@ -34,15 +36,21 @@ pub enum BinaryOp {
     #[display("addl")]
     Add,
     #[display("subl")]
-    Sub,
+    Subtract,
     #[display("imull")]
-    Mult,
+    Multiply,
+    #[display("andl")]
+    BitAnd,
+    #[display("orl")]
+    BitOr,
+    #[display("xorl")]
+    BitXor,
 }
 
 #[derive(Debug, Display, Clone)]
 pub enum Operand {
     #[display("${_0}")]
-    Imm(i64),
+    Imm(i32),
     #[display("{_0}")]
     Reg(Reg),
     #[display("<pseudo register will never be emit>")]
@@ -61,4 +69,6 @@ pub enum Reg {
     R10,
     #[display("%r11d")]
     R11,
+    #[display("%ecx")]
+    CX,
 }

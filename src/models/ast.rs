@@ -15,7 +15,7 @@ pub enum Stmt {
 
 #[derive(Debug)]
 pub enum Expr {
-    Const(i64),
+    Const(i32),
     Unary(UnaryOp, Box<Expr>),
     Binary(BinaryOp, Box<Expr>, Box<Expr>),
 }
@@ -33,4 +33,9 @@ pub enum BinaryOp {
     Multiply,
     Divide,
     Remainder,
+    BitAnd,
+    BitOr,
+    BitXor,
+    LShift,
+    RShift,
 }
