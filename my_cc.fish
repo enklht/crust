@@ -1,12 +1,17 @@
 #!/usr/bin/env fish
 
 # Check args
-if test (count $argv) -ne 1
-    printf "Usage: %s /path/to/source.c\n" (basename $argv0) >&2
+if test (count $argv) -lt 1 -o (count $argv) -gt 2
+    printf "Usage: my_cc.fish [--lex|--parse|--codegen] /path/to/source.c\n" >&2
     exit 2
 end
 
-set input $argv[1]
+if test (count $argv) -eq 2
+    set flag $argv[1]
+    set input $argv[2]
+else
+    set input $argv[1]
+end
 
 if not test -f $input -a -r $input
     printf "Error: input file '%s' not found or not readable\n" $input >&2
@@ -34,24 +39,25 @@ if test $status -ne 0
     exit 4
 end
 
-# Step 2: Compile -> assembly (STUB)
-# Since the real compiler isn't written yet, use gcc -S as a stub to produce .s
-./target/debug/my_cc "$pre" -o "$asm"
+# Step 2: Compile -> assembly
+./target/debug/my_cc -o "$asm" $flag "$pre"
 if test $status -ne 0
-    printf "Error: compilation (stub) to assembly failed\n" >&2
+    printf "Error: compilation to assembly failed\n" >&2
     exit 5
 end
 
-# We can remove the preprocessed file now (spec requires deleting it)
+# We can remove the preprocessed file now
 rm -f -- "$pre"
 
 # Step 3: Assemble & link
-gcc "$asm" -o "$out"
-if test $status -ne 0
-    # avoid leaving partial executable
-    rm -f -- "$out"
-    printf "Error: assembly/linking failed\n" >&2
-    exit 6
+if test -z "$flag"
+    gcc "$asm" -o "$out"
+    if test $status -ne 0
+        # avoid leaving partial executable
+        rm -f -- "$out"
+        printf "Error: assembly/linking failed\n" >&2
+        exit 6
+    end
 end
 
 # If we reach here, success. Remove assembly file and exit 0.
