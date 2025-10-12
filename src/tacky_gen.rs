@@ -1,6 +1,7 @@
 use crate::models::ast;
 use crate::models::tacky;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -59,6 +60,7 @@ fn convert_unop(op: ast::UnaryOp) -> tacky::UnaryOp {
     match op {
         ast::UnaryOp::Complement => tacky::UnaryOp::Complement,
         ast::UnaryOp::Negate => tacky::UnaryOp::Negate,
+        _ => todo!(),
     }
 }
 
@@ -74,5 +76,6 @@ fn convert_binop(op: ast::BinaryOp) -> tacky::BinaryOp {
         ast::BinaryOp::BitXor => tacky::BinaryOp::BitXor,
         ast::BinaryOp::LShift => tacky::BinaryOp::LShift,
         ast::BinaryOp::RShift => tacky::BinaryOp::RShift,
+        _ => todo!(),
     }
 }

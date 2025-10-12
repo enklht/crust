@@ -1,5 +1,6 @@
 use crate::models::assembly as asm;
-use crate::models::{tacky, tacky::BinaryOp as BinOp};
+use crate::models::tacky;
+use crate::models::tacky::BinaryOp as BinOp;
 
 pub fn gen_program(program: tacky::Program) -> asm::Program {
     match program {

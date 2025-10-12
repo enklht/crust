@@ -17,11 +17,17 @@ type ParseResult<'a, T> = Result<(T, &'a [Token]), ParseError>;
 fn precedence(token: &Token) -> Option<u8> {
     match token {
         Token::Star | Token::Slash | Token::Percent => Some(3),
-        Token::Plus | Token::Minus => Some(4),
+        Token::Plus | Token::Hyphen => Some(4),
         Token::LShift | Token::RShift => Some(5),
+        Token::LessThan | Token::LessOrEqual | Token::GreaterThan | Token::GreaterOrEqual => {
+            Some(6)
+        }
+        Token::DoubleEqual | Token::BangEqual => Some(7),
         Token::Ampersand => Some(8),
         Token::Caret => Some(9),
         Token::VerticalBar => Some(10),
+        Token::LogicalAnd => Some(11),
+        Token::LogicalOr => Some(12),
         _ => None,
     }
 }
@@ -92,7 +98,7 @@ fn parse_expr(tokens: &[Token], max_prec: u8) -> ParseResult<'_, Expr> {
 fn parse_factor(tokens: &[Token]) -> ParseResult<'_, Expr> {
     match tokens.first() {
         Some(Token::Const(i)) => Ok((Expr::Const(*i), &tokens[1..])),
-        Some(Token::Tilde) | Some(Token::Minus) => {
+        Some(Token::Tilde) | Some(Token::Hyphen) | Some(Token::Bang) => {
             let (op, rest) = parse_unop(tokens)?;
             let (expr, rest) = parse_factor(rest)?;
             Ok((Expr::Unary(op, Box::new(expr)), rest))
@@ -113,7 +119,8 @@ fn parse_factor(tokens: &[Token]) -> ParseResult<'_, Expr> {
 fn parse_unop(tokens: &[Token]) -> ParseResult<'_, UnaryOp> {
     match tokens.first() {
         Some(Token::Tilde) => Ok((UnaryOp::Complement, &tokens[1..])),
-        Some(Token::Minus) => Ok((UnaryOp::Negate, &tokens[1..])),
+        Some(Token::Hyphen) => Ok((UnaryOp::Negate, &tokens[1..])),
+        Some(Token::Bang) => Ok((UnaryOp::Not, &tokens[1..])),
         Some(actual) => Err(ParseError::UnexpectedToken(
             "unary operator".to_string(),
             actual.clone(),
@@ -125,7 +132,7 @@ fn parse_unop(tokens: &[Token]) -> ParseResult<'_, UnaryOp> {
 fn parse_binop(tokens: &[Token]) -> ParseResult<'_, BinaryOp> {
     let operator = match tokens.first() {
         Some(Token::Plus) => BinaryOp::Add,
-        Some(Token::Minus) => BinaryOp::Subtract,
+        Some(Token::Hyphen) => BinaryOp::Subtract,
         Some(Token::Star) => BinaryOp::Multiply,
         Some(Token::Slash) => BinaryOp::Divide,
         Some(Token::Percent) => BinaryOp::Remainder,
@@ -134,13 +141,21 @@ fn parse_binop(tokens: &[Token]) -> ParseResult<'_, BinaryOp> {
         Some(Token::VerticalBar) => BinaryOp::BitOr,
         Some(Token::LShift) => BinaryOp::LShift,
         Some(Token::RShift) => BinaryOp::RShift,
+        Some(Token::LogicalAnd) => BinaryOp::And,
+        Some(Token::LogicalOr) => BinaryOp::Or,
+        Some(Token::DoubleEqual) => BinaryOp::Equal,
+        Some(Token::BangEqual) => BinaryOp::NotEqual,
+        Some(Token::LessThan) => BinaryOp::LessThan,
+        Some(Token::LessOrEqual) => BinaryOp::LessOrEqual,
+        Some(Token::GreaterThan) => BinaryOp::GreaterThan,
+        Some(Token::GreaterOrEqual) => BinaryOp::GreaterOrEqual,
         Some(actual) => {
             return Err(ParseError::UnexpectedToken(
-                "unary operator".to_string(),
+                "binary operator".to_string(),
                 actual.clone(),
             ));
         }
-        None => return Err(ParseError::UnexpectedEof("unary operator".to_string())),
+        None => return Err(ParseError::UnexpectedEof("binary operator".to_string())),
     };
 
     Ok((operator, &tokens[1..]))

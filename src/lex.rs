@@ -32,7 +32,7 @@ pub fn lex(mut input: &str) -> Result<Vec<Token>, LexError> {
         (Regex::new(r"^\{").unwrap(), |_| Token::LBrace),
         (Regex::new(r"^\}").unwrap(), |_| Token::RBrace),
         (Regex::new(r"^;").unwrap(), |_| Token::Semicolon),
-        (Regex::new(r"^-").unwrap(), |_| Token::Minus),
+        (Regex::new(r"^-").unwrap(), |_| Token::Hyphen),
         (Regex::new(r"^~").unwrap(), |_| Token::Tilde),
         (Regex::new(r"^\+").unwrap(), |_| Token::Plus),
         (Regex::new(r"^\*").unwrap(), |_| Token::Star),
@@ -43,7 +43,16 @@ pub fn lex(mut input: &str) -> Result<Vec<Token>, LexError> {
         (Regex::new(r"^\^").unwrap(), |_| Token::Caret),
         (Regex::new(r"^<<").unwrap(), |_| Token::LShift),
         (Regex::new(r"^>>").unwrap(), |_| Token::RShift),
-        (Regex::new(r"^--").unwrap(), |_| Token::Decrement),
+        (Regex::new(r"^!").unwrap(), |_| Token::Bang),
+        (Regex::new(r"^&&").unwrap(), |_| Token::LogicalAnd),
+        (Regex::new(r"^\|\|").unwrap(), |_| Token::LogicalOr),
+        (Regex::new(r"^==").unwrap(), |_| Token::DoubleEqual),
+        (Regex::new(r"^!=").unwrap(), |_| Token::BangEqual),
+        (Regex::new(r"^<").unwrap(), |_| Token::LessThan),
+        (Regex::new(r"^<=").unwrap(), |_| Token::LessOrEqual),
+        (Regex::new(r"^>").unwrap(), |_| Token::GreaterThan),
+        (Regex::new(r"^>=").unwrap(), |_| Token::GreaterOrEqual),
+        (Regex::new(r"^--").unwrap(), |_| Token::DoubleHyphen),
     ];
     let whitespace = Regex::new(r"^\s+|^//.*?\n|^/\*.*?\*/").unwrap();
 

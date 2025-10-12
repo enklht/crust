@@ -6,7 +6,8 @@ mod parse;
 mod tacky_gen;
 
 use bpaf::*;
-use std::{fs, path::PathBuf};
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Bpaf)]
 #[bpaf(options)]
