@@ -1,5 +1,5 @@
+mod backend;
 mod codeemit;
-mod codegen;
 mod lex;
 mod models;
 mod parse;
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let assembly_ast = codegen::codegen(tacky);
+    let assembly_ast = backend::codegen(tacky);
 
     if opts.mode == CompilerMode::Codegen {
         return Ok(());

@@ -1,14 +1,7 @@
-use std::collections::HashMap;
-
 use crate::models::assembly as asm;
 use crate::models::tacky;
 
-pub fn codegen(program: tacky::Program) -> asm::Program {
-    let program = gen_program(program);
-    program
-}
-
-fn gen_program(program: tacky::Program) -> asm::Program {
+pub fn gen_program(program: tacky::Program) -> asm::Program {
     match program {
         tacky::Program::Program(function) => asm::Program::Program(gen_function(function)),
     }
@@ -22,7 +15,7 @@ fn gen_function(function: tacky::Function) -> asm::Function {
     }
 }
 
-pub fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instruction> {
+fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instruction> {
     let mut assembly_instructions = Vec::new();
     for instruction in instructions {
         match instruction {

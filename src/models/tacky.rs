@@ -16,7 +16,7 @@ pub enum Instruction {
 
 #[derive(Debug, Clone)]
 pub enum Val {
-    Const(i32),
+    Const(i64),
     Var(String),
 }
 

@@ -15,7 +15,7 @@ pub enum Stmt {
 
 #[derive(Debug)]
 pub enum Expr {
-    Const(i32),
+    Const(i64),
     Unary(UnaryOp, Box<Expr>),
 }
 

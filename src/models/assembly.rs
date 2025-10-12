@@ -37,13 +37,13 @@ pub enum UnaryOp {
 #[derive(Debug, Display, Clone)]
 pub enum Operand {
     #[display("${_0}")]
-    Imm(i32),
+    Imm(i64),
     #[display("{_0}")]
     Reg(Reg),
     #[display("pseudo register")]
     Pseudo(String),
     #[display("{_0}(%rbp)")]
-    Stack(i32),
+    Stack(isize),
 }
 
 #[derive(Debug, Display, Clone)]
