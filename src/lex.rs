@@ -32,8 +32,8 @@ pub fn lex(mut input: &str) -> Result<Vec<Token>, LexError> {
         (Regex::new(r"^\{").unwrap(), |_| Token::LBrace),
         (Regex::new(r"^\}").unwrap(), |_| Token::RBrace),
         (Regex::new(r"^;").unwrap(), |_| Token::Semicolon),
-        (Regex::new(r"^-").unwrap(), |_| Token::UnaryMinus),
-        (Regex::new(r"^~").unwrap(), |_| Token::UnaryNegation),
+        (Regex::new(r"^-").unwrap(), |_| Token::Minus),
+        (Regex::new(r"^~").unwrap(), |_| Token::Tilde),
         (Regex::new(r"^--").unwrap(), |_| Token::Decrement),
     ];
     let whitespace = Regex::new(r"^\s+|^//.*?\n|^/\*.*?\*/").unwrap();
