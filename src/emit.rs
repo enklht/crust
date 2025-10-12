@@ -28,9 +28,12 @@ fn emit_instructions(instructions: Vec<Instruction>, acc: &mut String) {
     for instruction in instructions {
         let fixed = match instruction {
             Instruction::Mov(src, dst) => format!("    movl {src}, {dst}\n"),
-            Instruction::Unary(operator, operand) => format!("    {operator} {operand}\n"),
-            Instruction::AllocateStack(size) => format!("    subq ${size}, %rsp\n"),
             Instruction::Ret => "    movq %rbp, %rsp\n    popq %rbp\n    ret\n".to_string(),
+            Instruction::Unary(operator, operand) => format!("    {operator} {operand}\n"),
+            Instruction::Binary(operator, src, dst) => format!("    {operator} {src}, {dst}\n"),
+            Instruction::Idiv(op) => format!("    idivl {op}\n"),
+            Instruction::Cdq => "    cdq\n".to_string(),
+            Instruction::AllocateStack(size) => format!("    subq ${size}, %rsp\n"),
         };
         acc.push_str(&fixed);
     }

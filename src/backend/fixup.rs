@@ -1,32 +1,55 @@
-use super::asm;
+use super::asm::*;
 
-pub fn fixup(program: asm::Program, last_offset: isize) -> asm::Program {
+pub fn fixup(program: Program, last_offset: isize) -> Program {
     match program {
-        asm::Program::Program(function) => {
-            asm::Program::Program(fixup_function(function, last_offset))
-        }
+        Program::Program(function) => Program::Program(fixup_function(function, last_offset)),
     }
 }
 
-fn fixup_function(function: asm::Function, last_offset: isize) -> asm::Function {
+fn fixup_function(function: Function, last_offset: isize) -> Function {
     match function {
-        asm::Function::Function(name, instructions) => {
-            let mut fixed = vec![asm::Instruction::AllocateStack(-last_offset as usize)];
+        Function::Function(name, instructions) => {
+            let mut fixed = vec![Instruction::AllocateStack(-last_offset as usize)];
 
             for instruction in instructions {
                 emit_instruction(instruction, &mut fixed);
             }
 
-            asm::Function::Function(name, fixed)
+            Function::Function(name, fixed)
         }
     }
 }
 
-fn emit_instruction(instruction: asm::Instruction, acc: &mut Vec<asm::Instruction>) {
+fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
     match instruction {
-        asm::Instruction::Mov(src @ asm::Operand::Stack(_), dst @ asm::Operand::Stack(_)) => {
-            acc.push(asm::Instruction::Mov(src, asm::Operand::Reg(asm::Reg::R10)));
-            acc.push(asm::Instruction::Mov(asm::Operand::Reg(asm::Reg::R10), dst));
+        Instruction::Mov(src @ Operand::Stack(_), dst @ Operand::Stack(_)) => {
+            acc.extend([
+                Instruction::Mov(src, Operand::Reg(Reg::R10)),
+                Instruction::Mov(Operand::Reg(Reg::R10), dst),
+            ]);
+        }
+        Instruction::Binary(
+            op @ (BinaryOp::Add | BinaryOp::Sub),
+            src @ Operand::Stack(_),
+            dst @ Operand::Stack(_),
+        ) => {
+            acc.extend([
+                Instruction::Mov(src, Operand::Reg(Reg::R10)),
+                Instruction::Binary(op, Operand::Reg(Reg::R10), dst),
+            ]);
+        }
+        Instruction::Binary(BinaryOp::Mult, src, dst @ Operand::Stack(_)) => {
+            acc.extend([
+                Instruction::Mov(dst.clone(), Operand::Reg(Reg::R11)),
+                Instruction::Binary(BinaryOp::Mult, src, Operand::Reg(Reg::R11)),
+                Instruction::Mov(Operand::Reg(Reg::R11), dst),
+            ]);
+        }
+        Instruction::Idiv(op @ Operand::Imm(_)) => {
+            acc.extend([
+                Instruction::Mov(op, Operand::Reg(Reg::R10)),
+                Instruction::Idiv(Operand::Reg(Reg::R10)),
+            ]);
         }
         other => {
             acc.push(other);

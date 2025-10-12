@@ -1,4 +1,4 @@
-use super::asm;
+use super::asm::*;
 
 #[derive(Default)]
 struct State {
@@ -15,19 +15,19 @@ impl State {
     }
 }
 
-pub fn replace_pseudos(program: asm::Program) -> (asm::Program, isize) {
+pub fn replace_pseudos(program: Program) -> (Program, isize) {
     match program {
-        asm::Program::Program(function) => {
+        Program::Program(function) => {
             let (function, offset) = replace_pseudos_in_function(function);
-            (asm::Program::Program(function), offset)
+            (Program::Program(function), offset)
         }
     }
 }
 
-fn replace_pseudos_in_function(function: asm::Function) -> (asm::Function, isize) {
+fn replace_pseudos_in_function(function: Function) -> (Function, isize) {
     let state = &mut State::default();
     let function = match function {
-        asm::Function::Function(name, instructions) => asm::Function::Function(
+        Function::Function(name, instructions) => Function::Function(
             name,
             instructions
                 .into_iter()
@@ -38,28 +38,34 @@ fn replace_pseudos_in_function(function: asm::Function) -> (asm::Function, isize
     (function, state.current_offset)
 }
 
-fn replace_pseudos_in_instruction(
-    instruction: asm::Instruction,
-    state: &mut State,
-) -> asm::Instruction {
+fn replace_pseudos_in_instruction(instruction: Instruction, state: &mut State) -> Instruction {
     match instruction {
-        asm::Instruction::Mov(src, dst) => {
+        Instruction::Mov(src, dst) => {
             let src = replace_operand(src, state);
             let dst = replace_operand(dst, state);
-            asm::Instruction::Mov(src, dst)
+            Instruction::Mov(src, dst)
         }
-        asm::Instruction::Unary(operator, operand) => {
-            let operand = replace_operand(operand, state);
-            asm::Instruction::Unary(operator, operand)
+        Instruction::Unary(op, dst) => {
+            let dst = replace_operand(dst, state);
+            Instruction::Unary(op, dst)
         }
-        asm::Instruction::Ret => asm::Instruction::Ret,
-        asm::Instruction::AllocateStack(_) => unreachable!(),
+        Instruction::Binary(op, src, dst) => {
+            let src = replace_operand(src, state);
+            let dst = replace_operand(dst, state);
+            Instruction::Binary(op, src, dst)
+        }
+        Instruction::Idiv(op) => {
+            let op = replace_operand(op, state);
+            Instruction::Idiv(op)
+        }
+        Instruction::AllocateStack(_) => unreachable!(),
+        other => other,
     }
 }
 
-fn replace_operand(operand: asm::Operand, state: &mut State) -> asm::Operand {
+fn replace_operand(operand: Operand, state: &mut State) -> Operand {
     match operand {
-        asm::Operand::Pseudo(ident) => asm::Operand::Stack(state.get(ident)),
+        Operand::Pseudo(ident) => Operand::Stack(state.get(ident)),
         other => other,
     }
 }

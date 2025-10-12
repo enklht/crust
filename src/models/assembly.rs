@@ -14,6 +14,9 @@ pub enum Function {
 pub enum Instruction {
     Mov(Operand, Operand),
     Unary(UnaryOp, Operand),
+    Binary(BinaryOp, Operand, Operand),
+    Idiv(Operand),
+    Cdq,
     AllocateStack(usize),
     Ret,
 }
@@ -24,6 +27,16 @@ pub enum UnaryOp {
     Neg,
     #[display("notl")]
     Not,
+}
+
+#[derive(Debug, Display)]
+pub enum BinaryOp {
+    #[display("addl")]
+    Add,
+    #[display("subl")]
+    Sub,
+    #[display("imull")]
+    Mult,
 }
 
 #[derive(Debug, Display, Clone)]
@@ -42,6 +55,10 @@ pub enum Operand {
 pub enum Reg {
     #[display("%eax")]
     AX,
+    #[display("%edx")]
+    DX,
     #[display("%r10d")]
     R10,
+    #[display("%r11d")]
+    R11,
 }
