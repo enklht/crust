@@ -45,6 +45,7 @@ fn emit_expr(expr: ast::Expr, instructions: &mut Vec<tacky::Instruction>) -> tac
             instructions.push(tacky::Instruction::Unary(tacky_op, src, dst.clone()));
             dst
         }
+        _ => todo!(),
     }
 }
 

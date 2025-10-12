@@ -55,22 +55,46 @@ fn parse_function(tokens: &[Token]) -> ParseResult<'_, Function> {
 
 fn parse_stmt(tokens: &[Token]) -> ParseResult<'_, Stmt> {
     let rest = expect(Token::KeywordReturn, tokens)?;
-    let (val, rest) = parse_expr(rest)?;
+    let (val, rest) = parse_expr(rest, 0)?;
     let rest = expect(Token::Semicolon, rest)?;
 
     Ok((Stmt::Return(val), rest))
 }
 
-fn parse_expr(tokens: &[Token]) -> ParseResult<'_, Expr> {
+fn precedence(token: &Token) -> Option<u8> {
+    match token {
+        Token::Star | Token::Slash | Token::Percent => Some(50),
+        Token::Plus | Token::Minus => Some(45),
+        _ => None,
+    }
+}
+
+fn parse_expr(tokens: &[Token], min_prec: u8) -> ParseResult<'_, Expr> {
+    let (mut left, mut rest_outer) = parse_factor(tokens)?;
+
+    while let Some(token) = rest_outer.first()
+        && let Some(prec) = precedence(token)
+        && prec > min_prec
+    {
+        let (operator, rest) = parse_binop(rest_outer)?;
+        let (right, rest) = parse_expr(rest, precedence(token).unwrap() + 1)?;
+        rest_outer = rest;
+        left = Expr::Binary(operator, Box::new(left), Box::new(right));
+    }
+
+    Ok((left, rest_outer))
+}
+
+fn parse_factor(tokens: &[Token]) -> ParseResult<'_, Expr> {
     match tokens.first() {
         Some(Token::Const(i)) => Ok((Expr::Const(*i), &tokens[1..])),
         Some(Token::Tilde) | Some(Token::Minus) => {
             let (op, rest) = parse_unop(tokens)?;
-            let (expr, rest) = parse_expr(rest)?;
+            let (expr, rest) = parse_factor(rest)?;
             Ok((Expr::Unary(op, Box::new(expr)), rest))
         }
         Some(Token::LParen) => {
-            let (expr, rest) = parse_expr(&tokens[1..])?;
+            let (expr, rest) = parse_expr(&tokens[1..], 0)?;
             let rest = expect(Token::RParen, rest)?;
             Ok((expr, rest))
         }
@@ -86,6 +110,21 @@ fn parse_unop(tokens: &[Token]) -> ParseResult<'_, UnaryOp> {
     match tokens.first() {
         Some(Token::Tilde) => Ok((UnaryOp::Complement, &tokens[1..])),
         Some(Token::Minus) => Ok((UnaryOp::Negate, &tokens[1..])),
+        Some(actual) => Err(ParseError::UnexpectedToken(
+            "unary operator".to_string(),
+            actual.clone(),
+        )),
+        None => Err(ParseError::UnexpectedEof("unary operator".to_string())),
+    }
+}
+
+fn parse_binop(tokens: &[Token]) -> ParseResult<'_, BinaryOp> {
+    match tokens.first() {
+        Some(Token::Plus) => Ok((BinaryOp::Add, &tokens[1..])),
+        Some(Token::Minus) => Ok((BinaryOp::Subtract, &tokens[1..])),
+        Some(Token::Star) => Ok((BinaryOp::Multiply, &tokens[1..])),
+        Some(Token::Slash) => Ok((BinaryOp::Divide, &tokens[1..])),
+        Some(Token::Percent) => Ok((BinaryOp::Remainder, &tokens[1..])),
         Some(actual) => Err(ParseError::UnexpectedToken(
             "unary operator".to_string(),
             actual.clone(),

@@ -17,10 +17,20 @@ pub enum Stmt {
 pub enum Expr {
     Const(i64),
     Unary(UnaryOp, Box<Expr>),
+    Binary(BinaryOp, Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug)]
 pub enum UnaryOp {
     Complement,
     Negate,
+}
+
+#[derive(Debug)]
+pub enum BinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
 }
