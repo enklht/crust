@@ -23,7 +23,6 @@ pub enum Instruction {
     JmpCC(CondCode, String),
     SetCC(CondCode, Operand),
     Label(String),
-
     Cdq,
     AllocateStack(usize),
     Ret,
@@ -65,26 +64,54 @@ pub enum Operand {
     Stack(isize),
 }
 
+impl Operand {
+    pub fn onebyte(self) -> String {
+        match self {
+            Operand::Reg(reg) => reg.onebyte(),
+            other => other.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Display)]
 pub enum CondCode {
+    #[display("e")]
     E,
+    #[display("ne")]
     NE,
-    G,
-    GE,
+    #[display("l")]
     L,
+    #[display("le")]
     LE,
+    #[display("g")]
+    G,
+    #[display("ge")]
+    GE,
 }
 
 #[derive(Debug, Display, Clone)]
 pub enum Reg {
     #[display("%eax")]
     AX,
+    #[display("%ecx")]
+    CX,
     #[display("%edx")]
     DX,
     #[display("%r10d")]
     R10,
     #[display("%r11d")]
     R11,
-    #[display("%ecx")]
-    CX,
+}
+
+impl Reg {
+    fn onebyte(self) -> String {
+        match self {
+            Reg::AX => "%al",
+            Reg::CX => "%cl",
+            Reg::DX => "%dl",
+            Reg::R10 => "%r10b",
+            Reg::R11 => "%r11b",
+        }
+        .to_string()
+    }
 }

@@ -38,7 +38,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instructi
                     asm::Instruction::Cmp(asm::Operand::Imm(0), gen_val(src)),
                     asm::Instruction::Mov(asm::Operand::Imm(0), dst.clone()),
                     asm::Instruction::SetCC(asm::CondCode::E, dst),
-                ])
+                ]);
             }
             tacky::Instruction::Unary(op, src, dst) => {
                 let dst = gen_val(dst);
@@ -103,26 +103,29 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instructi
                         asm::Instruction::Cmp(gen_val(src2), gen_val(src1)),
                         asm::Instruction::Mov(asm::Operand::Imm(0), dst.clone()),
                         asm::Instruction::SetCC(gen_rel(op), dst),
-                    ])
+                    ]);
                 }
-                _ => todo!(),
             },
             tacky::Instruction::Jump(target) => {
-                asm_instructions.push(asm::Instruction::Jmp(target))
+                asm_instructions.push(asm::Instruction::Jmp(target));
             }
-            tacky::Instruction::JumpIfZero(val, target) => asm_instructions.extend([
-                asm::Instruction::Cmp(asm::Operand::Imm(0), gen_val(val)),
-                asm::Instruction::JmpCC(asm::CondCode::E, target),
-            ]),
-            tacky::Instruction::JumpIfNotZero(val, target) => asm_instructions.extend([
-                asm::Instruction::Cmp(asm::Operand::Imm(0), gen_val(val)),
-                asm::Instruction::JmpCC(asm::CondCode::NE, target),
-            ]),
+            tacky::Instruction::JumpIfZero(val, target) => {
+                asm_instructions.extend([
+                    asm::Instruction::Cmp(asm::Operand::Imm(0), gen_val(val)),
+                    asm::Instruction::JmpCC(asm::CondCode::E, target),
+                ]);
+            }
+            tacky::Instruction::JumpIfNotZero(val, target) => {
+                asm_instructions.extend([
+                    asm::Instruction::Cmp(asm::Operand::Imm(0), gen_val(val)),
+                    asm::Instruction::JmpCC(asm::CondCode::NE, target),
+                ]);
+            }
             tacky::Instruction::Copy(src, dst) => {
-                asm_instructions.push(asm::Instruction::Mov(gen_val(src), gen_val(dst)))
+                asm_instructions.push(asm::Instruction::Mov(gen_val(src), gen_val(dst)));
             }
-            tacky::Instruction::Label(ident) => {
-                asm_instructions.push(asm::Instruction::Label(ident))
+            tacky::Instruction::Label(label) => {
+                asm_instructions.push(asm::Instruction::Label(label));
             }
         }
     }

@@ -36,7 +36,11 @@ fn emit_instructions(instructions: Vec<Instruction>, acc: &mut String) {
             Instruction::Shl(dst) => format!("    sall %cl, {dst}\n"),
             Instruction::Shr(dst) => format!("    sarl %cl, {dst}\n"),
             Instruction::AllocateStack(size) => format!("    subq ${size}, %rsp\n"),
-            _ => todo!(),
+            Instruction::Cmp(src, dst) => format!("    cmpl {src}, {dst}\n"),
+            Instruction::Jmp(label) => format!("    jmp .L{label}\n"),
+            Instruction::JmpCC(code, label) => format!("    j{code} .L{label}\n"),
+            Instruction::SetCC(code, op) => format!("    set{code} {}\n", op.onebyte()),
+            Instruction::Label(label) => format!(".L{label}:\n"),
         };
         acc.push_str(&fixed);
     }
