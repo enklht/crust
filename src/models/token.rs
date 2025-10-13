@@ -21,7 +21,6 @@ pub enum Token {
     LShift,
     RShift,
     Percent,
-    DoubleHyphen,
     Bang,
     LogicalAnd,
     LogicalOr,
@@ -31,4 +30,6 @@ pub enum Token {
     LessOrEqual,
     GreaterThan,
     GreaterOrEqual,
+    Equal,
+    DoubleHyphen,
 }

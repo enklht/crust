@@ -10,6 +10,10 @@ pub enum ParseError {
     UnexpectedEof(String),
     #[error("expected <eof>, found {0:?}")]
     ExpectedEof(Token),
+    #[error("expected a block item")]
+    ExpectedBlockItem,
+    #[error("expected a statement")]
+    ExpectedStmt,
 }
 
 type ParseResult<'a, T> = Result<(T, &'a [Token]), ParseError>;
@@ -28,6 +32,7 @@ fn precedence(token: &Token) -> Option<u8> {
         Token::VerticalBar => Some(10),
         Token::LogicalAnd => Some(11),
         Token::LogicalOr => Some(12),
+        Token::Equal => Some(14),
         _ => None,
     }
 }
@@ -55,28 +60,67 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, ParseError> {
 fn parse_program(tokens: &[Token]) -> ParseResult<'_, Program> {
     let (function, rest) = parse_function(tokens)?;
 
-    Ok((Program::Function(function), rest))
+    Ok((Program::FunctionDefinition(function), rest))
 }
 
-fn parse_function(tokens: &[Token]) -> ParseResult<'_, Function> {
-    let rest = expect(Token::KeywordInt, tokens)?;
-    let (name, rest) = parse_ident(rest)?;
-    let rest = expect(Token::LParen, rest)?;
-    let rest = expect(Token::KeywordVoid, rest)?;
-    let rest = expect(Token::RParen, rest)?;
-    let rest = expect(Token::LBrace, rest)?;
-    let (body, rest) = parse_stmt(rest)?;
+fn parse_function(tokens: &[Token]) -> ParseResult<'_, FunctionDefinition> {
+    let name: String;
+    let mut rest = expect(Token::KeywordInt, tokens)?;
+    (name, rest) = parse_ident(rest)?;
+    rest = expect(Token::LParen, rest)?;
+    rest = expect(Token::KeywordVoid, rest)?;
+    rest = expect(Token::RParen, rest)?;
+    rest = expect(Token::LBrace, rest)?;
+
+    let mut body = Vec::new();
+    let mut next_item: BlockItem;
+    while rest.first() != Some(&Token::RBrace) {
+        (next_item, rest) = parse_block_item(rest)?;
+        body.push(next_item);
+    }
     let rest = expect(Token::RBrace, rest)?;
 
-    Ok((Function::Function(name, body), rest))
+    Ok((FunctionDefinition::Function(name, body), rest))
+}
+
+fn parse_block_item(tokens: &[Token]) -> ParseResult<'_, BlockItem> {
+    if let Ok((stmt, rest)) = parse_stmt(tokens) {
+        Ok((BlockItem::S(stmt), rest))
+    } else if let Ok((declaration, rest)) = parse_declaration(tokens) {
+        Ok((BlockItem::D(declaration), rest))
+    } else {
+        Err(ParseError::ExpectedBlockItem)
+    }
 }
 
 fn parse_stmt(tokens: &[Token]) -> ParseResult<'_, Stmt> {
-    let rest = expect(Token::KeywordReturn, tokens)?;
-    let (val, rest) = parse_expr(rest, 255)?;
-    let rest = expect(Token::Semicolon, rest)?;
+    if let Ok(rest) = expect(Token::KeywordReturn, tokens) {
+        let (val, rest) = parse_expr(rest, u8::MAX)?;
+        let rest = expect(Token::Semicolon, rest)?;
+        Ok((Stmt::Return(val), rest))
+    } else if let Ok((expr, rest)) = parse_expr(tokens, u8::MAX) {
+        let rest = expect(Token::Semicolon, rest)?;
+        Ok((Stmt::Expression(expr), rest))
+    } else if let Ok(rest) = expect(Token::Semicolon, tokens) {
+        Ok((Stmt::Null, rest))
+    } else {
+        Err(ParseError::ExpectedStmt)
+    }
+}
 
-    Ok((Stmt::Return(val), rest))
+fn parse_declaration(tokens: &[Token]) -> ParseResult<'_, Declaration> {
+    let rest = expect(Token::KeywordInt, tokens)?;
+    let (name, rest) = parse_ident(rest)?;
+    match rest.first() {
+        Some(Token::Equal) => {
+            let (expr, rest) = parse_expr(&rest[1..], u8::MAX)?;
+            let rest = expect(Token::Semicolon, rest)?;
+            Ok((Declaration::Declaration(name, Some(expr)), rest))
+        }
+        Some(Token::Semicolon) => Ok((Declaration::Declaration(name, None), &rest[1..])),
+        Some(actual) => Err(ParseError::UnexpectedToken("=".to_string(), actual.clone())),
+        None => Err(ParseError::UnexpectedEof("=".to_string())),
+    }
 }
 
 fn parse_expr(tokens: &[Token], max_prec: u8) -> ParseResult<'_, Expr> {
@@ -86,10 +130,16 @@ fn parse_expr(tokens: &[Token], max_prec: u8) -> ParseResult<'_, Expr> {
         && let Some(prec) = precedence(token)
         && prec <= max_prec
     {
-        let (operator, rest_inner) = parse_binop(rest)?;
-        let (right, rest_inner) = parse_expr(rest_inner, prec - 1)?;
-        rest = rest_inner;
-        left = Expr::Binary(operator, Box::new(left), Box::new(right));
+        if token == &Token::Equal {
+            let (right, rest_inner) = parse_expr(&rest[1..], prec)?;
+            rest = rest_inner;
+            left = Expr::Assignment(Box::new(left), Box::new(right));
+        } else {
+            let (operator, rest_inner) = parse_binop(rest)?;
+            let (right, rest_inner) = parse_expr(rest_inner, prec - 1)?;
+            rest = rest_inner;
+            left = Expr::Binary(operator, Box::new(left), Box::new(right));
+        }
     }
 
     Ok((left, rest))
@@ -98,13 +148,14 @@ fn parse_expr(tokens: &[Token], max_prec: u8) -> ParseResult<'_, Expr> {
 fn parse_factor(tokens: &[Token]) -> ParseResult<'_, Expr> {
     match tokens.first() {
         Some(Token::Const(i)) => Ok((Expr::Const(*i), &tokens[1..])),
+        Some(Token::Ident(ident)) => Ok((Expr::Var(ident.clone()), &tokens[1..])),
         Some(Token::Tilde) | Some(Token::Hyphen) | Some(Token::Bang) => {
             let (op, rest) = parse_unop(tokens)?;
             let (expr, rest) = parse_factor(rest)?;
             Ok((Expr::Unary(op, Box::new(expr)), rest))
         }
         Some(Token::LParen) => {
-            let (expr, rest) = parse_expr(&tokens[1..], 255)?;
+            let (expr, rest) = parse_expr(&tokens[1..], u8::MAX)?;
             let rest = expect(Token::RParen, rest)?;
             Ok((expr, rest))
         }

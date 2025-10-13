@@ -17,15 +17,17 @@ fn make_label(prefix: &str) -> String {
 
 pub fn convert_program(program: ast::Program) -> tacky::Program {
     match program {
-        ast::Program::Function(function) => tacky::Program::Program(convert_function(function)),
+        ast::Program::FunctionDefinition(function) => {
+            tacky::Program::Program(convert_function(function))
+        }
     }
 }
 
-fn convert_function(function: ast::Function) -> tacky::Function {
+fn convert_function(function: ast::FunctionDefinition) -> tacky::Function {
     match function {
-        ast::Function::Function(name, body) => {
+        ast::FunctionDefinition::Function(name, body) => {
             let mut instructions = Vec::new();
-            emit_stmt(body, &mut instructions);
+            // emit_stmt(body, &mut instructions);
             tacky::Function::Function(name, instructions)
         }
     }
@@ -37,6 +39,7 @@ fn emit_stmt(stmt: ast::Stmt, instructions: &mut Vec<tacky::Instruction>) {
             let tacky_expr = emit_expr(expr, instructions);
             instructions.push(tacky::Instruction::Return(tacky_expr))
         }
+        _ => todo!(),
     }
 }
 
@@ -92,6 +95,7 @@ fn emit_expr(expr: ast::Expr, instructions: &mut Vec<tacky::Instruction>) -> tac
             instructions.push(tacky::Instruction::Binary(tacky_op, v1, v2, dst.clone()));
             dst
         }
+        _ => todo!(),
     }
 }
 

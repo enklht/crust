@@ -52,6 +52,7 @@ pub fn lex(mut input: &str) -> Result<Vec<Token>, LexError> {
         (Regex::new(r"^<=").unwrap(), |_| Token::LessOrEqual),
         (Regex::new(r"^>").unwrap(), |_| Token::GreaterThan),
         (Regex::new(r"^>=").unwrap(), |_| Token::GreaterOrEqual),
+        (Regex::new(r"^=").unwrap(), |_| Token::Equal),
         (Regex::new(r"^--").unwrap(), |_| Token::DoubleHyphen),
     ];
     let whitespace = Regex::new(r"^\s+|^//.*?\n|^/\*.*?\*/").unwrap();
