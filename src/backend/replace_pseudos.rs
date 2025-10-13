@@ -66,6 +66,15 @@ fn replace_pseudos_in_instruction(instruction: Instruction, state: &mut State) -
             let dst = replace_operand(dst, state);
             Instruction::Shr(dst)
         }
+        Instruction::Cmp(src, dst) => {
+            let src = replace_operand(src, state);
+            let dst = replace_operand(dst, state);
+            Instruction::Cmp(src, dst)
+        }
+        Instruction::SetCC(val, target) => {
+            let target = replace_operand(target, state);
+            Instruction::SetCC(val, target)
+        }
         Instruction::AllocateStack(_) => unreachable!(),
         other => other,
     }

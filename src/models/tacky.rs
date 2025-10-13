@@ -13,6 +13,11 @@ pub enum Instruction {
     Return(Val),
     Unary(UnaryOp, Val, Val),
     Binary(BinaryOp, Val, Val, Val),
+    Copy(Val, Val),
+    Jump(String),
+    JumpIfZero(Val, String),
+    JumpIfNotZero(Val, String),
+    Label(String),
 }
 
 #[derive(Debug, Clone)]
@@ -25,6 +30,7 @@ pub enum Val {
 pub enum UnaryOp {
     Complement,
     Negate,
+    Not,
 }
 
 #[derive(Debug)]
@@ -39,4 +45,10 @@ pub enum BinaryOp {
     BitXor,
     LShift,
     RShift,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessOrEqual,
+    GreaterThan,
+    GreaterOrEqual,
 }

@@ -55,6 +55,18 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Idiv(Operand::Reg(Reg::R10)),
             ]);
         }
+        Instruction::Cmp(src @ Operand::Stack(_), dst @ Operand::Stack(_)) => {
+            acc.extend([
+                Instruction::Mov(src, Operand::Reg(Reg::R10)),
+                Instruction::Cmp(Operand::Reg(Reg::R10), dst),
+            ]);
+        }
+        Instruction::Cmp(src, dst @ Operand::Imm(_)) => {
+            acc.extend([
+                Instruction::Mov(dst, Operand::Reg(Reg::R11)),
+                Instruction::Cmp(src, Operand::Reg(Reg::R11)),
+            ]);
+        }
         other => {
             acc.push(other);
         }

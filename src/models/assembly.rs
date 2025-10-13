@@ -15,9 +15,15 @@ pub enum Instruction {
     Mov(Operand, Operand),
     Unary(UnaryOp, Operand),
     Binary(BinaryOp, Operand, Operand),
+    Cmp(Operand, Operand),
     Idiv(Operand),
     Shl(Operand),
     Shr(Operand),
+    Jmp(String),
+    JmpCC(CondCode, String),
+    SetCC(CondCode, Operand),
+    Label(String),
+
     Cdq,
     AllocateStack(usize),
     Ret,
@@ -57,6 +63,16 @@ pub enum Operand {
     Pseudo(String),
     #[display("{_0}(%rbp)")]
     Stack(isize),
+}
+
+#[derive(Debug, Display)]
+pub enum CondCode {
+    E,
+    NE,
+    G,
+    GE,
+    L,
+    LE,
 }
 
 #[derive(Debug, Display, Clone)]

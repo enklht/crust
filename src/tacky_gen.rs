@@ -10,6 +10,11 @@ fn make_temporary() -> String {
     format!("tmp.{}", i)
 }
 
+fn make_label(prefix: &str) -> String {
+    let i = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{}.{}", prefix, i)
+}
+
 pub fn convert_program(program: ast::Program) -> tacky::Program {
     match program {
         ast::Program::Function(function) => tacky::Program::Program(convert_function(function)),
@@ -45,6 +50,40 @@ fn emit_expr(expr: ast::Expr, instructions: &mut Vec<tacky::Instruction>) -> tac
             instructions.push(tacky::Instruction::Unary(tacky_op, src, dst.clone()));
             dst
         }
+        ast::Expr::Binary(ast::BinaryOp::And, v1, v2) => {
+            let false_label = make_label("and_false");
+            let end_label = make_label("and_end");
+            let dst = tacky::Val::Var(make_temporary());
+            let v1 = emit_expr(*v1, instructions);
+            instructions.push(tacky::Instruction::JumpIfZero(v1, false_label.clone()));
+            let v2 = emit_expr(*v2, instructions);
+            instructions.extend([
+                tacky::Instruction::JumpIfZero(v2, false_label.clone()),
+                tacky::Instruction::Copy(tacky::Val::Const(1), dst.clone()),
+                tacky::Instruction::Jump(end_label.clone()),
+                tacky::Instruction::Label(false_label),
+                tacky::Instruction::Copy(tacky::Val::Const(0), dst.clone()),
+                tacky::Instruction::Label(end_label),
+            ]);
+            dst
+        }
+        ast::Expr::Binary(ast::BinaryOp::Or, v1, v2) => {
+            let true_label = make_label("or_true");
+            let end_label = make_label("or_end");
+            let dst = tacky::Val::Var(make_temporary());
+            let v1 = emit_expr(*v1, instructions);
+            instructions.push(tacky::Instruction::JumpIfNotZero(v1, true_label.clone()));
+            let v2 = emit_expr(*v2, instructions);
+            instructions.extend([
+                tacky::Instruction::JumpIfNotZero(v2, true_label.clone()),
+                tacky::Instruction::Copy(tacky::Val::Const(0), dst.clone()),
+                tacky::Instruction::Jump(end_label.clone()),
+                tacky::Instruction::Label(true_label),
+                tacky::Instruction::Copy(tacky::Val::Const(1), dst.clone()),
+                tacky::Instruction::Label(end_label),
+            ]);
+            dst
+        }
         ast::Expr::Binary(op, e1, e2) => {
             let v1 = emit_expr(*e1, instructions);
             let v2 = emit_expr(*e2, instructions);
@@ -60,7 +99,7 @@ fn convert_unop(op: ast::UnaryOp) -> tacky::UnaryOp {
     match op {
         ast::UnaryOp::Complement => tacky::UnaryOp::Complement,
         ast::UnaryOp::Negate => tacky::UnaryOp::Negate,
-        _ => todo!(),
+        ast::UnaryOp::Not => tacky::UnaryOp::Not,
     }
 }
 
@@ -76,6 +115,12 @@ fn convert_binop(op: ast::BinaryOp) -> tacky::BinaryOp {
         ast::BinaryOp::BitXor => tacky::BinaryOp::BitXor,
         ast::BinaryOp::LShift => tacky::BinaryOp::LShift,
         ast::BinaryOp::RShift => tacky::BinaryOp::RShift,
-        _ => todo!(),
+        ast::BinaryOp::Equal => tacky::BinaryOp::Equal,
+        ast::BinaryOp::NotEqual => tacky::BinaryOp::NotEqual,
+        ast::BinaryOp::LessThan => tacky::BinaryOp::LessThan,
+        ast::BinaryOp::LessOrEqual => tacky::BinaryOp::LessOrEqual,
+        ast::BinaryOp::GreaterThan => tacky::BinaryOp::GreaterThan,
+        ast::BinaryOp::GreaterOrEqual => tacky::BinaryOp::GreaterOrEqual,
+        _ => unreachable!(),
     }
 }
