@@ -8,6 +8,7 @@ mod tacky_gen;
 mod utils;
 
 use bpaf::*;
+use chumsky::Parser;
 use std::fs;
 use std::path::PathBuf;
 
@@ -32,26 +33,46 @@ enum CompilerMode {
     Full,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum CrustError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("lex error")]
+    LexError,
+}
+
+fn main() -> Result<(), CrustError> {
     let opts: Options = options().run();
 
     let source = fs::read_to_string(&opts.input)?;
 
-    let tokens = lex::lex(&source)?;
+    let lexer = lex::lexer();
+
+    let tokens = match lexer.parse(&source).into_result() {
+        Ok(tokens) => tokens,
+        Err(parse_errs) => {
+            parse_errs
+                .into_iter()
+                .for_each(|e| eprintln!("Lex Error: {e}"));
+            std::process::exit(1);
+        }
+    };
 
     if opts.mode == CompilerMode::Lex {
         println!("{:#?}", tokens);
         return Ok(());
     }
 
-    let ast = parse::parse(tokens)?;
+    let ast = parse::parse(tokens).unwrap();
 
     if opts.mode == CompilerMode::Parse {
         println!("{:#?}", ast);
         return Ok(());
     }
 
-    let validated_ast = semantic_analysis::validate(ast)?;
+    let validated_ast = semantic_analysis::validate(ast).unwrap();
 
     if opts.mode == CompilerMode::Validate {
         println!("{:#?}", validated_ast);

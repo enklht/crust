@@ -1,98 +1,81 @@
 use crate::models::token::Token;
-use regex::Regex;
-use thiserror::Error;
+use chumsky::error::Rich;
+use chumsky::prelude::*;
+use chumsky::text;
 
-#[derive(Debug, Error)]
-pub enum LexError {
-    #[error("unknown token: {0}")]
-    UnknownToken(String),
-}
-
-type Converter = fn(&str) -> Token;
-
-fn convert_ident(input: &str) -> Token {
-    match input {
+pub fn lexer<'src>() -> impl Parser<'src, &'src str, Vec<Token>, extra::Err<Rich<'src, char>>> {
+    let ident = text::ident().map(|s| match s {
         "int" => Token::KeywordInt,
         "return" => Token::KeywordReturn,
         "void" => Token::KeywordVoid,
-        _ => Token::Ident(input.to_string()),
-    }
-}
+        s => Token::Ident(s.to_string()),
+    });
+    let constant = text::int(10)
+        .then_ignore(any().filter(|&c: &char| !c.is_alphanumeric()).rewind())
+        .from_str()
+        .unwrapped()
+        .map(Token::Const);
 
-fn convert_const(input: &str) -> Token {
-    Token::Const(input.parse().unwrap())
-}
+    let punctuation = choice((
+        just("(").to(Token::LParen),
+        just(")").to(Token::RParen),
+        just("{").to(Token::LBrace),
+        just("}").to(Token::RBrace),
+        just(";").to(Token::Semicolon),
+    ));
 
-pub fn lex(mut input: &str) -> Result<Vec<Token>, LexError> {
-    let rules: Vec<(Regex, Converter)> = vec![
-        (Regex::new(r"^[a-zA-Z_]\w*\b").unwrap(), convert_ident),
-        (Regex::new(r"^[0-9]+\b").unwrap(), convert_const),
-        (Regex::new(r"^\(").unwrap(), |_| Token::LParen),
-        (Regex::new(r"^\)").unwrap(), |_| Token::RParen),
-        (Regex::new(r"^\{").unwrap(), |_| Token::LBrace),
-        (Regex::new(r"^\}").unwrap(), |_| Token::RBrace),
-        (Regex::new(r"^;").unwrap(), |_| Token::Semicolon),
-        (Regex::new(r"^\+").unwrap(), |_| Token::Plus),
-        (Regex::new(r"^-").unwrap(), |_| Token::Hyphen),
-        (Regex::new(r"^\*").unwrap(), |_| Token::Star),
-        (Regex::new(r"^/").unwrap(), |_| Token::Slash),
-        (Regex::new(r"^%").unwrap(), |_| Token::Percent),
-        (Regex::new(r"^~").unwrap(), |_| Token::Tilde),
-        (Regex::new(r"^&").unwrap(), |_| Token::Ampersand),
-        (Regex::new(r"^\|").unwrap(), |_| Token::VerticalBar),
-        (Regex::new(r"^\^").unwrap(), |_| Token::Caret),
-        (Regex::new(r"^<<").unwrap(), |_| Token::LShift),
-        (Regex::new(r"^>>").unwrap(), |_| Token::RShift),
-        (Regex::new(r"^!").unwrap(), |_| Token::Bang),
-        (Regex::new(r"^&&").unwrap(), |_| Token::LogicalAnd),
-        (Regex::new(r"^\|\|").unwrap(), |_| Token::LogicalOr),
-        (Regex::new(r"^==").unwrap(), |_| Token::DoubleEqual),
-        (Regex::new(r"^!=").unwrap(), |_| Token::BangEqual),
-        (Regex::new(r"^<").unwrap(), |_| Token::LessThan),
-        (Regex::new(r"^<=").unwrap(), |_| Token::LessOrEqual),
-        (Regex::new(r"^>").unwrap(), |_| Token::GreaterThan),
-        (Regex::new(r"^>=").unwrap(), |_| Token::GreaterOrEqual),
-        (Regex::new(r"^=").unwrap(), |_| Token::Equal),
-        (Regex::new(r"^\+=").unwrap(), |_| Token::PlusEqual),
-        (Regex::new(r"^-=").unwrap(), |_| Token::HyphenEqual),
-        (Regex::new(r"^\*=").unwrap(), |_| Token::StarEqual),
-        (Regex::new(r"^/=").unwrap(), |_| Token::SlashEqual),
-        (Regex::new(r"^%=").unwrap(), |_| Token::PercentEqual),
-        (Regex::new(r"^&=").unwrap(), |_| Token::AndEqual),
-        (Regex::new(r"^\|=").unwrap(), |_| Token::VBarEqual),
-        (Regex::new(r"^\^=").unwrap(), |_| Token::CaretEqual),
-        (Regex::new(r"^<<=").unwrap(), |_| Token::LShiftEqual),
-        (Regex::new(r"^>>=").unwrap(), |_| Token::RShiftEqual),
-        (Regex::new(r"^\+\+").unwrap(), |_| Token::DoublePlus),
-        (Regex::new(r"^--").unwrap(), |_| Token::DoubleHyphen),
-    ];
-    let whitespace = Regex::new(r"^\s+|^//.*?\n|^/\*.*?\*/").unwrap();
+    let operator = choice((
+        just("+").to(Token::Plus),
+        just("-").to(Token::Hyphen),
+        just("*").to(Token::Star),
+        just("/").to(Token::Slash),
+        just("%").to(Token::Percent),
+        just("~").to(Token::Tilde),
+        just("&").to(Token::Ampersand),
+        just("|").to(Token::VerticalBar),
+        just("^").to(Token::Caret),
+        just("<<").to(Token::LShift),
+        just(">>").to(Token::RShift),
+        just("!").to(Token::Bang),
+        just("&&").to(Token::LogicalAnd),
+        just("||").to(Token::LogicalOr),
+    ));
 
-    let mut tokens: Vec<Token> = Vec::new();
+    let relational = choice((
+        just("==").to(Token::DoubleEqual),
+        just("!=").to(Token::BangEqual),
+        just("<").to(Token::LessThan),
+        just("<=").to(Token::LessOrEqual),
+        just(">").to(Token::GreaterThan),
+        just(">=").to(Token::GreaterOrEqual),
+    ));
 
-    while !input.is_empty() {
-        if let Some(m) = whitespace.find(input) {
-            input = &input[m.end()..];
-            continue;
-        }
+    let assignment = choice((
+        just("=").to(Token::Equal),
+        just("+=").to(Token::PlusEqual),
+        just("-=").to(Token::HyphenEqual),
+        just("*=").to(Token::StarEqual),
+        just("/=").to(Token::SlashEqual),
+        just("%=").to(Token::PercentEqual),
+        just("&=").to(Token::AndEqual),
+        just("|=").to(Token::VBarEqual),
+        just("^=").to(Token::CaretEqual),
+        just("<<=").to(Token::LShiftEqual),
+        just(">>=").to(Token::RShiftEqual),
+        just("++").to(Token::DoublePlus),
+        just("--").to(Token::DoubleHyphen),
+    ));
 
-        let mut best = None;
-
-        for (re, f) in &rules {
-            if let Some(mat) = re.find(input) {
-                let len = mat.end();
-                if best.as_ref().is_none_or(|(_, l)| len > *l) {
-                    best = Some((f(mat.as_str()), len));
-                }
-            }
-        }
-
-        let Some((token, len)) = best else {
-            return Err(LexError::UnknownToken(input.to_string()));
-        };
-        tokens.push(token);
-        input = &input[len..]
-    }
-
-    Ok(tokens)
+    choice((
+        ident,
+        constant,
+        punctuation,
+        operator,
+        relational,
+        assignment,
+    ))
+    .padded()
+    .repeated()
+    .collect()
+    .then_ignore(end())
 }
