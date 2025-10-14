@@ -61,11 +61,19 @@ fn main() -> Result<(), CrustError> {
     };
 
     if opts.mode == CompilerMode::Lex {
-        println!("{:#?}", tokens);
+        tokens.iter().for_each(|token| println!("{:?}", token));
         return Ok(());
     }
 
-    let ast = parse::parse(tokens).unwrap();
+    let ast = match parse::parser().parse(&tokens).into_result() {
+        Ok(ast) => ast,
+        Err(parse_errs) => {
+            parse_errs
+                .into_iter()
+                .for_each(|e| eprintln!("Parse Error: {e:?}"));
+            std::process::exit(1);
+        }
+    };
 
     if opts.mode == CompilerMode::Parse {
         println!("{:#?}", ast);

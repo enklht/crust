@@ -10,48 +10,27 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Vec<Token>, extra::Err<Rich
         "void" => Token::KeywordVoid,
         s => Token::Ident(s.to_string()),
     });
+
     let constant = text::int(10)
         .then_ignore(any().filter(|&c: &char| !c.is_alphanumeric()).rewind())
         .from_str()
         .unwrapped()
         .map(Token::Const);
 
-    let punctuation = choice((
-        just("(").to(Token::LParen),
-        just(")").to(Token::RParen),
-        just("{").to(Token::LBrace),
-        just("}").to(Token::RBrace),
-        just(";").to(Token::Semicolon),
+    let three_chars_long = choice((
+        just("<<=").to(Token::LShiftEqual),
+        just(">>=").to(Token::RShiftEqual),
     ));
 
-    let operator = choice((
-        just("+").to(Token::Plus),
-        just("-").to(Token::Hyphen),
-        just("*").to(Token::Star),
-        just("/").to(Token::Slash),
-        just("%").to(Token::Percent),
-        just("~").to(Token::Tilde),
-        just("&").to(Token::Ampersand),
-        just("|").to(Token::VerticalBar),
-        just("^").to(Token::Caret),
+    let two_chars_long = choice((
         just("<<").to(Token::LShift),
         just(">>").to(Token::RShift),
-        just("!").to(Token::Bang),
         just("&&").to(Token::LogicalAnd),
         just("||").to(Token::LogicalOr),
-    ));
-
-    let relational = choice((
         just("==").to(Token::DoubleEqual),
         just("!=").to(Token::BangEqual),
-        just("<").to(Token::LessThan),
         just("<=").to(Token::LessOrEqual),
-        just(">").to(Token::GreaterThan),
         just(">=").to(Token::GreaterOrEqual),
-    ));
-
-    let assignment = choice((
-        just("=").to(Token::Equal),
         just("+=").to(Token::PlusEqual),
         just("-=").to(Token::HyphenEqual),
         just("*=").to(Token::StarEqual),
@@ -60,19 +39,37 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Vec<Token>, extra::Err<Rich
         just("&=").to(Token::AndEqual),
         just("|=").to(Token::VBarEqual),
         just("^=").to(Token::CaretEqual),
-        just("<<=").to(Token::LShiftEqual),
-        just(">>=").to(Token::RShiftEqual),
         just("++").to(Token::DoublePlus),
         just("--").to(Token::DoubleHyphen),
+    ));
+
+    let one_char_long = choice((
+        just("(").to(Token::LParen),
+        just(")").to(Token::RParen),
+        just("{").to(Token::LBrace),
+        just("}").to(Token::RBrace),
+        just(";").to(Token::Semicolon),
+        just("+").to(Token::Plus),
+        just("-").to(Token::Hyphen),
+        just("*").to(Token::Star),
+        just("/").to(Token::Slash),
+        just("%").to(Token::Percent),
+        just("~").to(Token::Tilde),
+        just("!").to(Token::Bang),
+        just("&").to(Token::Ampersand),
+        just("|").to(Token::VerticalBar),
+        just("^").to(Token::Caret),
+        just("<").to(Token::LessThan),
+        just(">").to(Token::GreaterThan),
+        just("=").to(Token::Equal),
     ));
 
     choice((
         ident,
         constant,
-        punctuation,
-        operator,
-        relational,
-        assignment,
+        three_chars_long,
+        two_chars_long,
+        one_char_long,
     ))
     .padded()
     .repeated()

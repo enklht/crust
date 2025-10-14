@@ -4,4 +4,4 @@ test *flags:
 
 run fname *flags:
   cargo build
-  ./target/debug/crust {{flags}} ./writing-a-c-compiler-tests/tests/{{fname}}
+  ./crust.fish {{flags}} ./writing-a-c-compiler-tests/tests/{{fname}}

@@ -150,7 +150,7 @@ fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::V
 
 fn convert_unop(op: UnaryOp) -> tacky::UnaryOp {
     match op {
-        UnaryOp::Complement => tacky::UnaryOp::Complement,
+        UnaryOp::BitNot => tacky::UnaryOp::Complement,
         UnaryOp::Negate => tacky::UnaryOp::Negate,
         UnaryOp::Not => tacky::UnaryOp::Not,
         _ => unreachable!(),

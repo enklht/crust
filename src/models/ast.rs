@@ -1,27 +1,27 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Program {
     FuncDef(FuncDef),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FuncDef {
     Function(String, Vec<BlockItem>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BlockItem {
     S(Stmt),
     D(Decl),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Return(Expr),
     Expression(Expr),
     Null,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Decl {
     Decl(String, Option<Expr>),
 }
@@ -37,8 +37,8 @@ pub enum Expr {
 
 #[derive(Debug, Clone)]
 pub enum UnaryOp {
-    Complement,
     Negate,
+    BitNot,
     Not,
     PrefixIncrement,
     PrefixDecrement,
