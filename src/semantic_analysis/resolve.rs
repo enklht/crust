@@ -71,6 +71,12 @@ fn resolve_expr(expr: Expr, env: &mut HashMap<String, String>) -> ValidationResu
             Some(unique_name) => Expr::Var(unique_name.clone()),
             None => return Err(ValidationError::UndefinedVariable(name)),
         },
+        Expr::Unary(op @ (UnaryOp::PostfixIncrement | UnaryOp::PostfixDecrement), expr) => {
+            match *expr {
+                expr @ Expr::Var(_) => Expr::Unary(op, Box::new(resolve_expr(expr, env)?)),
+                other => return Err(ValidationError::InvalidLvalue(other.clone())),
+            }
+        }
         Expr::Unary(op, e) => Expr::Unary(op, Box::new(resolve_expr(*e, env)?)),
         Expr::Binary(op, e1, e2) => Expr::Binary(
             op,

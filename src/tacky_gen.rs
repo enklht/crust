@@ -54,6 +54,38 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<tacky::Instruction>) {
 fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::Val {
     match expr {
         Expr::Const(i) => tacky::Val::Const(i),
+        Expr::Unary(UnaryOp::PostfixIncrement, expr) => match *expr.clone() {
+            Expr::Var(v) => {
+                let tmp = tacky::Val::Var(make_temporary());
+                instructions.extend([
+                    tacky::Instruction::Copy(tacky::Val::Var(v.clone()), tmp.clone()),
+                    tacky::Instruction::Binary(
+                        tacky::BinaryOp::Add,
+                        tacky::Val::Var(v.clone()),
+                        tacky::Val::Const(1),
+                        tacky::Val::Var(v),
+                    ),
+                ]);
+                tmp
+            }
+            _ => unreachable!(),
+        },
+        Expr::Unary(UnaryOp::PostfixDecrement, expr) => match *expr.clone() {
+            Expr::Var(v) => {
+                let tmp = tacky::Val::Var(make_temporary());
+                instructions.extend([
+                    tacky::Instruction::Copy(tacky::Val::Var(v.clone()), tmp.clone()),
+                    tacky::Instruction::Binary(
+                        tacky::BinaryOp::Subtract,
+                        tacky::Val::Var(v.clone()),
+                        tacky::Val::Const(1),
+                        tacky::Val::Var(v),
+                    ),
+                ]);
+                tmp
+            }
+            _ => unreachable!(),
+        },
         Expr::Unary(op, inner) => {
             let src = emit_expr(*inner, instructions);
             let dst = tacky::Val::Var(make_temporary());
@@ -121,6 +153,7 @@ fn convert_unop(op: UnaryOp) -> tacky::UnaryOp {
         UnaryOp::Complement => tacky::UnaryOp::Complement,
         UnaryOp::Negate => tacky::UnaryOp::Negate,
         UnaryOp::Not => tacky::UnaryOp::Not,
+        _ => unreachable!(),
     }
 }
 

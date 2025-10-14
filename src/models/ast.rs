@@ -40,6 +40,10 @@ pub enum UnaryOp {
     Complement,
     Negate,
     Not,
+    PrefixIncrement,
+    PrefixDecrement,
+    PostfixIncrement,
+    PostfixDecrement,
 }
 
 #[derive(Debug, Clone)]

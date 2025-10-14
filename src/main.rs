@@ -40,35 +40,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tokens = lex::lex(&source)?;
 
     if opts.mode == CompilerMode::Lex {
-        println!("{:?}", tokens);
+        println!("{:#?}", tokens);
         return Ok(());
     }
 
     let ast = parse::parse(tokens)?;
 
     if opts.mode == CompilerMode::Parse {
-        println!("{:?}", ast);
+        println!("{:#?}", ast);
         return Ok(());
     }
 
     let validated_ast = semantic_analysis::validate(ast)?;
 
     if opts.mode == CompilerMode::Validate {
-        println!("{:?}", validated_ast);
+        println!("{:#?}", validated_ast);
         return Ok(());
     }
 
     let tacky = tacky_gen::convert_program(validated_ast);
 
     if opts.mode == CompilerMode::Tacky {
-        println!("{:?}", tacky);
+        println!("{:#?}", tacky);
         return Ok(());
     }
 
     let asm_ast = backend::codegen(tacky);
 
     if opts.mode == CompilerMode::Codegen {
-        println!("{:?}", asm_ast);
+        println!("{:#?}", asm_ast);
         return Ok(());
     }
 
