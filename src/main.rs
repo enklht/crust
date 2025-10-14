@@ -3,7 +3,9 @@ mod emit;
 mod lex;
 mod models;
 mod parse;
+mod semantic_analysis;
 mod tacky_gen;
+mod utils;
 
 use bpaf::*;
 use std::fs;
@@ -24,6 +26,7 @@ struct Options {
 enum CompilerMode {
     Lex,
     Parse,
+    Validate,
     Tacky,
     Codegen,
     Full,
@@ -48,7 +51,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let tacky = tacky_gen::convert_program(ast);
+    let validated_ast = semantic_analysis::validate(ast)?;
+
+    if opts.mode == CompilerMode::Validate {
+        println!("{:?}", validated_ast);
+        return Ok(());
+    }
+
+    let tacky = tacky_gen::convert_program(validated_ast);
 
     if opts.mode == CompilerMode::Tacky {
         println!("{:?}", tacky);

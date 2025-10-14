@@ -1,59 +1,67 @@
-use crate::models::ast;
+use crate::models::ast::*;
 use crate::models::tacky;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
+use crate::utils::make_label;
+use crate::utils::make_temporary;
 
-static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-fn make_temporary() -> String {
-    let i = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("tmp.{}", i)
-}
-
-fn make_label(prefix: &str) -> String {
-    let i = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("{}.{}", prefix, i)
-}
-
-pub fn convert_program(program: ast::Program) -> tacky::Program {
+pub fn convert_program(program: Program) -> tacky::Program {
     match program {
-        ast::Program::FunctionDefinition(function) => {
-            tacky::Program::Program(convert_function(function))
-        }
+        Program::FuncDef(function) => tacky::Program::Program(convert_function(function)),
     }
 }
 
-fn convert_function(function: ast::FunctionDefinition) -> tacky::Function {
+fn convert_function(function: FuncDef) -> tacky::Function {
     match function {
-        ast::FunctionDefinition::Function(name, body) => {
+        FuncDef::Function(name, body) => {
             let mut instructions = Vec::new();
-            // emit_stmt(body, &mut instructions);
+            body.into_iter()
+                .for_each(|item| emit_block_item(item, &mut instructions));
+            instructions.push(tacky::Instruction::Return(tacky::Val::Const(0)));
             tacky::Function::Function(name, instructions)
         }
     }
 }
 
-fn emit_stmt(stmt: ast::Stmt, instructions: &mut Vec<tacky::Instruction>) {
-    match stmt {
-        ast::Stmt::Return(expr) => {
-            let tacky_expr = emit_expr(expr, instructions);
-            instructions.push(tacky::Instruction::Return(tacky_expr))
-        }
-        _ => todo!(),
+fn emit_block_item(block_item: BlockItem, instructions: &mut Vec<tacky::Instruction>) {
+    match block_item {
+        BlockItem::S(stmt) => emit_stmt(stmt, instructions),
+        BlockItem::D(decl) => emit_decl(decl, instructions),
     }
 }
 
-fn emit_expr(expr: ast::Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::Val {
+fn emit_decl(decl: Decl, instructions: &mut Vec<tacky::Instruction>) {
+    match decl {
+        Decl::Decl(name, Some(expr)) => {
+            let result = emit_expr(expr, instructions);
+            instructions.push(tacky::Instruction::Copy(result, tacky::Val::Var(name)));
+        }
+        Decl::Decl(_, None) => {}
+    }
+}
+
+fn emit_stmt(stmt: Stmt, instructions: &mut Vec<tacky::Instruction>) {
+    match stmt {
+        Stmt::Return(expr) => {
+            let tacky_expr = emit_expr(expr, instructions);
+            instructions.push(tacky::Instruction::Return(tacky_expr))
+        }
+        Stmt::Expression(expr) => {
+            emit_expr(expr, instructions);
+        }
+        Stmt::Null => {}
+    }
+}
+
+fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::Val {
     match expr {
-        ast::Expr::Const(i) => tacky::Val::Const(i),
-        ast::Expr::Unary(op, inner) => {
+        Expr::Const(i) => tacky::Val::Const(i),
+        Expr::Unary(op, inner) => {
             let src = emit_expr(*inner, instructions);
             let dst = tacky::Val::Var(make_temporary());
             let tacky_op = convert_unop(op);
             instructions.push(tacky::Instruction::Unary(tacky_op, src, dst.clone()));
             dst
         }
-        ast::Expr::Binary(ast::BinaryOp::And, v1, v2) => {
+        Expr::Binary(BinaryOp::And, v1, v2) => {
             let false_label = make_label("and_false");
             let end_label = make_label("and_end");
             let dst = tacky::Val::Var(make_temporary());
@@ -70,7 +78,7 @@ fn emit_expr(expr: ast::Expr, instructions: &mut Vec<tacky::Instruction>) -> tac
             ]);
             dst
         }
-        ast::Expr::Binary(ast::BinaryOp::Or, v1, v2) => {
+        Expr::Binary(BinaryOp::Or, v1, v2) => {
             let true_label = make_label("or_true");
             let end_label = make_label("or_end");
             let dst = tacky::Val::Var(make_temporary());
@@ -87,7 +95,7 @@ fn emit_expr(expr: ast::Expr, instructions: &mut Vec<tacky::Instruction>) -> tac
             ]);
             dst
         }
-        ast::Expr::Binary(op, e1, e2) => {
+        Expr::Binary(op, e1, e2) => {
             let v1 = emit_expr(*e1, instructions);
             let v2 = emit_expr(*e2, instructions);
             let dst = tacky::Val::Var(make_temporary());
@@ -95,36 +103,45 @@ fn emit_expr(expr: ast::Expr, instructions: &mut Vec<tacky::Instruction>) -> tac
             instructions.push(tacky::Instruction::Binary(tacky_op, v1, v2, dst.clone()));
             dst
         }
-        _ => todo!(),
+        Expr::Var(name) => tacky::Val::Var(name),
+        Expr::Assignment(left, right) => match *left {
+            Expr::Var(v) => {
+                let result = emit_expr(*right, instructions);
+                instructions.push(tacky::Instruction::Copy(result, tacky::Val::Var(v.clone())));
+                tacky::Val::Var(v)
+            }
+            _ => unreachable!(),
+        },
+        // _ => todo!(),
     }
 }
 
-fn convert_unop(op: ast::UnaryOp) -> tacky::UnaryOp {
+fn convert_unop(op: UnaryOp) -> tacky::UnaryOp {
     match op {
-        ast::UnaryOp::Complement => tacky::UnaryOp::Complement,
-        ast::UnaryOp::Negate => tacky::UnaryOp::Negate,
-        ast::UnaryOp::Not => tacky::UnaryOp::Not,
+        UnaryOp::Complement => tacky::UnaryOp::Complement,
+        UnaryOp::Negate => tacky::UnaryOp::Negate,
+        UnaryOp::Not => tacky::UnaryOp::Not,
     }
 }
 
-fn convert_binop(op: ast::BinaryOp) -> tacky::BinaryOp {
+fn convert_binop(op: BinaryOp) -> tacky::BinaryOp {
     match op {
-        ast::BinaryOp::Add => tacky::BinaryOp::Add,
-        ast::BinaryOp::Subtract => tacky::BinaryOp::Subtract,
-        ast::BinaryOp::Multiply => tacky::BinaryOp::Multiply,
-        ast::BinaryOp::Divide => tacky::BinaryOp::Divide,
-        ast::BinaryOp::Remainder => tacky::BinaryOp::Remainder,
-        ast::BinaryOp::BitAnd => tacky::BinaryOp::BitAnd,
-        ast::BinaryOp::BitOr => tacky::BinaryOp::BitOr,
-        ast::BinaryOp::BitXor => tacky::BinaryOp::BitXor,
-        ast::BinaryOp::LShift => tacky::BinaryOp::LShift,
-        ast::BinaryOp::RShift => tacky::BinaryOp::RShift,
-        ast::BinaryOp::Equal => tacky::BinaryOp::Equal,
-        ast::BinaryOp::NotEqual => tacky::BinaryOp::NotEqual,
-        ast::BinaryOp::LessThan => tacky::BinaryOp::LessThan,
-        ast::BinaryOp::LessOrEqual => tacky::BinaryOp::LessOrEqual,
-        ast::BinaryOp::GreaterThan => tacky::BinaryOp::GreaterThan,
-        ast::BinaryOp::GreaterOrEqual => tacky::BinaryOp::GreaterOrEqual,
+        BinaryOp::Add => tacky::BinaryOp::Add,
+        BinaryOp::Subtract => tacky::BinaryOp::Subtract,
+        BinaryOp::Multiply => tacky::BinaryOp::Multiply,
+        BinaryOp::Divide => tacky::BinaryOp::Divide,
+        BinaryOp::Remainder => tacky::BinaryOp::Remainder,
+        BinaryOp::BitAnd => tacky::BinaryOp::BitAnd,
+        BinaryOp::BitOr => tacky::BinaryOp::BitOr,
+        BinaryOp::BitXor => tacky::BinaryOp::BitXor,
+        BinaryOp::LShift => tacky::BinaryOp::LShift,
+        BinaryOp::RShift => tacky::BinaryOp::RShift,
+        BinaryOp::Equal => tacky::BinaryOp::Equal,
+        BinaryOp::NotEqual => tacky::BinaryOp::NotEqual,
+        BinaryOp::LessThan => tacky::BinaryOp::LessThan,
+        BinaryOp::LessOrEqual => tacky::BinaryOp::LessOrEqual,
+        BinaryOp::GreaterThan => tacky::BinaryOp::GreaterThan,
+        BinaryOp::GreaterOrEqual => tacky::BinaryOp::GreaterOrEqual,
         _ => unreachable!(),
     }
 }

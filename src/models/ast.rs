@@ -1,17 +1,17 @@
 #[derive(Debug)]
 pub enum Program {
-    FunctionDefinition(FunctionDefinition),
+    FuncDef(FuncDef),
 }
 
 #[derive(Debug)]
-pub enum FunctionDefinition {
+pub enum FuncDef {
     Function(String, Vec<BlockItem>),
 }
 
 #[derive(Debug)]
 pub enum BlockItem {
     S(Stmt),
-    D(Declaration),
+    D(Decl),
 }
 
 #[derive(Debug)]
@@ -22,11 +22,11 @@ pub enum Stmt {
 }
 
 #[derive(Debug)]
-pub enum Declaration {
-    Declaration(String, Option<Expr>),
+pub enum Decl {
+    Decl(String, Option<Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Const(i32),
     Var(String),
@@ -35,14 +35,14 @@ pub enum Expr {
     Assignment(Box<Expr>, Box<Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOp {
     Complement,
     Negate,
     Not,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOp {
     Add,
     Subtract,

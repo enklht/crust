@@ -60,10 +60,10 @@ pub fn parse(tokens: Vec<Token>) -> Result<Program, ParseError> {
 fn parse_program(tokens: &[Token]) -> ParseResult<'_, Program> {
     let (function, rest) = parse_function(tokens)?;
 
-    Ok((Program::FunctionDefinition(function), rest))
+    Ok((Program::FuncDef(function), rest))
 }
 
-fn parse_function(tokens: &[Token]) -> ParseResult<'_, FunctionDefinition> {
+fn parse_function(tokens: &[Token]) -> ParseResult<'_, FuncDef> {
     let name: String;
     let mut rest = expect(Token::KeywordInt, tokens)?;
     (name, rest) = parse_ident(rest)?;
@@ -80,14 +80,14 @@ fn parse_function(tokens: &[Token]) -> ParseResult<'_, FunctionDefinition> {
     }
     let rest = expect(Token::RBrace, rest)?;
 
-    Ok((FunctionDefinition::Function(name, body), rest))
+    Ok((FuncDef::Function(name, body), rest))
 }
 
 fn parse_block_item(tokens: &[Token]) -> ParseResult<'_, BlockItem> {
     if let Ok((stmt, rest)) = parse_stmt(tokens) {
         Ok((BlockItem::S(stmt), rest))
-    } else if let Ok((declaration, rest)) = parse_declaration(tokens) {
-        Ok((BlockItem::D(declaration), rest))
+    } else if let Ok((decl, rest)) = parse_decl(tokens) {
+        Ok((BlockItem::D(decl), rest))
     } else {
         Err(ParseError::ExpectedBlockItem)
     }
@@ -108,16 +108,16 @@ fn parse_stmt(tokens: &[Token]) -> ParseResult<'_, Stmt> {
     }
 }
 
-fn parse_declaration(tokens: &[Token]) -> ParseResult<'_, Declaration> {
+fn parse_decl(tokens: &[Token]) -> ParseResult<'_, Decl> {
     let rest = expect(Token::KeywordInt, tokens)?;
     let (name, rest) = parse_ident(rest)?;
     match rest.first() {
         Some(Token::Equal) => {
             let (expr, rest) = parse_expr(&rest[1..], u8::MAX)?;
             let rest = expect(Token::Semicolon, rest)?;
-            Ok((Declaration::Declaration(name, Some(expr)), rest))
+            Ok((Decl::Decl(name, Some(expr)), rest))
         }
-        Some(Token::Semicolon) => Ok((Declaration::Declaration(name, None), &rest[1..])),
+        Some(Token::Semicolon) => Ok((Decl::Decl(name, None), &rest[1..])),
         Some(actual) => Err(ParseError::UnexpectedToken("=".to_string(), actual.clone())),
         None => Err(ParseError::UnexpectedEof("=".to_string())),
     }
