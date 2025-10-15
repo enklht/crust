@@ -1,5 +1,6 @@
 mod backend;
 mod emit;
+mod error_report;
 mod lex;
 mod models;
 mod parse;
@@ -9,8 +10,10 @@ mod utils;
 
 use bpaf::*;
 use chumsky::Parser;
+use chumsky::input::Input;
 use std::fs;
 use std::path::PathBuf;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Bpaf)]
 #[bpaf(options)]
@@ -33,30 +36,26 @@ enum CompilerMode {
     Full,
 }
 
-use thiserror::Error;
-
 #[derive(Error, Debug)]
-pub enum CrustError {
+enum CrustError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error("lex error")]
-    LexError,
+    #[error(transparent)]
+    ValidationError(#[from] crate::semantic_analysis::ValidationError),
 }
 
 fn main() -> Result<(), CrustError> {
     let opts: Options = options().run();
 
-    let source = fs::read_to_string(&opts.input)?;
+    let fname = &opts.input.display().to_string();
+    let source = &fs::read_to_string(&opts.input)?;
 
     let lexer = lex::lexer();
 
-    let tokens = match lexer.parse(&source).into_result() {
+    let tokens = match lexer.parse(source).into_result() {
         Ok(tokens) => tokens,
-        Err(parse_errs) => {
-            parse_errs
-                .into_iter()
-                .for_each(|e| eprintln!("Lex Error: {e}"));
-            std::process::exit(1);
+        Err(errs) => {
+            error_report::report_errors(fname, &errs, source);
         }
     };
 
@@ -65,13 +64,17 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let ast = match parse::parser().parse(&tokens).into_result() {
+    let ast = match parse::parser()
+        .parse(
+            tokens
+                .as_slice()
+                .map((source.len()..source.len()).into(), |(t, s)| (t, s)),
+        )
+        .into_result()
+    {
         Ok(ast) => ast,
-        Err(parse_errs) => {
-            parse_errs
-                .into_iter()
-                .for_each(|e| eprintln!("Parse Error: {e:?}"));
-            std::process::exit(1);
+        Err(errs) => {
+            error_report::report_errors(fname, &errs, source);
         }
     };
 
@@ -80,7 +83,7 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let validated_ast = semantic_analysis::validate(ast).unwrap();
+    let validated_ast = semantic_analysis::validate(ast)?;
 
     if opts.mode == CompilerMode::Validate {
         println!("{:#?}", validated_ast);
@@ -102,6 +105,7 @@ fn main() -> Result<(), CrustError> {
     }
 
     let asm_text = emit::emit(asm_ast);
+
     let output = opts.output.unwrap_or(opts.input.with_extension("s"));
     fs::write(&output, asm_text)?;
 

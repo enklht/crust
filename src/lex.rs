@@ -1,9 +1,11 @@
 use crate::models::token::Token;
-use chumsky::error::Rich;
 use chumsky::prelude::*;
 use chumsky::text;
 
-pub fn lexer<'src>() -> impl Parser<'src, &'src str, Vec<Token>, extra::Err<Rich<'src, char>>> {
+type Spanned<T> = (T, SimpleSpan);
+
+pub fn lexer<'src>()
+-> impl Parser<'src, &'src str, Vec<Spanned<Token>>, extra::Err<Rich<'src, char>>> {
     let ident = text::ident().map(|s| match s {
         "int" => Token::KeywordInt,
         "return" => Token::KeywordReturn,
@@ -72,6 +74,7 @@ pub fn lexer<'src>() -> impl Parser<'src, &'src str, Vec<Token>, extra::Err<Rich
         one_char_long,
     ))
     .padded()
+    .map_with(|t, e| (t, e.span()))
     .repeated()
     .collect()
     .then_ignore(end())

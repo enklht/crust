@@ -40,8 +40,6 @@ pub enum UnaryOp {
     Negate,
     BitNot,
     Not,
-    PrefixIncrement,
-    PrefixDecrement,
     PostfixIncrement,
     PostfixDecrement,
 }

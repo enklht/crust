@@ -1,11 +1,15 @@
 use crate::models::ast::*;
 use crate::models::token::Token;
+use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
 
-pub fn parser<'tokens>()
--> impl Parser<'tokens, &'tokens [Token], Program, extra::Err<Rich<'tokens, Token>>> {
+pub fn parser<'tokens, I>() -> impl Parser<'tokens, I, Program, extra::Err<Rich<'tokens, Token>>>
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
     let ident = select! { Token::Ident(ident) => ident };
+
     let expr = expr();
 
     let stmt = choice((
@@ -15,22 +19,29 @@ pub fn parser<'tokens>()
             .then_ignore(just(Token::Semicolon))
             .map(Stmt::Return),
         just(Token::Semicolon).to(Stmt::Null),
-    ));
+    ))
+    .labelled("statement")
+    .as_context();
 
     let decl = just(Token::KeywordInt)
         .ignore_then(ident)
         .then(just(Token::Equal).ignore_then(expr).or_not())
         .then_ignore(just(Token::Semicolon))
-        .map(|(name, init)| Decl::Decl(name, init));
+        .map(|(name, init)| Decl::Decl(name, init))
+        .labelled("declaration")
+        .as_context();
 
     let block_item = choice((stmt.map(BlockItem::S), decl.map(BlockItem::D)));
-
-    let body = block_item.repeated().collect();
 
     let func_def = just(Token::KeywordInt)
         .ignore_then(ident)
         .then_ignore(just([Token::LParen, Token::KeywordVoid, Token::RParen]))
-        .then(body.delimited_by(just(Token::LBrace), just(Token::RBrace)))
+        .then(
+            block_item
+                .repeated()
+                .collect()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
         .map(|(name, body)| FuncDef::Function(name, body));
 
     let program = func_def.map(Program::FuncDef);
@@ -38,8 +49,10 @@ pub fn parser<'tokens>()
     program.then_ignore(end())
 }
 
-fn expr<'tokens>()
--> impl Parser<'tokens, &'tokens [Token], Expr, extra::Err<Rich<'tokens, Token>>> + Clone {
+fn expr<'tokens, I>() -> impl Parser<'tokens, I, Expr, extra::Err<Rich<'tokens, Token>>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
     recursive(|expr| {
         let atom = choice((
             select! {
@@ -162,6 +175,8 @@ fn expr<'tokens>()
             ),
         ))
     })
+    .labelled("expression")
+    .as_context()
 }
 
 fn convert_binop(token: Token) -> BinaryOp {

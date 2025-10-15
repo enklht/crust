@@ -1,46 +1,91 @@
-#[derive(Debug, PartialEq, Clone)]
+use derive_more::Display;
+
+#[derive(Debug, PartialEq, Clone, Display)]
 pub enum Token {
+    #[display("{_0}")]
     Ident(String),
+    #[display("{_0}")]
     Const(i32),
+    #[display("int")]
     KeywordInt,
+    #[display("void")]
     KeywordVoid,
+    #[display("return")]
     KeywordReturn,
+    #[display("(")]
     LParen,
+    #[display(")")]
     RParen,
+    #[display("{{")]
     LBrace,
+    #[display("}}")]
     RBrace,
+    #[display(";")]
     Semicolon,
+    #[display("+")]
     Plus,
+    #[display("-")]
     Hyphen,
+    #[display("*")]
     Star,
+    #[display("/")]
     Slash,
-    Tilde,
-    Ampersand,
-    VerticalBar,
-    Caret,
-    LShift,
-    RShift,
+    #[display("%")]
     Percent,
+    #[display("|")]
+    Tilde,
+    #[display("&")]
+    Ampersand,
+    #[display("|")]
+    VerticalBar,
+    #[display("^")]
+    Caret,
+    #[display("<<")]
+    LShift,
+    #[display(">>")]
+    RShift,
+    #[display("!")]
     Bang,
+    #[display("&&")]
     LogicalAnd,
+    #[display("||")]
     LogicalOr,
+    #[display("==")]
     DoubleEqual,
+    #[display("!=")]
     BangEqual,
+    #[display("<")]
     LessThan,
+    #[display("<=")]
     LessOrEqual,
+    #[display(">")]
     GreaterThan,
+    #[display(">=")]
     GreaterOrEqual,
+    #[display("=")]
     Equal,
+    #[display("+=")]
     PlusEqual,
+    #[display("-=")]
     HyphenEqual,
+    #[display("*=")]
     StarEqual,
+    #[display("/=")]
     SlashEqual,
+    #[display("%=")]
     PercentEqual,
+    #[display("&=")]
     AndEqual,
+    #[display("|=")]
     VBarEqual,
+    #[display("^=")]
     CaretEqual,
+    #[display("<<=")]
     LShiftEqual,
+    #[display(">>=")]
     RShiftEqual,
+    #[display("++")]
     DoublePlus,
+    #[display("--")]
     DoubleHyphen,
 }

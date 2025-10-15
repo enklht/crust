@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ariadne = "0.5.1"
 bpaf = { version = "0.9.20", features = ["derive", "dull-color"] }
 chumsky = { version = "0.11.1", features = ["pratt"] }
 derive_more = { version = "2.0.1", features = ["display"] }
