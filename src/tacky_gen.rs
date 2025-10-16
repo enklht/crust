@@ -1,5 +1,6 @@
 use crate::models::ast::*;
 use crate::models::tacky;
+use crate::models::tacky::Instruction;
 use crate::utils::make_label;
 use crate::utils::make_temporary;
 
@@ -15,34 +16,34 @@ fn convert_function(function: FuncDef) -> tacky::Function {
             let mut instructions = Vec::new();
             body.into_iter()
                 .for_each(|item| emit_block_item(item, &mut instructions));
-            instructions.push(tacky::Instruction::Return(tacky::Val::Const(0)));
+            instructions.push(Instruction::Return(tacky::Val::Const(0)));
             tacky::Function::Function(name, instructions)
         }
     }
 }
 
-fn emit_block_item(block_item: BlockItem, instructions: &mut Vec<tacky::Instruction>) {
+fn emit_block_item(block_item: BlockItem, instructions: &mut Vec<Instruction>) {
     match block_item {
         BlockItem::S(stmt) => emit_stmt(stmt, instructions),
         BlockItem::D(decl) => emit_decl(decl, instructions),
     }
 }
 
-fn emit_decl(decl: Decl, instructions: &mut Vec<tacky::Instruction>) {
+fn emit_decl(decl: Decl, instructions: &mut Vec<Instruction>) {
     match decl {
         Decl::Decl(name, Some(expr)) => {
             let result = emit_expr(expr, instructions);
-            instructions.push(tacky::Instruction::Copy(result, tacky::Val::Var(name)));
+            instructions.push(Instruction::Copy(result, tacky::Val::Var(name)));
         }
         Decl::Decl(_, None) => {}
     }
 }
 
-fn emit_stmt(stmt: Stmt, instructions: &mut Vec<tacky::Instruction>) {
+fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>) {
     match stmt {
         Stmt::Return(expr) => {
             let tacky_expr = emit_expr(expr, instructions);
-            instructions.push(tacky::Instruction::Return(tacky_expr))
+            instructions.push(Instruction::Return(tacky_expr))
         }
         Stmt::Expression(expr) => {
             emit_expr(expr, instructions);
@@ -50,36 +51,41 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<tacky::Instruction>) {
         Stmt::If(cond, then, None) => {
             let end_label = make_label("if_end");
             let cond = emit_expr(cond, instructions);
-            instructions.push(tacky::Instruction::JumpIfZero(cond, end_label.clone()));
+            instructions.push(Instruction::JumpIfZero(cond, end_label.clone()));
             emit_stmt(*then, instructions);
-            instructions.push(tacky::Instruction::Label(end_label))
+            instructions.push(Instruction::Label(end_label))
         }
         Stmt::If(cond, then, Some(else_)) => {
             let else_label = make_label("if_else");
             let end_label = make_label("if_end");
             let cond = emit_expr(cond, instructions);
-            instructions.push(tacky::Instruction::JumpIfZero(cond, else_label.clone()));
+            instructions.push(Instruction::JumpIfZero(cond, else_label.clone()));
             emit_stmt(*then, instructions);
             instructions.extend([
-                tacky::Instruction::Jump(end_label.clone()),
-                tacky::Instruction::Label(else_label.clone()),
+                Instruction::Jump(end_label.clone()),
+                Instruction::Label(else_label.clone()),
             ]);
             emit_stmt(*else_, instructions);
-            instructions.push(tacky::Instruction::Label(end_label))
+            instructions.push(Instruction::Label(end_label))
         }
+        Stmt::Labelled(label, stmt) => {
+            instructions.push(Instruction::Label(label));
+            emit_stmt(*stmt, instructions);
+        }
+        Stmt::Goto(label) => instructions.push(Instruction::Jump(label)),
         Stmt::Null => {}
     }
 }
 
-fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::Val {
+fn emit_expr(expr: Expr, instructions: &mut Vec<Instruction>) -> tacky::Val {
     match expr {
         Expr::Const(i) => tacky::Val::Const(i),
         Expr::Unary(UnaryOp::PostfixIncrement, expr) => match *expr.clone() {
             Expr::Var(v) => {
                 let tmp = tacky::Val::Var(make_temporary());
                 instructions.extend([
-                    tacky::Instruction::Copy(tacky::Val::Var(v.clone()), tmp.clone()),
-                    tacky::Instruction::Binary(
+                    Instruction::Copy(tacky::Val::Var(v.clone()), tmp.clone()),
+                    Instruction::Binary(
                         tacky::BinaryOp::Add,
                         tacky::Val::Var(v.clone()),
                         tacky::Val::Const(1),
@@ -94,8 +100,8 @@ fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::V
             Expr::Var(v) => {
                 let tmp = tacky::Val::Var(make_temporary());
                 instructions.extend([
-                    tacky::Instruction::Copy(tacky::Val::Var(v.clone()), tmp.clone()),
-                    tacky::Instruction::Binary(
+                    Instruction::Copy(tacky::Val::Var(v.clone()), tmp.clone()),
+                    Instruction::Binary(
                         tacky::BinaryOp::Subtract,
                         tacky::Val::Var(v.clone()),
                         tacky::Val::Const(1),
@@ -110,7 +116,7 @@ fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::V
             let src = emit_expr(*inner, instructions);
             let dst = tacky::Val::Var(make_temporary());
             let tacky_op = convert_unop(op);
-            instructions.push(tacky::Instruction::Unary(tacky_op, src, dst.clone()));
+            instructions.push(Instruction::Unary(tacky_op, src, dst.clone()));
             dst
         }
         Expr::Binary(BinaryOp::And, v1, v2) => {
@@ -118,15 +124,15 @@ fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::V
             let end_label = make_label("and_end");
             let dst = tacky::Val::Var(make_temporary());
             let v1 = emit_expr(*v1, instructions);
-            instructions.push(tacky::Instruction::JumpIfZero(v1, false_label.clone()));
+            instructions.push(Instruction::JumpIfZero(v1, false_label.clone()));
             let v2 = emit_expr(*v2, instructions);
             instructions.extend([
-                tacky::Instruction::JumpIfZero(v2, false_label.clone()),
-                tacky::Instruction::Copy(tacky::Val::Const(1), dst.clone()),
-                tacky::Instruction::Jump(end_label.clone()),
-                tacky::Instruction::Label(false_label),
-                tacky::Instruction::Copy(tacky::Val::Const(0), dst.clone()),
-                tacky::Instruction::Label(end_label),
+                Instruction::JumpIfZero(v2, false_label.clone()),
+                Instruction::Copy(tacky::Val::Const(1), dst.clone()),
+                Instruction::Jump(end_label.clone()),
+                Instruction::Label(false_label),
+                Instruction::Copy(tacky::Val::Const(0), dst.clone()),
+                Instruction::Label(end_label),
             ]);
             dst
         }
@@ -135,15 +141,15 @@ fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::V
             let end_label = make_label("or_end");
             let dst = tacky::Val::Var(make_temporary());
             let v1 = emit_expr(*v1, instructions);
-            instructions.push(tacky::Instruction::JumpIfNotZero(v1, true_label.clone()));
+            instructions.push(Instruction::JumpIfNotZero(v1, true_label.clone()));
             let v2 = emit_expr(*v2, instructions);
             instructions.extend([
-                tacky::Instruction::JumpIfNotZero(v2, true_label.clone()),
-                tacky::Instruction::Copy(tacky::Val::Const(0), dst.clone()),
-                tacky::Instruction::Jump(end_label.clone()),
-                tacky::Instruction::Label(true_label),
-                tacky::Instruction::Copy(tacky::Val::Const(1), dst.clone()),
-                tacky::Instruction::Label(end_label),
+                Instruction::JumpIfNotZero(v2, true_label.clone()),
+                Instruction::Copy(tacky::Val::Const(0), dst.clone()),
+                Instruction::Jump(end_label.clone()),
+                Instruction::Label(true_label),
+                Instruction::Copy(tacky::Val::Const(1), dst.clone()),
+                Instruction::Label(end_label),
             ]);
             dst
         }
@@ -152,14 +158,14 @@ fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::V
             let v2 = emit_expr(*e2, instructions);
             let dst = tacky::Val::Var(make_temporary());
             let tacky_op = convert_binop(op);
-            instructions.push(tacky::Instruction::Binary(tacky_op, v1, v2, dst.clone()));
+            instructions.push(Instruction::Binary(tacky_op, v1, v2, dst.clone()));
             dst
         }
         Expr::Var(name) => tacky::Val::Var(name),
         Expr::Assignment(left, right) => match *left {
             Expr::Var(v) => {
                 let result = emit_expr(*right, instructions);
-                instructions.push(tacky::Instruction::Copy(result, tacky::Val::Var(v.clone())));
+                instructions.push(Instruction::Copy(result, tacky::Val::Var(v.clone())));
                 tacky::Val::Var(v)
             }
             _ => unreachable!(),
@@ -169,17 +175,17 @@ fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::V
             let end_label = make_label("ternary_end");
             let result = tacky::Val::Var(make_temporary());
             let cond = emit_expr(*cond, instructions);
-            instructions.push(tacky::Instruction::JumpIfZero(cond, else_label.clone()));
+            instructions.push(Instruction::JumpIfZero(cond, else_label.clone()));
             let then = emit_expr(*then, instructions);
             instructions.extend([
-                tacky::Instruction::Copy(then, result.clone()),
-                tacky::Instruction::Jump(end_label.clone()),
-                tacky::Instruction::Label(else_label),
+                Instruction::Copy(then, result.clone()),
+                Instruction::Jump(end_label.clone()),
+                Instruction::Label(else_label),
             ]);
             let else_ = emit_expr(*else_, instructions);
             instructions.extend([
-                tacky::Instruction::Copy(else_, result.clone()),
-                tacky::Instruction::Label(end_label),
+                Instruction::Copy(else_, result.clone()),
+                Instruction::Label(end_label),
             ]);
             result
         }

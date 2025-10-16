@@ -13,36 +13,50 @@ where
     let expr = expr();
 
     let stmt = recursive(|stmt| {
-        let if_ = just(Token::KeywordIf)
+        let expr_stmt = expr
+            .clone()
+            .then_ignore(just(Token::Semicolon))
+            .map(Stmt::Expression);
+        let return_stmt = just(Token::KwReturn)
+            .ignore_then(expr.clone())
+            .then_ignore(just(Token::Semicolon))
+            .map(Stmt::Return);
+        let if_stmt = just(Token::KwIf)
             .ignore_then(
                 expr.clone()
                     .delimited_by(just(Token::LParen), just(Token::RParen)),
             )
             .then(stmt.clone().map(Box::new))
             .then(
-                just(Token::KeywordElse)
-                    .ignore_then(stmt)
+                just(Token::KwElse)
+                    .ignore_then(stmt.clone())
                     .map(Box::new)
                     .or_not(),
             )
             .map(|((cond, then), else_)| Stmt::If(cond, then, else_));
+        let labelled_stmt = ident
+            .then_ignore(just(Token::Colon))
+            .then(stmt)
+            .map(|(label, stmt)| Stmt::Labelled(label, Box::new(stmt)));
+        let goto_stmt = just(Token::KwGoto)
+            .ignore_then(ident)
+            .then_ignore(just(Token::Semicolon))
+            .map(Stmt::Goto);
+        let null_stmt = just(Token::Semicolon).to(Stmt::Null);
 
         choice((
-            expr.clone()
-                .then_ignore(just(Token::Semicolon))
-                .map(Stmt::Expression),
-            just(Token::KeywordReturn)
-                .ignore_then(expr.clone())
-                .then_ignore(just(Token::Semicolon))
-                .map(Stmt::Return),
-            if_,
-            just(Token::Semicolon).to(Stmt::Null),
+            expr_stmt,
+            return_stmt,
+            if_stmt,
+            labelled_stmt,
+            goto_stmt,
+            null_stmt,
         ))
         .labelled("statement")
         .as_context()
     });
 
-    let decl = just(Token::KeywordInt)
+    let decl = just(Token::KwInt)
         .ignore_then(ident)
         .then(just(Token::Equal).ignore_then(expr).or_not())
         .then_ignore(just(Token::Semicolon))
@@ -52,9 +66,9 @@ where
 
     let block_item = choice((stmt.map(BlockItem::S), decl.map(BlockItem::D)));
 
-    let func_def = just(Token::KeywordInt)
+    let func_def = just(Token::KwInt)
         .ignore_then(ident)
-        .then_ignore(just([Token::LParen, Token::KeywordVoid, Token::RParen]))
+        .then_ignore(just([Token::LParen, Token::KwVoid, Token::RParen]))
         .then(
             block_item
                 .repeated()

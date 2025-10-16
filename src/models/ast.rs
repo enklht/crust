@@ -20,6 +20,8 @@ pub enum Stmt {
     Expression(Expr),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Null,
+    Labelled(String, Box<Stmt>),
+    Goto(String),
 }
 
 #[derive(Debug, Clone)]

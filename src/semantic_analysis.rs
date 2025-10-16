@@ -1,4 +1,5 @@
-mod resolve;
+mod resolve_labels;
+mod resolve_variables;
 
 use crate::models::ast::*;
 use thiserror::Error;
@@ -16,5 +17,7 @@ pub enum ValidationError {
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
 pub fn validate(program: Program) -> ValidationResult<Program> {
-    resolve::resolve_program(program)
+    let program = resolve_variables::resolve_program(program)?;
+    let program = resolve_labels::resolve_program(program)?;
+    Ok(program)
 }

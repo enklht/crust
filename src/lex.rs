@@ -7,11 +7,12 @@ type Spanned<T> = (T, SimpleSpan);
 pub fn lexer<'src>()
 -> impl Parser<'src, &'src str, Vec<Spanned<Token>>, extra::Err<Rich<'src, char>>> {
     let ident = text::ident().map(|s| match s {
-        "int" => Token::KeywordInt,
-        "return" => Token::KeywordReturn,
-        "void" => Token::KeywordVoid,
-        "if" => Token::KeywordIf,
-        "else" => Token::KeywordElse,
+        "int" => Token::KwInt,
+        "return" => Token::KwReturn,
+        "void" => Token::KwVoid,
+        "if" => Token::KwIf,
+        "else" => Token::KwElse,
+        "goto" => Token::KwGoto,
         s => Token::Ident(s.to_string()),
     });
 

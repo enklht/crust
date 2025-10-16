@@ -7,15 +7,17 @@ pub enum Token {
     #[display("{_0}")]
     Const(i32),
     #[display("int")]
-    KeywordInt,
+    KwInt,
     #[display("void")]
-    KeywordVoid,
+    KwVoid,
     #[display("return")]
-    KeywordReturn,
+    KwReturn,
     #[display("if")]
-    KeywordIf,
+    KwIf,
     #[display("else")]
-    KeywordElse,
+    KwElse,
+    #[display("goto")]
+    KwGoto,
     #[display("(")]
     LParen,
     #[display(")")]

@@ -64,6 +64,8 @@ fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, String>) -> ValidationResu
             Box::new(resolve_stmt(*then, env)?),
             None,
         ),
+        Stmt::Labelled(label, stmt) => Stmt::Labelled(label, Box::new(resolve_stmt(*stmt, env)?)),
+        Stmt::Goto(label) => Stmt::Goto(label),
         Stmt::Null => Stmt::Null,
     })
 }
