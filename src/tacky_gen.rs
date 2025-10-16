@@ -47,6 +47,26 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<tacky::Instruction>) {
         Stmt::Expression(expr) => {
             emit_expr(expr, instructions);
         }
+        Stmt::If(cond, then, None) => {
+            let end_label = make_label("if_end");
+            let cond = emit_expr(cond, instructions);
+            instructions.push(tacky::Instruction::JumpIfZero(cond, end_label.clone()));
+            emit_stmt(*then, instructions);
+            instructions.push(tacky::Instruction::Label(end_label))
+        }
+        Stmt::If(cond, then, Some(else_)) => {
+            let else_label = make_label("if_else");
+            let end_label = make_label("if_end");
+            let cond = emit_expr(cond, instructions);
+            instructions.push(tacky::Instruction::JumpIfZero(cond, else_label.clone()));
+            emit_stmt(*then, instructions);
+            instructions.extend([
+                tacky::Instruction::Jump(end_label.clone()),
+                tacky::Instruction::Label(else_label.clone()),
+            ]);
+            emit_stmt(*else_, instructions);
+            instructions.push(tacky::Instruction::Label(end_label))
+        }
         Stmt::Null => {}
     }
 }
@@ -144,7 +164,25 @@ fn emit_expr(expr: Expr, instructions: &mut Vec<tacky::Instruction>) -> tacky::V
             }
             _ => unreachable!(),
         },
-        // _ => todo!(),
+        Expr::Conditional(cond, then, else_) => {
+            let else_label = make_label("ternary_else");
+            let end_label = make_label("ternary_end");
+            let result = tacky::Val::Var(make_temporary());
+            let cond = emit_expr(*cond, instructions);
+            instructions.push(tacky::Instruction::JumpIfZero(cond, else_label.clone()));
+            let then = emit_expr(*then, instructions);
+            instructions.extend([
+                tacky::Instruction::Copy(then, result.clone()),
+                tacky::Instruction::Jump(end_label.clone()),
+                tacky::Instruction::Label(else_label),
+            ]);
+            let else_ = emit_expr(*else_, instructions);
+            instructions.extend([
+                tacky::Instruction::Copy(else_, result.clone()),
+                tacky::Instruction::Label(end_label),
+            ]);
+            result
+        }
     }
 }
 

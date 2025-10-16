@@ -10,6 +10,8 @@ pub fn lexer<'src>()
         "int" => Token::KeywordInt,
         "return" => Token::KeywordReturn,
         "void" => Token::KeywordVoid,
+        "if" => Token::KeywordIf,
+        "else" => Token::KeywordElse,
         s => Token::Ident(s.to_string()),
     });
 
@@ -64,6 +66,8 @@ pub fn lexer<'src>()
         just("<").to(Token::LessThan),
         just(">").to(Token::GreaterThan),
         just("=").to(Token::Equal),
+        just("?").to(Token::Question),
+        just(":").to(Token::Colon),
     ));
 
     choice((

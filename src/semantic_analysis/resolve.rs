@@ -54,12 +54,23 @@ fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, String>) -> ValidationResu
     Ok(match stmt {
         Stmt::Return(expr) => Stmt::Return(resolve_expr(expr, env)?),
         Stmt::Expression(expr) => Stmt::Expression(resolve_expr(expr, env)?),
+        Stmt::If(cond, then, Some(else_)) => Stmt::If(
+            resolve_expr(cond, env)?,
+            Box::new(resolve_stmt(*then, env)?),
+            Some(Box::new(resolve_stmt(*else_, env)?)),
+        ),
+        Stmt::If(cond, then, None) => Stmt::If(
+            resolve_expr(cond, env)?,
+            Box::new(resolve_stmt(*then, env)?),
+            None,
+        ),
         Stmt::Null => Stmt::Null,
     })
 }
 
 fn resolve_expr(expr: Expr, env: &mut HashMap<String, String>) -> ValidationResult<Expr> {
     Ok(match expr {
+        Expr::Const(i) => Expr::Const(i),
         Expr::Assignment(left, right) => match *left {
             left @ Expr::Var(_) => Expr::Assignment(
                 Box::new(resolve_expr(left, env)?),
@@ -83,6 +94,10 @@ fn resolve_expr(expr: Expr, env: &mut HashMap<String, String>) -> ValidationResu
             Box::new(resolve_expr(*e1, env)?),
             Box::new(resolve_expr(*e2, env)?),
         ),
-        other => other,
+        Expr::Conditional(cond, then, else_) => Expr::Conditional(
+            Box::new(resolve_expr(*cond, env)?),
+            Box::new(resolve_expr(*then, env)?),
+            Box::new(resolve_expr(*else_, env)?),
+        ),
     })
 }

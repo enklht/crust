@@ -18,6 +18,7 @@ pub enum BlockItem {
 pub enum Stmt {
     Return(Expr),
     Expression(Expr),
+    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Null,
 }
 
@@ -33,6 +34,7 @@ pub enum Expr {
     Unary(UnaryOp, Box<Expr>),
     Binary(BinaryOp, Box<Expr>, Box<Expr>),
     Assignment(Box<Expr>, Box<Expr>),
+    Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone)]

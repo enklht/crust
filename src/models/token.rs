@@ -12,6 +12,10 @@ pub enum Token {
     KeywordVoid,
     #[display("return")]
     KeywordReturn,
+    #[display("if")]
+    KeywordIf,
+    #[display("else")]
+    KeywordElse,
     #[display("(")]
     LParen,
     #[display(")")]
@@ -88,4 +92,8 @@ pub enum Token {
     DoublePlus,
     #[display("--")]
     DoubleHyphen,
+    #[display("?")]
+    Question,
+    #[display(":")]
+    Colon,
 }

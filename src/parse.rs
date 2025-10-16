@@ -12,16 +12,35 @@ where
 
     let expr = expr();
 
-    let stmt = choice((
-        expr.clone().map(Stmt::Expression),
-        just(Token::KeywordReturn)
-            .ignore_then(expr.clone())
-            .then_ignore(just(Token::Semicolon))
-            .map(Stmt::Return),
-        just(Token::Semicolon).to(Stmt::Null),
-    ))
-    .labelled("statement")
-    .as_context();
+    let stmt = recursive(|stmt| {
+        let if_ = just(Token::KeywordIf)
+            .ignore_then(
+                expr.clone()
+                    .delimited_by(just(Token::LParen), just(Token::RParen)),
+            )
+            .then(stmt.clone().map(Box::new))
+            .then(
+                just(Token::KeywordElse)
+                    .ignore_then(stmt)
+                    .map(Box::new)
+                    .or_not(),
+            )
+            .map(|((cond, then), else_)| Stmt::If(cond, then, else_));
+
+        choice((
+            expr.clone()
+                .then_ignore(just(Token::Semicolon))
+                .map(Stmt::Expression),
+            just(Token::KeywordReturn)
+                .ignore_then(expr.clone())
+                .then_ignore(just(Token::Semicolon))
+                .map(Stmt::Return),
+            if_,
+            just(Token::Semicolon).to(Stmt::Null),
+        ))
+        .labelled("statement")
+        .as_context()
+    });
 
     let decl = just(Token::KeywordInt)
         .ignore_then(ident)
@@ -59,7 +78,8 @@ where
                 Token::Ident(ident) => Expr::Var(ident.clone()),
                 Token::Const(i) => Expr::Const(i)
             },
-            expr.delimited_by(just(Token::LParen), just(Token::RParen)),
+            expr.clone()
+                .delimited_by(just(Token::LParen), just(Token::RParen)),
         ));
 
         atom.pratt((
@@ -148,6 +168,13 @@ where
             infix(left(3), just(Token::LogicalOr), |left, op, right, _| {
                 Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
             }),
+            infix(
+                right(2),
+                expr.delimited_by(just(Token::Question), just(Token::Colon)),
+                |cond, then, else_, _| {
+                    Expr::Conditional(Box::new(cond), Box::new(then), Box::new(else_))
+                },
+            ),
             infix(right(1), just(Token::Equal), |left, _, right, _| {
                 Expr::Assignment(Box::new(left), Box::new(right))
             }),
