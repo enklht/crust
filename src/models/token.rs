@@ -28,6 +28,12 @@ pub enum Token {
     KwBreak,
     #[display("continue")]
     KwContinue,
+    #[display("switch")]
+    KwSwitch,
+    #[display("case")]
+    KwCase,
+    #[display("default")]
+    KwDefault,
     #[display("(")]
     LParen,
     #[display(")")]

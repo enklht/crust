@@ -75,7 +75,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Inst>) {
             emit_stmt(*else_, instructions);
             instructions.push(Inst::Label(end_label))
         }
-        Stmt::Labelled(label, stmt) => {
+        Stmt::Labelled(Label::Ident(label), stmt) => {
             instructions.push(Inst::Label(label));
             emit_stmt(*stmt, instructions);
         }

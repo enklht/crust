@@ -102,6 +102,11 @@ fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, MapEntry>) -> ValidationRe
             let body = Box::new(resolve_stmt(*body, new_env)?);
             Stmt::For(init, cond, post, body, label)
         }
+        Stmt::Switch(cond, body, label) => {
+            let cond = resolve_exp(cond, env)?;
+            let body = Box::new(resolve_stmt(*body, env)?);
+            Stmt::Switch(cond, body, label)
+        }
         // Break, Continue, Null
         other => other,
     };

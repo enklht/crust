@@ -35,13 +35,11 @@ fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
 fn collect_labels(stmt: &Stmt, labels: &mut HashMap<String, String>) -> ValidationResult<()> {
     match stmt {
         Stmt::If(_, then, Some(else_)) => {
-            collect_labels(then.as_ref(), labels)?;
-            collect_labels(else_.as_ref(), labels)?;
+            collect_labels(then, labels)?;
+            collect_labels(else_, labels)?;
         }
-        Stmt::If(_, then, None) => {
-            collect_labels(then.as_ref(), labels)?;
-        }
-        Stmt::Labelled(label, stmt) => {
+        Stmt::If(_, then, None) => collect_labels(then, labels)?,
+        Stmt::Labelled(Label::Ident(label), stmt) => {
             match labels.get(label) {
                 Some(_) => return Err(ValidationError::DuplicateLabelDefinition(label.clone())),
                 None => {
@@ -49,7 +47,10 @@ fn collect_labels(stmt: &Stmt, labels: &mut HashMap<String, String>) -> Validati
                     labels.insert(label.clone(), new_label)
                 }
             };
-            collect_labels(stmt.as_ref(), labels)?;
+            collect_labels(stmt, labels)?;
+        }
+        Stmt::Labelled(_, stmt) => {
+            collect_labels(stmt, labels)?;
         }
         Stmt::Compound(block) => {
             for block_item in block {
@@ -57,6 +58,12 @@ fn collect_labels(stmt: &Stmt, labels: &mut HashMap<String, String>) -> Validati
                     collect_labels(stmt, labels)?;
                 }
             }
+        }
+        Stmt::While(_, body, _)
+        | Stmt::DoWhile(body, _, _)
+        | Stmt::For(_, _, _, body, _)
+        | Stmt::Switch(_, body, _) => {
+            collect_labels(body, labels)?;
         }
         _ => {}
     }
@@ -82,10 +89,16 @@ fn resolve_stmt(stmt: Stmt, labels: &HashMap<String, String>) -> ValidationResul
             Some(Box::new(resolve_stmt(*else_, labels)?)),
         ),
         Stmt::If(cond, then, None) => Stmt::If(cond, Box::new(resolve_stmt(*then, labels)?), None),
-        Stmt::Labelled(label, stmt) => match labels.get(&label) {
-            Some(label) => Stmt::Labelled(label.clone(), Box::new(resolve_stmt(*stmt, labels)?)),
+        Stmt::Labelled(Label::Ident(label), stmt) => match labels.get(&label) {
+            Some(label) => Stmt::Labelled(
+                Label::Ident(label.clone()),
+                Box::new(resolve_stmt(*stmt, labels)?),
+            ),
             None => return Err(ValidationError::UndefinedLabel(label.clone())),
         },
+        Stmt::Labelled(label, stmt) => {
+            Stmt::Labelled(label, Box::new(resolve_stmt(*stmt, labels)?))
+        }
         Stmt::Goto(label) => match labels.get(&label) {
             Some(label) => Stmt::Goto(label.clone()),
             None => return Err(ValidationError::UndefinedLabel(label)),
@@ -96,6 +109,22 @@ fn resolve_stmt(stmt: Stmt, labels: &HashMap<String, String>) -> ValidationResul
                 .map(|block_item| resolve_block_item(block_item, labels))
                 .collect::<Result<_, _>>()?;
             Stmt::Compound(block)
+        }
+        Stmt::While(cond, body, label) => {
+            Stmt::While(cond, Box::new(resolve_stmt(*body, labels)?), label)
+        }
+        Stmt::DoWhile(body, cond, label) => {
+            Stmt::DoWhile(Box::new(resolve_stmt(*body, labels)?), cond, label)
+        }
+        Stmt::For(init, cond, post, body, label) => Stmt::For(
+            init,
+            cond,
+            post,
+            Box::new(resolve_stmt(*body, labels)?),
+            label,
+        ),
+        Stmt::Switch(cond, body, label) => {
+            Stmt::Switch(cond, Box::new(resolve_stmt(*body, labels)?), label)
         }
         other => other,
     };

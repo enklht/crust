@@ -28,11 +28,18 @@ pub enum ForInit {
 }
 
 #[derive(Debug, Clone)]
+pub enum Label {
+    Ident(String),
+    Case(Exp),
+    Default,
+}
+
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Return(Exp),
     Expression(Exp),
     If(Exp, Box<Stmt>, Option<Box<Stmt>>),
-    Labelled(String, Box<Stmt>),
+    Labelled(Label, Box<Stmt>),
     Goto(String),
     Compound(Block),
     Break(Option<String>),
@@ -40,6 +47,8 @@ pub enum Stmt {
     While(Exp, Box<Stmt>, Option<String>),
     DoWhile(Box<Stmt>, Exp, Option<String>),
     For(ForInit, Option<Exp>, Option<Exp>, Box<Stmt>, Option<String>),
+    Switch(Exp, Box<Stmt>, Option<String>),
+    SwitchResolved(Exp, Box<Stmt>, Option<String>, Vec<i32>, bool),
     Null,
 }
 

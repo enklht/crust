@@ -1,5 +1,6 @@
 mod label_loops;
 mod resolve_labels;
+mod resolve_switches;
 mod resolve_variables;
 
 use crate::models::ast::*;
@@ -18,16 +19,30 @@ pub enum ValidationError {
     #[error("label {0} is not defined")]
     UndefinedLabel(String),
     #[error("break statement outside of loop")]
-    ContinueOutsideLoop,
-    #[error("continue statement outside of loop")]
     BreakOutsideLoop,
+    #[error("continue statement outside of loop")]
+    ContinueOutsideLoop,
+    #[error("case label outside of switch")]
+    CaseOutsideLoop,
+    #[error("default label outside of switch")]
+    DefaultOutsideLoop,
+    #[error("non-constant case value: {0:?}")]
+    NonConstCase(Exp),
+    #[error("duplicate case value: {0:?}")]
+    DuplicateCaseValue(i32),
+    #[error("multiple default statements found in switch")]
+    DuplicateDefault,
 }
 
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
 pub fn validate(program: Program) -> ValidationResult<Program> {
-    let program = resolve_variables::resolve_program(program)?;
-    let program = resolve_labels::resolve_program(program)?;
-    let program = label_loops::label_program(program)?;
-    Ok(program)
+    let passes = [
+        resolve_variables::resolve_program,
+        resolve_labels::resolve_program,
+        label_loops::label_program,
+        resolve_switches::resolve_program,
+    ];
+
+    passes.iter().try_fold(program, |p, pass| pass(p))
 }

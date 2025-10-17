@@ -65,7 +65,14 @@ where
                         .or_not(),
                 )
                 .map(|((cond, then), else_)| Stmt::If(cond, Box::new(then), else_));
-            let labelled_stmt = ident
+            let label = choice((
+                ident.map(Label::Ident),
+                just(Token::KwCase)
+                    .ignore_then(exp.clone())
+                    .map(Label::Case),
+                just(Token::KwDefault).to(Label::Default),
+            ));
+            let labelled_stmt = label
                 .then_ignore(just(Token::Colon))
                 .then(stmt.clone())
                 .map(|(label, stmt)| Stmt::Labelled(label, Box::new(stmt)));
@@ -91,10 +98,17 @@ where
                         .then(exp.clone().or_not())
                         .delimited_by(just(Token::LParen), just(Token::RParen)),
                 )
-                .then(stmt)
+                .then(stmt.clone())
                 .map(|(((init, cond), post), body)| {
                     Stmt::For(init, cond, post, Box::new(body), None)
                 });
+            let switch_stmt = just(Token::KwSwitch)
+                .ignore_then(
+                    exp.clone()
+                        .delimited_by(just(Token::LParen), just(Token::RParen)),
+                )
+                .then(stmt.clone())
+                .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), None));
 
             choice((
                 exp_stmt,
@@ -108,6 +122,7 @@ where
                 while_stmt,
                 do_while_stmt,
                 for_stmt,
+                switch_stmt,
                 just(Token::Semicolon).to(Stmt::Null),
             ))
             .labelled("statement")

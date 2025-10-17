@@ -18,6 +18,9 @@ pub fn lexer<'src>()
         "for" => Token::KwFor,
         "break" => Token::KwBreak,
         "continue" => Token::KwContinue,
+        "switch" => Token::KwSwitch,
+        "case" => Token::KwCase,
+        "default" => Token::KwDefault,
         s => Token::Ident(s.to_string()),
     });
 
