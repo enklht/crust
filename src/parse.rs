@@ -10,71 +10,73 @@ where
 {
     let ident = select! { Token::Ident(ident) => ident };
 
-    let expr = expr();
+    let block = recursive(|block| {
+        let expr = expr();
 
-    let stmt = recursive(|stmt| {
-        let expr_stmt = expr
-            .clone()
-            .then_ignore(just(Token::Semicolon))
-            .map(Stmt::Expression);
-        let return_stmt = just(Token::KwReturn)
-            .ignore_then(expr.clone())
-            .then_ignore(just(Token::Semicolon))
-            .map(Stmt::Return);
-        let if_stmt = just(Token::KwIf)
-            .ignore_then(
-                expr.clone()
-                    .delimited_by(just(Token::LParen), just(Token::RParen)),
-            )
-            .then(stmt.clone().map(Box::new))
-            .then(
-                just(Token::KwElse)
-                    .ignore_then(stmt.clone())
-                    .map(Box::new)
-                    .or_not(),
-            )
-            .map(|((cond, then), else_)| Stmt::If(cond, then, else_));
-        let labelled_stmt = ident
-            .then_ignore(just(Token::Colon))
-            .then(stmt)
-            .map(|(label, stmt)| Stmt::Labelled(label, Box::new(stmt)));
-        let goto_stmt = just(Token::KwGoto)
+        let stmt = recursive(|stmt| {
+            let expr_stmt = expr
+                .clone()
+                .then_ignore(just(Token::Semicolon))
+                .map(Stmt::Expression);
+            let return_stmt = just(Token::KwReturn)
+                .ignore_then(expr.clone())
+                .then_ignore(just(Token::Semicolon))
+                .map(Stmt::Return);
+            let if_stmt = just(Token::KwIf)
+                .ignore_then(
+                    expr.clone()
+                        .delimited_by(just(Token::LParen), just(Token::RParen)),
+                )
+                .then(stmt.clone().map(Box::new))
+                .then(
+                    just(Token::KwElse)
+                        .ignore_then(stmt.clone())
+                        .map(Box::new)
+                        .or_not(),
+                )
+                .map(|((cond, then), else_)| Stmt::If(cond, then, else_));
+            let labelled_stmt = ident
+                .then_ignore(just(Token::Colon))
+                .then(stmt)
+                .map(|(label, stmt)| Stmt::Labelled(label, Box::new(stmt)));
+            let goto_stmt = just(Token::KwGoto)
+                .ignore_then(ident)
+                .then_ignore(just(Token::Semicolon))
+                .map(Stmt::Goto);
+
+            choice((
+                expr_stmt,
+                return_stmt,
+                if_stmt,
+                labelled_stmt,
+                goto_stmt,
+                block.map(Stmt::Compound),
+                just(Token::Semicolon).to(Stmt::Null),
+            ))
+            .labelled("statement")
+            .as_context()
+        });
+
+        let decl = just(Token::KwInt)
             .ignore_then(ident)
+            .then(just(Token::Equal).ignore_then(expr).or_not())
             .then_ignore(just(Token::Semicolon))
-            .map(Stmt::Goto);
-        let null_stmt = just(Token::Semicolon).to(Stmt::Null);
+            .map(|(name, init)| Decl::Decl(name, init))
+            .labelled("declaration")
+            .as_context();
 
-        choice((
-            expr_stmt,
-            return_stmt,
-            if_stmt,
-            labelled_stmt,
-            goto_stmt,
-            null_stmt,
-        ))
-        .labelled("statement")
-        .as_context()
+        let block_item = choice((stmt.map(BlockItem::S), decl.map(BlockItem::D)));
+
+        block_item
+            .repeated()
+            .collect()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace))
     });
-
-    let decl = just(Token::KwInt)
-        .ignore_then(ident)
-        .then(just(Token::Equal).ignore_then(expr).or_not())
-        .then_ignore(just(Token::Semicolon))
-        .map(|(name, init)| Decl::Decl(name, init))
-        .labelled("declaration")
-        .as_context();
-
-    let block_item = choice((stmt.map(BlockItem::S), decl.map(BlockItem::D)));
 
     let func_def = just(Token::KwInt)
         .ignore_then(ident)
-        .then_ignore(just([Token::LParen, Token::KwVoid, Token::RParen]))
-        .then(
-            block_item
-                .repeated()
-                .collect()
-                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
-        )
+        .then_ignore(just(Token::KwVoid).delimited_by(just(Token::LParen), just(Token::RParen)))
+        .then(block)
         .map(|(name, body)| FuncDef::Function(name, body));
 
     let program = func_def.map(Program::FuncDef);

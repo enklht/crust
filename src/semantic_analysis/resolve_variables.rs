@@ -4,6 +4,14 @@ use crate::models::ast::*;
 use crate::utils::make_label;
 use std::collections::HashMap;
 
+type MapEntry = (String, bool);
+
+fn copy_env(env: &HashMap<String, MapEntry>) -> HashMap<String, MapEntry> {
+    env.iter()
+        .map(|(name, (unique_name, _))| (name.clone(), (unique_name.clone(), false)))
+        .collect()
+}
+
 pub fn resolve_program(program: Program) -> ValidationResult<Program> {
     Ok(match program {
         Program::FuncDef(func_def) => Program::FuncDef(resolve_func_def(func_def)?),
@@ -14,19 +22,21 @@ fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
     Ok(match func_def {
         FuncDef::Function(name, body) => {
             let mut env = HashMap::new();
-            FuncDef::Function(
-                name,
-                body.into_iter()
-                    .map(|block_item| resolve_block_item(block_item, &mut env))
-                    .collect::<ValidationResult<_>>()?,
-            )
+            FuncDef::Function(name, resolve_block(body, &mut env)?)
         }
     })
 }
 
+fn resolve_block(block: Block, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Block> {
+    block
+        .into_iter()
+        .map(|block_item| resolve_block_item(block_item, env))
+        .collect::<ValidationResult<_>>()
+}
+
 fn resolve_block_item(
     block_item: BlockItem,
-    env: &mut HashMap<String, String>,
+    env: &mut HashMap<String, MapEntry>,
 ) -> ValidationResult<BlockItem> {
     Ok(match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, env)?),
@@ -34,15 +44,15 @@ fn resolve_block_item(
     })
 }
 
-fn resolve_decl(decl: Decl, env: &mut HashMap<String, String>) -> ValidationResult<Decl> {
+fn resolve_decl(decl: Decl, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Decl> {
     Ok(match decl {
         Decl::Decl(name, init) => match env.get(&name) {
-            Some(_) => {
+            Some((_, true)) => {
                 return Err(ValidationError::DuplicateVariableDefinition(name));
             }
-            None => {
+            _ => {
                 let unique_name = make_label(&name);
-                env.insert(name, unique_name.clone());
+                env.insert(name, (unique_name.clone(), true));
                 let init_resolved = init.map(|expr| resolve_expr(expr, env)).transpose()?;
                 Decl::Decl(unique_name, init_resolved)
             }
@@ -50,7 +60,7 @@ fn resolve_decl(decl: Decl, env: &mut HashMap<String, String>) -> ValidationResu
     })
 }
 
-fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, String>) -> ValidationResult<Stmt> {
+fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Stmt> {
     Ok(match stmt {
         Stmt::Return(expr) => Stmt::Return(resolve_expr(expr, env)?),
         Stmt::Expression(expr) => Stmt::Expression(resolve_expr(expr, env)?),
@@ -66,11 +76,15 @@ fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, String>) -> ValidationResu
         ),
         Stmt::Labelled(label, stmt) => Stmt::Labelled(label, Box::new(resolve_stmt(*stmt, env)?)),
         Stmt::Goto(label) => Stmt::Goto(label),
+        Stmt::Compound(block) => {
+            let mut new_env = copy_env(env);
+            Stmt::Compound(resolve_block(block, &mut new_env)?)
+        }
         Stmt::Null => Stmt::Null,
     })
 }
 
-fn resolve_expr(expr: Expr, env: &mut HashMap<String, String>) -> ValidationResult<Expr> {
+fn resolve_expr(expr: Expr, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Expr> {
     Ok(match expr {
         Expr::Const(i) => Expr::Const(i),
         Expr::Assignment(left, right) => match *left {
@@ -81,7 +95,7 @@ fn resolve_expr(expr: Expr, env: &mut HashMap<String, String>) -> ValidationResu
             other => return Err(ValidationError::InvalidLvalue(other.clone())),
         },
         Expr::Var(name) => match env.get(&name) {
-            Some(unique_name) => Expr::Var(unique_name.clone()),
+            Some((unique_name, _)) => Expr::Var(unique_name.clone()),
             None => return Err(ValidationError::UndefinedVariable(name)),
         },
         Expr::Unary(op @ (UnaryOp::PostfixIncrement | UnaryOp::PostfixDecrement), expr) => {

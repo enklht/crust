@@ -2,7 +2,7 @@
 
 # Check args
 if test (count $argv) -lt 1 -o (count $argv) -gt 2
-    printf "Usage: my_cc.fish [--lex|--parse|--codegen] /path/to/source.c\n" >&2
+    printf "Usage: my_cc.fish [--lex|--parse|--validate|--tacky|--codegen] /path/to/source.c\n" >&2
     exit 2
 end
 

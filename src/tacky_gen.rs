@@ -14,12 +14,17 @@ fn convert_function(function: FuncDef) -> tacky::Function {
     match function {
         FuncDef::Function(name, body) => {
             let mut instructions = Vec::new();
-            body.into_iter()
-                .for_each(|item| emit_block_item(item, &mut instructions));
+            emit_block(body, &mut instructions);
             instructions.push(Instruction::Return(tacky::Val::Const(0)));
             tacky::Function::Function(name, instructions)
         }
     }
+}
+
+fn emit_block(block: Block, instructions: &mut Vec<Instruction>) {
+    block
+        .into_iter()
+        .for_each(|item| emit_block_item(item, instructions));
 }
 
 fn emit_block_item(block_item: BlockItem, instructions: &mut Vec<Instruction>) {
@@ -73,6 +78,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>) {
             emit_stmt(*stmt, instructions);
         }
         Stmt::Goto(label) => instructions.push(Instruction::Jump(label)),
+        Stmt::Compound(block) => emit_block(block, instructions),
         Stmt::Null => {}
     }
 }

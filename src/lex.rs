@@ -16,11 +16,7 @@ pub fn lexer<'src>()
         s => Token::Ident(s.to_string()),
     });
 
-    let constant = text::int(10)
-        .then_ignore(any().filter(|&c: &char| !c.is_alphanumeric()).rewind())
-        .from_str()
-        .unwrapped()
-        .map(Token::Const);
+    let constant = text::int(10).from_str().unwrapped().map(Token::Const);
 
     let three_chars_long = choice((
         just("<<=").to(Token::LShiftEqual),

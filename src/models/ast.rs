@@ -5,8 +5,10 @@ pub enum Program {
 
 #[derive(Debug, Clone)]
 pub enum FuncDef {
-    Function(String, Vec<BlockItem>),
+    Function(String, Block),
 }
+
+pub type Block = Vec<BlockItem>;
 
 #[derive(Debug, Clone)]
 pub enum BlockItem {
@@ -19,9 +21,10 @@ pub enum Stmt {
     Return(Expr),
     Expression(Expr),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
-    Null,
     Labelled(String, Box<Stmt>),
     Goto(String),
+    Compound(Block),
+    Null,
 }
 
 #[derive(Debug, Clone)]
