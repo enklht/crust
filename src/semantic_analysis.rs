@@ -9,7 +9,7 @@ pub enum ValidationError {
     #[error("Validation error: duplicate variable definition {0}")]
     DuplicateVariableDefinition(String),
     #[error("Validation error: lvalue of an assignement must be a variable, found {0:?}")]
-    InvalidLvalue(Expr),
+    InvalidLvalue(Exp),
     #[error("Validation error: variable {0} is not defined")]
     UndefinedVariable(String),
 }

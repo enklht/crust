@@ -18,28 +18,39 @@ pub enum BlockItem {
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    Return(Expr),
-    Expression(Expr),
-    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
+    Return(Exp),
+    Expression(Exp),
+    If(Exp, Box<Stmt>, Option<Box<Stmt>>),
     Labelled(String, Box<Stmt>),
     Goto(String),
     Compound(Block),
+    Break,
+    Continue,
+    While(Exp, Box<Stmt>),
+    DoWhile(Box<Stmt>, Exp),
+    For(ForInit, Option<Exp>, Option<Exp>, Box<Stmt>),
     Null,
 }
 
 #[derive(Debug, Clone)]
-pub enum Decl {
-    Decl(String, Option<Expr>),
+pub enum ForInit {
+    InitDecl(Decl),
+    InitExpr(Option<Exp>),
 }
 
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub enum Decl {
+    Decl(String, Option<Exp>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Exp {
     Const(i32),
     Var(String),
-    Unary(UnaryOp, Box<Expr>),
-    Binary(BinaryOp, Box<Expr>, Box<Expr>),
-    Assignment(Box<Expr>, Box<Expr>),
-    Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
+    Unary(UnaryOp, Box<Exp>),
+    Binary(BinaryOp, Box<Exp>, Box<Exp>),
+    Assignment(Box<Exp>, Box<Exp>),
+    Conditional(Box<Exp>, Box<Exp>, Box<Exp>),
 }
 
 #[derive(Debug, Clone)]

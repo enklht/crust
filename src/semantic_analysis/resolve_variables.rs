@@ -53,7 +53,7 @@ fn resolve_decl(decl: Decl, env: &mut HashMap<String, MapEntry>) -> ValidationRe
             _ => {
                 let unique_name = make_label(&name);
                 env.insert(name, (unique_name.clone(), true));
-                let init_resolved = init.map(|expr| resolve_expr(expr, env)).transpose()?;
+                let init_resolved = init.map(|exp| resolve_exp(exp, env)).transpose()?;
                 Decl::Decl(unique_name, init_resolved)
             }
         },
@@ -62,15 +62,15 @@ fn resolve_decl(decl: Decl, env: &mut HashMap<String, MapEntry>) -> ValidationRe
 
 fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Stmt> {
     Ok(match stmt {
-        Stmt::Return(expr) => Stmt::Return(resolve_expr(expr, env)?),
-        Stmt::Expression(expr) => Stmt::Expression(resolve_expr(expr, env)?),
+        Stmt::Return(exp) => Stmt::Return(resolve_exp(exp, env)?),
+        Stmt::Expression(exp) => Stmt::Expression(resolve_exp(exp, env)?),
         Stmt::If(cond, then, Some(else_)) => Stmt::If(
-            resolve_expr(cond, env)?,
+            resolve_exp(cond, env)?,
             Box::new(resolve_stmt(*then, env)?),
             Some(Box::new(resolve_stmt(*else_, env)?)),
         ),
         Stmt::If(cond, then, None) => Stmt::If(
-            resolve_expr(cond, env)?,
+            resolve_exp(cond, env)?,
             Box::new(resolve_stmt(*then, env)?),
             None,
         ),
@@ -81,39 +81,39 @@ fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, MapEntry>) -> ValidationRe
             Stmt::Compound(resolve_block(block, &mut new_env)?)
         }
         Stmt::Null => Stmt::Null,
+        _ => todo!(),
     })
 }
 
-fn resolve_expr(expr: Expr, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Expr> {
-    Ok(match expr {
-        Expr::Const(i) => Expr::Const(i),
-        Expr::Assignment(left, right) => match *left {
-            left @ Expr::Var(_) => Expr::Assignment(
-                Box::new(resolve_expr(left, env)?),
-                Box::new(resolve_expr(*right, env)?),
+fn resolve_exp(exp: Exp, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Exp> {
+    Ok(match exp {
+        Exp::Const(i) => Exp::Const(i),
+        Exp::Assignment(left, right) => match *left {
+            left @ Exp::Var(_) => Exp::Assignment(
+                Box::new(resolve_exp(left, env)?),
+                Box::new(resolve_exp(*right, env)?),
             ),
             other => return Err(ValidationError::InvalidLvalue(other.clone())),
         },
-        Expr::Var(name) => match env.get(&name) {
-            Some((unique_name, _)) => Expr::Var(unique_name.clone()),
+        Exp::Var(name) => match env.get(&name) {
+            Some((unique_name, _)) => Exp::Var(unique_name.clone()),
             None => return Err(ValidationError::UndefinedVariable(name)),
         },
-        Expr::Unary(op @ (UnaryOp::PostfixIncrement | UnaryOp::PostfixDecrement), expr) => {
-            match *expr {
-                expr @ Expr::Var(_) => Expr::Unary(op, Box::new(resolve_expr(expr, env)?)),
-                other => return Err(ValidationError::InvalidLvalue(other.clone())),
-            }
-        }
-        Expr::Unary(op, e) => Expr::Unary(op, Box::new(resolve_expr(*e, env)?)),
-        Expr::Binary(op, e1, e2) => Expr::Binary(
+        Exp::Unary(op @ (UnaryOp::PostfixIncrement | UnaryOp::PostfixDecrement), exp) => match *exp
+        {
+            exp @ Exp::Var(_) => Exp::Unary(op, Box::new(resolve_exp(exp, env)?)),
+            other => return Err(ValidationError::InvalidLvalue(other.clone())),
+        },
+        Exp::Unary(op, e) => Exp::Unary(op, Box::new(resolve_exp(*e, env)?)),
+        Exp::Binary(op, e1, e2) => Exp::Binary(
             op,
-            Box::new(resolve_expr(*e1, env)?),
-            Box::new(resolve_expr(*e2, env)?),
+            Box::new(resolve_exp(*e1, env)?),
+            Box::new(resolve_exp(*e2, env)?),
         ),
-        Expr::Conditional(cond, then, else_) => Expr::Conditional(
-            Box::new(resolve_expr(*cond, env)?),
-            Box::new(resolve_expr(*then, env)?),
-            Box::new(resolve_expr(*else_, env)?),
+        Exp::Conditional(cond, then, else_) => Exp::Conditional(
+            Box::new(resolve_exp(*cond, env)?),
+            Box::new(resolve_exp(*then, env)?),
+            Box::new(resolve_exp(*else_, env)?),
         ),
     })
 }

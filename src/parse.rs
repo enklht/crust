@@ -11,20 +11,20 @@ where
     let ident = select! { Token::Ident(ident) => ident };
 
     let block = recursive(|block| {
-        let expr = expr();
+        let exp = exp();
 
         let stmt = recursive(|stmt| {
-            let expr_stmt = expr
+            let exp_stmt = exp
                 .clone()
                 .then_ignore(just(Token::Semicolon))
                 .map(Stmt::Expression);
             let return_stmt = just(Token::KwReturn)
-                .ignore_then(expr.clone())
+                .ignore_then(exp.clone())
                 .then_ignore(just(Token::Semicolon))
                 .map(Stmt::Return);
             let if_stmt = just(Token::KwIf)
                 .ignore_then(
-                    expr.clone()
+                    exp.clone()
                         .delimited_by(just(Token::LParen), just(Token::RParen)),
                 )
                 .then(stmt.clone().map(Box::new))
@@ -45,7 +45,7 @@ where
                 .map(Stmt::Goto);
 
             choice((
-                expr_stmt,
+                exp_stmt,
                 return_stmt,
                 if_stmt,
                 labelled_stmt,
@@ -59,7 +59,7 @@ where
 
         let decl = just(Token::KwInt)
             .ignore_then(ident)
-            .then(just(Token::Equal).ignore_then(expr).or_not())
+            .then(just(Token::Equal).ignore_then(exp).or_not())
             .then_ignore(just(Token::Semicolon))
             .map(|(name, init)| Decl::Decl(name, init))
             .labelled("declaration")
@@ -84,17 +84,17 @@ where
     program.then_ignore(end())
 }
 
-fn expr<'tokens, I>() -> impl Parser<'tokens, I, Expr, extra::Err<Rich<'tokens, Token>>> + Clone
+fn exp<'tokens, I>() -> impl Parser<'tokens, I, Exp, extra::Err<Rich<'tokens, Token>>> + Clone
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
-    recursive(|expr| {
+    recursive(|exp| {
         let atom = choice((
             select! {
-                Token::Ident(ident) => Expr::Var(ident.clone()),
-                Token::Const(i) => Expr::Const(i)
+                Token::Ident(ident) => Exp::Var(ident.clone()),
+                Token::Const(i) => Exp::Const(i)
             },
-            expr.clone()
+            exp.clone()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         ));
 
@@ -102,52 +102,52 @@ where
             postfix(
                 14,
                 one_of([Token::DoublePlus, Token::DoubleHyphen]),
-                |v, op, _| Expr::Unary(convert_unop(op), Box::new(v)),
+                |v, op, _| Exp::Unary(convert_unop(op), Box::new(v)),
             ),
-            prefix(13, just(Token::DoublePlus), |_, v: Expr, _| {
-                Expr::Assignment(
+            prefix(13, just(Token::DoublePlus), |_, v: Exp, _| {
+                Exp::Assignment(
                     Box::new(v.clone()),
-                    Box::new(Expr::Binary(
+                    Box::new(Exp::Binary(
                         BinaryOp::Add,
                         Box::new(v),
-                        Box::new(Expr::Const(1)),
+                        Box::new(Exp::Const(1)),
                     )),
                 )
             }),
-            prefix(13, just(Token::DoubleHyphen), |_, v: Expr, _| {
-                Expr::Assignment(
+            prefix(13, just(Token::DoubleHyphen), |_, v: Exp, _| {
+                Exp::Assignment(
                     Box::new(v.clone()),
-                    Box::new(Expr::Binary(
+                    Box::new(Exp::Binary(
                         BinaryOp::Subtract,
                         Box::new(v),
-                        Box::new(Expr::Const(1)),
+                        Box::new(Exp::Const(1)),
                     )),
                 )
             }),
             prefix(
                 13,
                 one_of([Token::Hyphen, Token::Tilde, Token::Bang]),
-                |op, v, _| Expr::Unary(convert_unop(op), Box::new(v)),
+                |op, v, _| Exp::Unary(convert_unop(op), Box::new(v)),
             ),
             infix(
                 left(12),
                 one_of([Token::Star, Token::Slash, Token::Percent]),
                 |left, op, right, _| {
-                    Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                    Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
                 },
             ),
             infix(
                 left(11),
                 one_of([Token::Plus, Token::Hyphen]),
                 |left, op, right, _| {
-                    Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                    Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
                 },
             ),
             infix(
                 left(10),
                 one_of([Token::LShift, Token::RShift]),
                 |left, op, right, _| {
-                    Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                    Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
                 },
             ),
             infix(
@@ -159,40 +159,40 @@ where
                     Token::LessOrEqual,
                 ]),
                 |left, op, right, _| {
-                    Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                    Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
                 },
             ),
             infix(
                 left(8),
                 one_of([Token::DoubleEqual, Token::BangEqual]),
                 |left, op, right, _| {
-                    Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                    Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
                 },
             ),
             infix(left(7), just(Token::Ampersand), |left, op, right, _| {
-                Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
             }),
             infix(left(6), just(Token::Caret), |left, op, right, _| {
-                Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
             }),
             infix(left(5), just(Token::VerticalBar), |left, op, right, _| {
-                Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
             }),
             infix(left(4), just(Token::LogicalAnd), |left, op, right, _| {
-                Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
             }),
             infix(left(3), just(Token::LogicalOr), |left, op, right, _| {
-                Expr::Binary(convert_binop(op), Box::new(left), Box::new(right))
+                Exp::Binary(convert_binop(op), Box::new(left), Box::new(right))
             }),
             infix(
                 right(2),
-                expr.delimited_by(just(Token::Question), just(Token::Colon)),
+                exp.delimited_by(just(Token::Question), just(Token::Colon)),
                 |cond, then, else_, _| {
-                    Expr::Conditional(Box::new(cond), Box::new(then), Box::new(else_))
+                    Exp::Conditional(Box::new(cond), Box::new(then), Box::new(else_))
                 },
             ),
             infix(right(1), just(Token::Equal), |left, _, right, _| {
-                Expr::Assignment(Box::new(left), Box::new(right))
+                Exp::Assignment(Box::new(left), Box::new(right))
             }),
             infix(
                 right(1),
@@ -208,17 +208,17 @@ where
                     Token::LShiftEqual,
                     Token::RShiftEqual,
                 ]),
-                |left: Expr, op, right, _| {
+                |left: Exp, op, right, _| {
                     let op = convert_compound(op);
-                    Expr::Assignment(
+                    Exp::Assignment(
                         Box::new(left.clone()),
-                        Box::new(Expr::Binary(op, Box::new(left), Box::new(right))),
+                        Box::new(Exp::Binary(op, Box::new(left), Box::new(right))),
                     )
                 },
             ),
         ))
     })
-    .labelled("expression")
+    .labelled("expession")
     .as_context()
 }
 
