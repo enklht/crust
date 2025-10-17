@@ -93,7 +93,7 @@ fn main() -> Result<(), CrustError> {
     let tacky = tacky_gen::convert_program(validated_ast);
 
     if opts.mode == CompilerMode::Tacky {
-        println!("{:#?}", tacky);
+        println!("{:?}", tacky);
         return Ok(());
     }
 

@@ -1,10 +1,12 @@
 use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
+use crate::utils::make_label;
+use rustc_hash::FxHashMap;
 
 struct Context {
-    cases: Vec<i32>,
-    has_default: bool,
+    cases: FxHashMap<i32, String>,
+    default: Option<String>,
 }
 
 pub fn resolve_program(program: Program) -> ValidationResult<Program> {
@@ -48,32 +50,35 @@ fn resolve_stmt(stmt: Stmt, context: &mut Option<&mut Context>) -> ValidationRes
         ),
         Stmt::If(cond, then, None) => Stmt::If(cond, Box::new(resolve_stmt(*then, context)?), None),
         Stmt::Labelled(Label::Case(exp), stmt) => {
+            let label = make_label("case");
             if let Some(context) = context.as_mut() {
                 let Exp::Const(case) = exp else {
                     return Err(ValidationError::NonConstCase(exp));
                 };
-                if context.cases.contains(&case) {
+                if context.cases.contains_key(&case) {
                     return Err(ValidationError::DuplicateCaseValue(case));
                 }
-                context.cases.push(case);
+                context.cases.insert(case, label.clone());
             } else {
                 return Err(ValidationError::CaseOutsideLoop);
             }
+
             let stmt = Box::new(resolve_stmt(*stmt, context)?);
-            Stmt::Labelled(Label::Default, stmt)
+            Stmt::Labelled(Label::Ident(label), stmt)
         }
         Stmt::Labelled(Label::Default, stmt) => {
+            let label = make_label("default");
             if let Some(context) = context.as_mut() {
-                if !context.has_default {
-                    context.has_default = true;
-                } else {
-                    return Err(ValidationError::DuplicateDefault);
+                match context.default {
+                    Some(_) => return Err(ValidationError::DuplicateDefault),
+                    None => context.default = Some(label.clone()),
                 }
             } else {
                 return Err(ValidationError::DefaultOutsideLoop);
             }
+
             let stmt = Box::new(resolve_stmt(*stmt, context)?);
-            Stmt::Labelled(Label::Default, stmt)
+            Stmt::Labelled(Label::Ident(label), stmt)
         }
         Stmt::Labelled(label, body) => {
             let body = Box::new(resolve_stmt(*body, context)?);
@@ -100,17 +105,11 @@ fn resolve_stmt(stmt: Stmt, context: &mut Option<&mut Context>) -> ValidationRes
         }
         Stmt::Switch(cond, body, label) => {
             let mut new_context = Context {
-                cases: Vec::new(),
-                has_default: false,
+                cases: FxHashMap::default(),
+                default: None,
             };
             let body = Box::new(resolve_stmt(*body, &mut Some(&mut new_context))?);
-            Stmt::SwitchResolved(
-                cond,
-                body,
-                label,
-                new_context.cases,
-                new_context.has_default,
-            )
+            Stmt::SwitchResolved(cond, body, label, new_context.cases, new_context.default)
         }
         other => other,
     };

@@ -4,6 +4,10 @@ use crate::models::tacky::Instruction as Inst;
 use crate::utils::make_label;
 use crate::utils::make_temporary;
 
+fn make_temp_var() -> tacky::Val {
+    tacky::Val::Var(make_temporary())
+}
+
 pub fn convert_program(program: Program) -> tacky::Program {
     match program {
         Program::FuncDef(function) => tacky::Program::Program(convert_function(function)),
@@ -131,6 +135,29 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Inst>) {
             }
             instructions.extend([Inst::Jump(start_label), Inst::Label(break_label)])
         }
+        Stmt::SwitchResolved(cond, body, Some(label), cases, default) => {
+            let break_label = format!("break_{label}");
+            let cond = emit_exp(cond, instructions);
+            let flag = make_temp_var();
+
+            for (case, case_label) in cases {
+                instructions.extend([
+                    Inst::Binary(
+                        tacky::BinaryOp::Equal,
+                        cond.clone(),
+                        tacky::Val::Const(case),
+                        flag.clone(),
+                    ),
+                    Inst::JumpIfNotZero(flag.clone(), case_label),
+                ])
+            }
+            match default {
+                Some(default_label) => instructions.push(Inst::Jump(default_label)),
+                None => instructions.push(Inst::Jump(break_label.clone())),
+            }
+            emit_stmt(*body, instructions);
+            instructions.push(Inst::Label(break_label));
+        }
         Stmt::Null => {}
         _ => unreachable!(),
     }
@@ -141,7 +168,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Inst>) -> tacky::Val {
         Exp::Const(i) => tacky::Val::Const(i),
         Exp::Unary(UnaryOp::PostfixIncrement, exp) => match *exp.clone() {
             Exp::Var(v) => {
-                let tmp = tacky::Val::Var(make_temporary());
+                let tmp = make_temp_var();
                 instructions.extend([
                     Inst::Copy(tacky::Val::Var(v.clone()), tmp.clone()),
                     Inst::Binary(
@@ -157,7 +184,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Inst>) -> tacky::Val {
         },
         Exp::Unary(UnaryOp::PostfixDecrement, exp) => match *exp.clone() {
             Exp::Var(v) => {
-                let tmp = tacky::Val::Var(make_temporary());
+                let tmp = make_temp_var();
                 instructions.extend([
                     Inst::Copy(tacky::Val::Var(v.clone()), tmp.clone()),
                     Inst::Binary(
@@ -173,7 +200,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Inst>) -> tacky::Val {
         },
         Exp::Unary(op, inner) => {
             let src = emit_exp(*inner, instructions);
-            let dst = tacky::Val::Var(make_temporary());
+            let dst = make_temp_var();
             let tacky_op = convert_unop(op);
             instructions.push(Inst::Unary(tacky_op, src, dst.clone()));
             dst
@@ -182,7 +209,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Inst>) -> tacky::Val {
             let false_label = make_label("and_false");
             let end_label = make_label("and_end");
 
-            let dst = tacky::Val::Var(make_temporary());
+            let dst = make_temp_var();
             let v1 = emit_exp(*v1, instructions);
             instructions.push(Inst::JumpIfZero(v1, false_label.clone()));
             let v2 = emit_exp(*v2, instructions);
@@ -200,7 +227,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Inst>) -> tacky::Val {
             let true_label = make_label("or_true");
             let end_label = make_label("or_end");
 
-            let dst = tacky::Val::Var(make_temporary());
+            let dst = make_temp_var();
             let v1 = emit_exp(*v1, instructions);
             instructions.push(Inst::JumpIfNotZero(v1, true_label.clone()));
             let v2 = emit_exp(*v2, instructions);
@@ -217,7 +244,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Inst>) -> tacky::Val {
         Exp::Binary(op, e1, e2) => {
             let v1 = emit_exp(*e1, instructions);
             let v2 = emit_exp(*e2, instructions);
-            let dst = tacky::Val::Var(make_temporary());
+            let dst = make_temp_var();
             let tacky_op = convert_binop(op);
             instructions.push(Inst::Binary(tacky_op, v1, v2, dst.clone()));
             dst
@@ -234,7 +261,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Inst>) -> tacky::Val {
         Exp::Conditional(cond, then, else_) => {
             let else_label = make_label("ternary_else");
             let end_label = make_label("ternary_end");
-            let result = tacky::Val::Var(make_temporary());
+            let result = make_temp_var();
 
             let cond = emit_exp(*cond, instructions);
             instructions.push(Inst::JumpIfZero(cond, else_label.clone()));

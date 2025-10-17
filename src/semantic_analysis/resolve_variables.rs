@@ -2,11 +2,11 @@ use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
 use crate::utils::make_label;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 type MapEntry = (String, bool);
 
-fn copy_env(env: &HashMap<String, MapEntry>) -> HashMap<String, MapEntry> {
+fn copy_env(env: &FxHashMap<String, MapEntry>) -> FxHashMap<String, MapEntry> {
     env.iter()
         .map(|(name, (unique_name, _))| (name.clone(), (unique_name.clone(), false)))
         .collect()
@@ -22,14 +22,14 @@ pub fn resolve_program(program: Program) -> ValidationResult<Program> {
 fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
     let func_def = match func_def {
         FuncDef::Function(name, body) => {
-            let mut env = HashMap::new();
+            let mut env = FxHashMap::default();
             FuncDef::Function(name, resolve_block(body, &mut env)?)
         }
     };
     Ok(func_def)
 }
 
-fn resolve_block(block: Block, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Block> {
+fn resolve_block(block: Block, env: &mut FxHashMap<String, MapEntry>) -> ValidationResult<Block> {
     block
         .into_iter()
         .map(|block_item| resolve_block_item(block_item, env))
@@ -38,7 +38,7 @@ fn resolve_block(block: Block, env: &mut HashMap<String, MapEntry>) -> Validatio
 
 fn resolve_block_item(
     block_item: BlockItem,
-    env: &mut HashMap<String, MapEntry>,
+    env: &mut FxHashMap<String, MapEntry>,
 ) -> ValidationResult<BlockItem> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, env)?),
@@ -47,7 +47,7 @@ fn resolve_block_item(
     Ok(block_item)
 }
 
-fn resolve_decl(decl: Decl, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Decl> {
+fn resolve_decl(decl: Decl, env: &mut FxHashMap<String, MapEntry>) -> ValidationResult<Decl> {
     let decl = match decl {
         Decl::Decl(name, init) => match env.get(&name) {
             Some((_, true)) => {
@@ -64,7 +64,7 @@ fn resolve_decl(decl: Decl, env: &mut HashMap<String, MapEntry>) -> ValidationRe
     Ok(decl)
 }
 
-fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Stmt> {
+fn resolve_stmt(stmt: Stmt, env: &mut FxHashMap<String, MapEntry>) -> ValidationResult<Stmt> {
     let stmt = match stmt {
         Stmt::Return(exp) => Stmt::Return(resolve_exp(exp, env)?),
         Stmt::Expression(exp) => Stmt::Expression(resolve_exp(exp, env)?),
@@ -115,7 +115,7 @@ fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, MapEntry>) -> ValidationRe
 
 fn resolve_for_init(
     init: ForInit,
-    env: &mut HashMap<String, MapEntry>,
+    env: &mut FxHashMap<String, MapEntry>,
 ) -> ValidationResult<ForInit> {
     let init = match init {
         ForInit::InitExp(exp) => {
@@ -126,7 +126,7 @@ fn resolve_for_init(
     Ok(init)
 }
 
-fn resolve_exp(exp: Exp, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Exp> {
+fn resolve_exp(exp: Exp, env: &mut FxHashMap<String, MapEntry>) -> ValidationResult<Exp> {
     let exp = match exp {
         Exp::Const(i) => Exp::Const(i),
         Exp::Assignment(left, right) => match *left {

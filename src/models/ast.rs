@@ -1,3 +1,5 @@
+use rustc_hash::FxHashMap;
+
 #[derive(Debug, Clone)]
 pub enum Program {
     FuncDef(FuncDef),
@@ -48,7 +50,13 @@ pub enum Stmt {
     DoWhile(Box<Stmt>, Exp, Option<String>),
     For(ForInit, Option<Exp>, Option<Exp>, Box<Stmt>, Option<String>),
     Switch(Exp, Box<Stmt>, Option<String>),
-    SwitchResolved(Exp, Box<Stmt>, Option<String>, Vec<i32>, bool),
+    SwitchResolved(
+        Exp,
+        Box<Stmt>,
+        Option<String>,
+        FxHashMap<i32, String>,
+        Option<String>,
+    ),
     Null,
 }
 

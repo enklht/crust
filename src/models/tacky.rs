@@ -3,9 +3,25 @@ pub enum Program {
     Program(Function),
 }
 
-#[derive(Debug)]
 pub enum Function {
     Function(String, Vec<Instruction>),
+}
+
+impl std::fmt::Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Function::Function(name, instructions) => {
+                write!(
+                    f,
+                    "\n    name: {}\n    instructions:\n{}",
+                    name,
+                    instructions
+                        .iter()
+                        .fold(String::new(), |acc, i| acc + &format!("        {i:?}\n"))
+                )
+            }
+        }
+    }
 }
 
 #[derive(Debug)]

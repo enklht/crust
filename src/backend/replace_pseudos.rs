@@ -1,9 +1,10 @@
 use super::asm::*;
+use rustc_hash::FxHashMap;
 
 #[derive(Default)]
 struct State {
     current_offset: isize,
-    offset_map: std::collections::HashMap<String, isize>,
+    offset_map: FxHashMap<String, isize>,
 }
 
 impl State {

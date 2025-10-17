@@ -2,7 +2,7 @@ use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
 use crate::utils::make_label;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 pub fn resolve_program(program: Program) -> ValidationResult<Program> {
     let program = match program {
@@ -14,7 +14,7 @@ pub fn resolve_program(program: Program) -> ValidationResult<Program> {
 fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
     let func_def = match func_def {
         FuncDef::Function(name, body) => {
-            let mut labels = HashMap::new();
+            let mut labels = FxHashMap::default();
             for block_item in &body {
                 if let BlockItem::S(stmt) = block_item {
                     collect_labels(stmt, &mut labels)?;
@@ -32,7 +32,7 @@ fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
     Ok(func_def)
 }
 
-fn collect_labels(stmt: &Stmt, labels: &mut HashMap<String, String>) -> ValidationResult<()> {
+fn collect_labels(stmt: &Stmt, labels: &mut FxHashMap<String, String>) -> ValidationResult<()> {
     match stmt {
         Stmt::If(_, then, Some(else_)) => {
             collect_labels(then, labels)?;
@@ -72,7 +72,7 @@ fn collect_labels(stmt: &Stmt, labels: &mut HashMap<String, String>) -> Validati
 
 fn resolve_block_item(
     block_item: BlockItem,
-    labels: &HashMap<String, String>,
+    labels: &FxHashMap<String, String>,
 ) -> ValidationResult<BlockItem> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, labels)?),
@@ -81,7 +81,7 @@ fn resolve_block_item(
     Ok(block_item)
 }
 
-fn resolve_stmt(stmt: Stmt, labels: &HashMap<String, String>) -> ValidationResult<Stmt> {
+fn resolve_stmt(stmt: Stmt, labels: &FxHashMap<String, String>) -> ValidationResult<Stmt> {
     let stmt = match stmt {
         Stmt::If(cond, then, Some(else_)) => Stmt::If(
             cond,
