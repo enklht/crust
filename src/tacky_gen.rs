@@ -80,6 +80,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>) {
         Stmt::Goto(label) => instructions.push(Instruction::Jump(label)),
         Stmt::Compound(block) => emit_block(block, instructions),
         Stmt::Null => {}
+        _ => todo!(),
     }
 }
 

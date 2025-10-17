@@ -17,6 +17,17 @@ pub enum BlockItem {
 }
 
 #[derive(Debug, Clone)]
+pub enum Decl {
+    Decl(String, Option<Exp>),
+}
+
+#[derive(Debug, Clone)]
+pub enum ForInit {
+    InitDecl(Decl),
+    InitExp(Option<Exp>),
+}
+
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Return(Exp),
     Expression(Exp),
@@ -24,23 +35,12 @@ pub enum Stmt {
     Labelled(String, Box<Stmt>),
     Goto(String),
     Compound(Block),
-    Break,
-    Continue,
-    While(Exp, Box<Stmt>),
-    DoWhile(Box<Stmt>, Exp),
-    For(ForInit, Option<Exp>, Option<Exp>, Box<Stmt>),
+    Break(Option<String>),
+    Continue(Option<String>),
+    While(Exp, Box<Stmt>, Option<String>),
+    DoWhile(Box<Stmt>, Exp, Option<String>),
+    For(ForInit, Option<Exp>, Option<Exp>, Box<Stmt>, Option<String>),
     Null,
-}
-
-#[derive(Debug, Clone)]
-pub enum ForInit {
-    InitDecl(Decl),
-    InitExpr(Option<Exp>),
-}
-
-#[derive(Debug, Clone)]
-pub enum Decl {
-    Decl(String, Option<Exp>),
 }
 
 #[derive(Debug, Clone)]

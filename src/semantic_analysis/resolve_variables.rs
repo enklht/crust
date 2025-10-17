@@ -13,18 +13,20 @@ fn copy_env(env: &HashMap<String, MapEntry>) -> HashMap<String, MapEntry> {
 }
 
 pub fn resolve_program(program: Program) -> ValidationResult<Program> {
-    Ok(match program {
+    let program = match program {
         Program::FuncDef(func_def) => Program::FuncDef(resolve_func_def(func_def)?),
-    })
+    };
+    Ok(program)
 }
 
 fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
-    Ok(match func_def {
+    let func_def = match func_def {
         FuncDef::Function(name, body) => {
             let mut env = HashMap::new();
             FuncDef::Function(name, resolve_block(body, &mut env)?)
         }
-    })
+    };
+    Ok(func_def)
 }
 
 fn resolve_block(block: Block, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Block> {
@@ -38,14 +40,15 @@ fn resolve_block_item(
     block_item: BlockItem,
     env: &mut HashMap<String, MapEntry>,
 ) -> ValidationResult<BlockItem> {
-    Ok(match block_item {
+    let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, env)?),
         BlockItem::D(decl) => BlockItem::D(resolve_decl(decl, env)?),
-    })
+    };
+    Ok(block_item)
 }
 
 fn resolve_decl(decl: Decl, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Decl> {
-    Ok(match decl {
+    let decl = match decl {
         Decl::Decl(name, init) => match env.get(&name) {
             Some((_, true)) => {
                 return Err(ValidationError::DuplicateVariableDefinition(name));
@@ -57,11 +60,12 @@ fn resolve_decl(decl: Decl, env: &mut HashMap<String, MapEntry>) -> ValidationRe
                 Decl::Decl(unique_name, init_resolved)
             }
         },
-    })
+    };
+    Ok(decl)
 }
 
 fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Stmt> {
-    Ok(match stmt {
+    let stmt = match stmt {
         Stmt::Return(exp) => Stmt::Return(resolve_exp(exp, env)?),
         Stmt::Expression(exp) => Stmt::Expression(resolve_exp(exp, env)?),
         Stmt::If(cond, then, Some(else_)) => Stmt::If(
@@ -77,16 +81,48 @@ fn resolve_stmt(stmt: Stmt, env: &mut HashMap<String, MapEntry>) -> ValidationRe
         Stmt::Labelled(label, stmt) => Stmt::Labelled(label, Box::new(resolve_stmt(*stmt, env)?)),
         Stmt::Goto(label) => Stmt::Goto(label),
         Stmt::Compound(block) => {
-            let mut new_env = copy_env(env);
-            Stmt::Compound(resolve_block(block, &mut new_env)?)
+            let new_env = &mut copy_env(env);
+            Stmt::Compound(resolve_block(block, new_env)?)
         }
-        Stmt::Null => Stmt::Null,
-        _ => todo!(),
-    })
+        Stmt::While(cond, body, label) => Stmt::While(
+            resolve_exp(cond, env)?,
+            Box::new(resolve_stmt(*body, env)?),
+            label,
+        ),
+        Stmt::DoWhile(body, cond, label) => Stmt::DoWhile(
+            Box::new(resolve_stmt(*body, env)?),
+            resolve_exp(cond, env)?,
+            label,
+        ),
+        Stmt::For(init, cond, post, body, label) => {
+            let new_env = &mut copy_env(env);
+            let init = resolve_for_init(init, new_env)?;
+            let cond = cond.map(|cond| resolve_exp(cond, new_env)).transpose()?;
+            let post = post.map(|post| resolve_exp(post, new_env)).transpose()?;
+            let body = Box::new(resolve_stmt(*body, new_env)?);
+            Stmt::For(init, cond, post, body, label)
+        }
+        // Break, Continue, Null
+        other => other,
+    };
+    Ok(stmt)
+}
+
+fn resolve_for_init(
+    init: ForInit,
+    env: &mut HashMap<String, MapEntry>,
+) -> ValidationResult<ForInit> {
+    let init = match init {
+        ForInit::InitExp(exp) => {
+            ForInit::InitExp(exp.map(|exp| resolve_exp(exp, env)).transpose()?)
+        }
+        ForInit::InitDecl(decl) => ForInit::InitDecl(resolve_decl(decl, env)?),
+    };
+    Ok(init)
 }
 
 fn resolve_exp(exp: Exp, env: &mut HashMap<String, MapEntry>) -> ValidationResult<Exp> {
-    Ok(match exp {
+    let exp = match exp {
         Exp::Const(i) => Exp::Const(i),
         Exp::Assignment(left, right) => match *left {
             left @ Exp::Var(_) => Exp::Assignment(
@@ -115,5 +151,6 @@ fn resolve_exp(exp: Exp, env: &mut HashMap<String, MapEntry>) -> ValidationResul
             Box::new(resolve_exp(*then, env)?),
             Box::new(resolve_exp(*else_, env)?),
         ),
-    })
+    };
+    Ok(exp)
 }

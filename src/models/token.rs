@@ -18,6 +18,16 @@ pub enum Token {
     KwElse,
     #[display("goto")]
     KwGoto,
+    #[display("do")]
+    KwDo,
+    #[display("while")]
+    KwWhile,
+    #[display("for")]
+    KwFor,
+    #[display("break")]
+    KwBreak,
+    #[display("continue")]
+    KwContinue,
     #[display("(")]
     LParen,
     #[display(")")]

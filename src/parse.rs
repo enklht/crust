@@ -4,45 +4,97 @@ use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
 
+trait SemicolonExt<'token, I, T>:
+    Parser<'token, I, T, extra::Err<Rich<'token, Token>>> + Clone
+where
+    I: ValueInput<'token, Token = Token, Span = SimpleSpan>,
+{
+    fn semicolon(self) -> impl Parser<'token, I, T, extra::Err<Rich<'token, Token>>> + Clone {
+        self.then_ignore(just(Token::Semicolon))
+    }
+}
+
+impl<'token, I, T, P> SemicolonExt<'token, I, T> for P
+where
+    I: ValueInput<'token, Token = Token, Span = SimpleSpan>,
+    P: Parser<'token, I, T, extra::Err<Rich<'token, Token>>> + Clone,
+{
+}
+
 pub fn parser<'tokens, I>() -> impl Parser<'tokens, I, Program, extra::Err<Rich<'tokens, Token>>>
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
     let ident = select! { Token::Ident(ident) => ident };
 
-    let block = recursive(|block| {
-        let exp = exp();
+    let exp = exp();
+    let exp_paren = exp
+        .clone()
+        .delimited_by(just(Token::LParen), just(Token::RParen));
 
+    let decl = just(Token::KwInt)
+        .ignore_then(ident)
+        .then(just(Token::Equal).ignore_then(exp.clone()).or_not())
+        .semicolon()
+        .map(|(name, init)| Decl::Decl(name, init))
+        .labelled("declaration")
+        .as_context();
+
+    let for_init = choice((
+        decl.clone().map(ForInit::InitDecl),
+        exp.clone()
+            .or_not()
+            .then_ignore(just(Token::Semicolon))
+            .map(ForInit::InitExp),
+    ));
+
+    let block = recursive(|block| {
         let stmt = recursive(|stmt| {
-            let exp_stmt = exp
-                .clone()
-                .then_ignore(just(Token::Semicolon))
-                .map(Stmt::Expression);
+            let exp_stmt = exp.clone().semicolon().map(Stmt::Expression);
             let return_stmt = just(Token::KwReturn)
                 .ignore_then(exp.clone())
-                .then_ignore(just(Token::Semicolon))
+                .semicolon()
                 .map(Stmt::Return);
             let if_stmt = just(Token::KwIf)
-                .ignore_then(
-                    exp.clone()
-                        .delimited_by(just(Token::LParen), just(Token::RParen)),
-                )
-                .then(stmt.clone().map(Box::new))
+                .ignore_then(exp_paren.clone())
+                .then(stmt.clone())
                 .then(
                     just(Token::KwElse)
                         .ignore_then(stmt.clone())
                         .map(Box::new)
                         .or_not(),
                 )
-                .map(|((cond, then), else_)| Stmt::If(cond, then, else_));
+                .map(|((cond, then), else_)| Stmt::If(cond, Box::new(then), else_));
             let labelled_stmt = ident
                 .then_ignore(just(Token::Colon))
-                .then(stmt)
+                .then(stmt.clone())
                 .map(|(label, stmt)| Stmt::Labelled(label, Box::new(stmt)));
             let goto_stmt = just(Token::KwGoto)
                 .ignore_then(ident)
-                .then_ignore(just(Token::Semicolon))
+                .semicolon()
                 .map(Stmt::Goto);
+            let while_stmt = just(Token::KwWhile)
+                .ignore_then(exp_paren.clone())
+                .then(stmt.clone())
+                .map(|(cond, body)| Stmt::While(cond, Box::new(body), None));
+            let do_while_stmt = just(Token::KwDo)
+                .ignore_then(stmt.clone())
+                .then_ignore(just(Token::KwWhile))
+                .then(exp_paren.clone())
+                .semicolon()
+                .map(|(body, cond)| Stmt::DoWhile(Box::new(body), cond, None));
+            let for_stmt = just(Token::KwFor)
+                .ignore_then(
+                    for_init
+                        .then(exp.clone().or_not())
+                        .semicolon()
+                        .then(exp.clone().or_not())
+                        .delimited_by(just(Token::LParen), just(Token::RParen)),
+                )
+                .then(stmt)
+                .map(|(((init, cond), post), body)| {
+                    Stmt::For(init, cond, post, Box::new(body), None)
+                });
 
             choice((
                 exp_stmt,
@@ -51,19 +103,16 @@ where
                 labelled_stmt,
                 goto_stmt,
                 block.map(Stmt::Compound),
+                just(Token::KwBreak).semicolon().to(Stmt::Break(None)),
+                just(Token::KwContinue).semicolon().to(Stmt::Continue(None)),
+                while_stmt,
+                do_while_stmt,
+                for_stmt,
                 just(Token::Semicolon).to(Stmt::Null),
             ))
             .labelled("statement")
             .as_context()
         });
-
-        let decl = just(Token::KwInt)
-            .ignore_then(ident)
-            .then(just(Token::Equal).ignore_then(exp).or_not())
-            .then_ignore(just(Token::Semicolon))
-            .map(|(name, init)| Decl::Decl(name, init))
-            .labelled("declaration")
-            .as_context();
 
         let block_item = choice((stmt.map(BlockItem::S), decl.map(BlockItem::D)));
 

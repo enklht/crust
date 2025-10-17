@@ -13,6 +13,11 @@ pub fn lexer<'src>()
         "if" => Token::KwIf,
         "else" => Token::KwElse,
         "goto" => Token::KwGoto,
+        "do" => Token::KwDo,
+        "while" => Token::KwWhile,
+        "for" => Token::KwFor,
+        "break" => Token::KwBreak,
+        "continue" => Token::KwContinue,
         s => Token::Ident(s.to_string()),
     });
 

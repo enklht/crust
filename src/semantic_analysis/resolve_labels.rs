@@ -5,13 +5,14 @@ use crate::utils::make_label;
 use std::collections::HashMap;
 
 pub fn resolve_program(program: Program) -> ValidationResult<Program> {
-    Ok(match program {
+    let program = match program {
         Program::FuncDef(func_def) => Program::FuncDef(resolve_func_def(func_def)?),
-    })
+    };
+    Ok(program)
 }
 
 fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
-    match func_def {
+    let func_def = match func_def {
         FuncDef::Function(name, body) => {
             let mut labels = HashMap::new();
             for block_item in &body {
@@ -25,9 +26,10 @@ fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
                 .map(|block_item| resolve_block_item(block_item, &labels))
                 .collect::<ValidationResult<_>>()?;
 
-            Ok(FuncDef::Function(name, body))
+            FuncDef::Function(name, body)
         }
-    }
+    };
+    Ok(func_def)
 }
 
 fn collect_labels(stmt: &Stmt, labels: &mut HashMap<String, String>) -> ValidationResult<()> {
@@ -41,7 +43,7 @@ fn collect_labels(stmt: &Stmt, labels: &mut HashMap<String, String>) -> Validati
         }
         Stmt::Labelled(label, stmt) => {
             match labels.get(label) {
-                Some(_) => return Err(ValidationError::DuplicateVariableDefinition(label.clone())),
+                Some(_) => return Err(ValidationError::DuplicateLabelDefinition(label.clone())),
                 None => {
                     let new_label = make_label(label);
                     labels.insert(label.clone(), new_label)
@@ -65,14 +67,15 @@ fn resolve_block_item(
     block_item: BlockItem,
     labels: &HashMap<String, String>,
 ) -> ValidationResult<BlockItem> {
-    Ok(match block_item {
+    let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, labels)?),
         decl => decl,
-    })
+    };
+    Ok(block_item)
 }
 
 fn resolve_stmt(stmt: Stmt, labels: &HashMap<String, String>) -> ValidationResult<Stmt> {
-    Ok(match stmt {
+    let stmt = match stmt {
         Stmt::If(cond, then, Some(else_)) => Stmt::If(
             cond,
             Box::new(resolve_stmt(*then, labels)?),
@@ -81,11 +84,11 @@ fn resolve_stmt(stmt: Stmt, labels: &HashMap<String, String>) -> ValidationResul
         Stmt::If(cond, then, None) => Stmt::If(cond, Box::new(resolve_stmt(*then, labels)?), None),
         Stmt::Labelled(label, stmt) => match labels.get(&label) {
             Some(label) => Stmt::Labelled(label.clone(), Box::new(resolve_stmt(*stmt, labels)?)),
-            None => return Err(ValidationError::UndefinedVariable(label.clone())),
+            None => return Err(ValidationError::UndefinedLabel(label.clone())),
         },
         Stmt::Goto(label) => match labels.get(&label) {
             Some(label) => Stmt::Goto(label.clone()),
-            None => return Err(ValidationError::UndefinedVariable(label)),
+            None => return Err(ValidationError::UndefinedLabel(label)),
         },
         Stmt::Compound(block) => {
             let block = block
@@ -95,5 +98,6 @@ fn resolve_stmt(stmt: Stmt, labels: &HashMap<String, String>) -> ValidationResul
             Stmt::Compound(block)
         }
         other => other,
-    })
+    };
+    Ok(stmt)
 }
