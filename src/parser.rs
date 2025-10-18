@@ -92,14 +92,14 @@ where
     let while_stmt = just(Token::KwWhile)
         .ignore_then(exp_paren.clone())
         .then(stmt.clone())
-        .map(|(cond, body)| Stmt::While(cond, Box::new(body), None));
+        .map(|(cond, body)| Stmt::While(cond, Box::new(body), ()));
 
     let do_while_stmt = just(Token::KwDo)
         .ignore_then(stmt.clone())
         .then_ignore(just(Token::KwWhile))
         .then(exp_paren.clone())
         .semicolon()
-        .map(|(body, cond)| Stmt::DoWhile(Box::new(body), cond, None));
+        .map(|(body, cond)| Stmt::DoWhile(Box::new(body), cond, ()));
 
     let for_stmt = just(Token::KwFor)
         .ignore_then(
@@ -110,7 +110,7 @@ where
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(stmt.clone())
-        .map(|(((init, cond), post), body)| Stmt::For(init, cond, post, Box::new(body), None));
+        .map(|(((init, cond), post), body)| Stmt::For(init, cond, post, Box::new(body), ()));
 
     let switch_stmt = just(Token::KwSwitch)
         .ignore_then(
@@ -118,7 +118,7 @@ where
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(stmt.clone())
-        .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), None, ()));
+        .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), (), ()));
 
     stmt.define(
         choice((
@@ -128,8 +128,8 @@ where
             labelled_stmt,
             goto_stmt,
             block.clone().map(Stmt::Compound),
-            just(Token::KwBreak).semicolon().to(Stmt::Break(None)),
-            just(Token::KwContinue).semicolon().to(Stmt::Continue(None)),
+            just(Token::KwBreak).semicolon().to(Stmt::Break(())),
+            just(Token::KwContinue).semicolon().to(Stmt::Continue(())),
             while_stmt,
             do_while_stmt,
             for_stmt,

@@ -4,7 +4,7 @@ use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
 
-pub fn check_program(program: &Program<SwitchResolved>) -> ValidationResult<Symbols> {
+pub fn check_program(program: &Program<Plain>) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
     match program {
         Program::Program(func_decls) => {
@@ -16,33 +16,27 @@ pub fn check_program(program: &Program<SwitchResolved>) -> ValidationResult<Symb
     Ok(symbols)
 }
 
-fn check_block(block: &Block<SwitchResolved>, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_block(block: &Block<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     block
         .iter()
         .try_for_each(|block_item| check_block_item(block_item, symbols))
 }
 
-fn check_block_item(
-    block_item: &BlockItem<SwitchResolved>,
-    symbols: &mut Symbols,
-) -> ValidationResult<()> {
+fn check_block_item(block_item: &BlockItem<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match block_item {
         BlockItem::S(stmt) => check_stmt(stmt, symbols),
         BlockItem::D(decl) => check_decl(decl, symbols),
     }
 }
 
-fn check_decl(decl: &Decl<SwitchResolved>, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_decl(decl: &Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match decl {
         Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols),
         Decl::VarDecl(var_decl) => check_var_decl(var_decl, symbols),
     }
 }
 
-fn check_func_decl(
-    func_decl: &FuncDecl<SwitchResolved>,
-    symbols: &mut Symbols,
-) -> ValidationResult<()> {
+fn check_func_decl(func_decl: &FuncDecl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match func_decl {
         FuncDecl::FuncDecl(name, params, body) => {
             let type_ = Type::Fn(params.len());
@@ -87,7 +81,7 @@ fn check_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> ValidationResult
     }
 }
 
-fn check_stmt(stmt: &Stmt<SwitchResolved>, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_stmt(stmt: &Stmt<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match stmt {
         Stmt::Return(exp) => {
             check_exp(exp, symbols)?;

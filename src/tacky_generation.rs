@@ -89,11 +89,9 @@ fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
         }
         Stmt::Goto(label) => instructions.push(Instruction::Jump(label)),
         Stmt::Compound(block) => emit_block(block, instructions),
-        Stmt::Break(Some(label)) => instructions.push(Instruction::Jump(format!("break_{label}"))),
-        Stmt::Continue(Some(label)) => {
-            instructions.push(Instruction::Jump(format!("continue_{label}")))
-        }
-        Stmt::While(cond, body, Some(label)) => {
+        Stmt::Break(label) => instructions.push(Instruction::Jump(format!("break_{label}"))),
+        Stmt::Continue(label) => instructions.push(Instruction::Jump(format!("continue_{label}"))),
+        Stmt::While(cond, body, label) => {
             let break_label = format!("break_{label}");
             let continue_label = format!("continue_{label}");
 
@@ -106,7 +104,7 @@ fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
                 Instruction::Label(break_label),
             ]);
         }
-        Stmt::DoWhile(body, cond, Some(label)) => {
+        Stmt::DoWhile(body, cond, label) => {
             let start_label = format!("start_{label}");
             let break_label = format!("break_{label}");
             let continue_label = format!("continue_{label}");
@@ -120,7 +118,7 @@ fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
                 Instruction::Label(break_label),
             ]);
         }
-        Stmt::For(init, cond, post, body, Some(label)) => {
+        Stmt::For(init, cond, post, body, label) => {
             let start_label = format!("start_{label}");
             let break_label = format!("break_{label}");
             let continue_label = format!("continue_{label}");
@@ -147,7 +145,7 @@ fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
                 Instruction::Label(break_label),
             ])
         }
-        Stmt::Switch(cond, body, Some(label), (cases, default)) => {
+        Stmt::Switch(cond, body, label, (cases, default)) => {
             let break_label = format!("break_{label}");
             let cond = emit_exp(cond, instructions);
             let flag = make_temp_var();

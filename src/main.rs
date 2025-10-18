@@ -1,16 +1,17 @@
-mod backend;
-mod emit;
-mod error_report;
-mod lex;
+mod asm_generation;
+mod code_emission;
+mod error_reporting;
+mod lexer;
 mod models;
-mod parse;
+mod parser;
 mod semantic_analysis;
-mod tacky_gen;
+mod tacky_generation;
 mod utils;
 
 use bpaf::*;
 use chumsky::Parser;
 use chumsky::input::Input;
+use error_reporting::report_errors;
 use std::fs;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -48,12 +49,12 @@ fn main() -> Result<(), CrustError> {
     let fname = &opts.input.display().to_string();
     let source = &fs::read_to_string(&opts.input)?;
 
-    let lexer = lex::lexer();
+    let lexer = lexer::lexer();
 
     let tokens = match lexer.parse(source).into_result() {
         Ok(tokens) => tokens,
         Err(errs) => {
-            error_report::report_errors(fname, &errs, source);
+            report_errors(fname, &errs, source);
         }
     };
 
@@ -62,7 +63,7 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let ast = match parse::parser()
+    let ast = match parser::parser()
         .parse(
             tokens
                 .as_slice()
@@ -72,7 +73,7 @@ fn main() -> Result<(), CrustError> {
     {
         Ok(ast) => ast,
         Err(errs) => {
-            error_report::report_errors(fname, &errs, source);
+            report_errors(fname, &errs, source);
         }
     };
 
@@ -94,21 +95,21 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let tacky = tacky_gen::convert_program(validated_ast);
+    let tacky = tacky_generation::convert_program(validated_ast);
 
     if opts.mode == CompilerMode::Tacky {
         println!("{:?}", tacky);
         return Ok(());
     }
 
-    let asm_ast = backend::codegen(tacky);
+    let asm_ast = asm_generation::codegen(tacky);
 
     if opts.mode == CompilerMode::Codegen {
         println!("{:#?}", asm_ast);
         return Ok(());
     }
 
-    let asm_text = emit::emit(asm_ast, &symbols);
+    let asm_text = code_emission::emit(asm_ast, &symbols);
 
     let output = opts.output.unwrap_or(opts.input.with_extension("s"));
     fs::write(&output, asm_text)?;

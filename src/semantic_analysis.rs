@@ -1,7 +1,7 @@
-mod label_loops;
-mod resolve_ident;
-mod resolve_labels;
-mod resolve_switches;
+mod block_labelling;
+mod ident_resolution;
+mod label_resolution;
+mod switch_resolution;
 mod type_check;
 
 use crate::models::ast::*;
@@ -61,16 +61,13 @@ pub enum ValidationError {
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
 pub fn validate(program: Program<Plain>) -> ValidationResult<(Program<SwitchResolved>, Symbols)> {
-    let passes = [
-        resolve_ident::resolve_program,
-        resolve_labels::resolve_program,
-        label_loops::label_program,
-    ];
-
-    let program = passes.iter().try_fold(program, |p, pass| pass(p))?;
-    let program = resolve_switches::resolve_program(program)?;
+    let program = ident_resolution::resolve_program(program)?;
+    let program = label_resolution::resolve_program(program)?;
 
     let symbols = type_check::check_program(&program)?;
+
+    let program = block_labelling::label_program(program)?;
+    let program = switch_resolution::resolve_program(program)?;
 
     Ok((program, symbols))
 }
