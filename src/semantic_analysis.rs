@@ -2,47 +2,67 @@ mod label_loops;
 mod resolve_ident;
 mod resolve_labels;
 mod resolve_switches;
+mod type_check;
 
 use crate::models::ast::*;
+use derive_more::Display;
 use thiserror::Error;
+
+#[derive(Debug, Clone, PartialEq, Display)]
+pub enum Type {
+    #[display("Int")]
+    Int,
+    #[display("Fn(Int{{{_0}}}) -> Int")]
+    Fn(usize),
+}
 
 #[derive(Debug, Error)]
 pub enum ValidationError {
-    // variable declaration
-    #[error("duplicate variable declaration {0}")]
+    // invalid variable declaration
+    #[error("Variable '{0}' has already been declared in this scope")]
     DuplicateVarDecl(String),
-    #[error("variable {0} is not defined")]
+    #[error("Cannot find variable '{0}' in this scope")]
     UndefinedVariable(String),
-    #[error("invalid lvalue: {0:?}")]
+    #[error("Expression '{0:?}' cannot be used as an lvalue")]
     InvalidLvalue(Exp),
-    // function declaration
-    #[error("duplicate function declaration {0}")]
+    // invalid function declaration
+    #[error("Function '{0}' has already been declared")]
     DuplicateFuncDecl(String),
-    #[error("function {0} is not defined")]
+    #[error("Cannot find function '{0}' in this scope")]
     UndefinedFunction(String),
-    #[error("function {0} is defined inside a function")]
+    #[error("Function '{0}' cannot be defined inside another function")]
     NestedFuncDef(String),
-    // invalid labels
-    #[error("label {0} is not defined")]
+    #[error("Function '{0}' is previously defined as {1}, now defined as {2}")]
+    IncompatibleFuncDecl(String, Type, Type),
+    // invalid label
+    #[error("Cannot find label '{0}' in this scope")]
     UndefinedLabel(String),
-    #[error("duplicate label definition: {0}")]
+    #[error("Label '{0}' has already been defined")]
     DuplicateLabel(String),
     // invalid loop label
-    #[error("break statement outside of loop")]
+    #[error("'break' statement can only be used within a loop")]
     BreakOutsideLoop,
-    #[error("continue statement outside of loop")]
+    #[error("'continue' statement can only be used within a loop")]
     ContinueOutsideLoop,
-    // invalid swtich label
-    #[error("case label outside of switch")]
-    CaseOutsideLoop,
-    #[error("duplicate case value: {0:?}")]
+    // invalid switch label
+    #[error("'case' statement can only appear inside a switch")]
+    CaseOutsideSwitch,
+    #[error("Duplicate case value {0:?} in switch statement")]
     DuplicateCaseValue(i32),
-    #[error("non-constant case value: {0:?}")]
+    #[error("Case value must be a constant expression, found: {0:?}")]
     NonConstCase(Exp),
-    #[error("default label outside of switch")]
-    DefaultOutsideLoop,
-    #[error("multiple default statements found in switch")]
+    #[error("'default' statement can only appear inside a switch")]
+    DefaultOutsideSwitch,
+    #[error("Switch statement cannot have multiple 'default' cases")]
     DuplicateDefault,
+    // invalid variable
+    #[error("'{0}' is a function and cannot be used as a variable")]
+    FunctionAsVariable(String),
+    // invalid function call
+    #[error("'{0}' is a variable and cannot be called as a function")]
+    VariableAsFunction(String),
+    #[error("Function '{0}' expects {1} arguments but was called with {2} arguments")]
+    WrongArity(String, usize, usize),
 }
 
 pub type ValidationResult<T> = Result<T, ValidationError>;
@@ -55,5 +75,8 @@ pub fn validate(program: Program) -> ValidationResult<Program> {
         resolve_switches::resolve_program,
     ];
 
-    passes.iter().try_fold(program, |p, pass| pass(p))
+    let program = passes.iter().try_fold(program, |p, pass| pass(p))?;
+
+    type_check::check_program(&program)?;
+    Ok(program)
 }

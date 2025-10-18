@@ -195,10 +195,9 @@ fn resolve_stmt(stmt: Stmt, ident_map: &mut IdentMap) -> ValidationResult<Stmt> 
 
 fn resolve_for_init(init: ForInit, ident_map: &mut IdentMap) -> ValidationResult<ForInit> {
     let init = match init {
-        ForInit::InitExp(exp) => {
-            ForInit::InitExp(exp.map(|exp| resolve_exp(exp, ident_map)).transpose()?)
-        }
+        ForInit::InitExp(exp) => ForInit::InitExp(resolve_exp(exp, ident_map)?),
         ForInit::InitDecl(var_decl) => ForInit::InitDecl(resolve_var_decl(var_decl, ident_map)?),
+        ForInit::Null => ForInit::Null,
     };
     Ok(init)
 }

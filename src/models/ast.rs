@@ -32,7 +32,8 @@ pub enum BlockItem {
 #[derive(Debug, Clone)]
 pub enum ForInit {
     InitDecl(VarDecl),
-    InitExp(Option<Exp>),
+    InitExp(Exp),
+    Null,
 }
 
 #[derive(Debug, Clone)]

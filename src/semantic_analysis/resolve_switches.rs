@@ -66,7 +66,7 @@ fn resolve_stmt(stmt: Stmt, context: &mut Option<&mut Context>) -> ValidationRes
                 }
                 context.cases.insert(case, label.clone());
             } else {
-                return Err(ValidationError::CaseOutsideLoop);
+                return Err(ValidationError::CaseOutsideSwitch);
             }
 
             let stmt = Box::new(resolve_stmt(*stmt, context)?);
@@ -80,7 +80,7 @@ fn resolve_stmt(stmt: Stmt, context: &mut Option<&mut Context>) -> ValidationRes
                     None => context.default = Some(label.clone()),
                 }
             } else {
-                return Err(ValidationError::DefaultOutsideLoop);
+                return Err(ValidationError::DefaultOutsideSwitch);
             }
 
             let stmt = Box::new(resolve_stmt(*stmt, context)?);

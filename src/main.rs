@@ -40,14 +40,10 @@ enum CompilerMode {
 enum CrustError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error(transparent)]
-    ValidationError(#[from] crate::semantic_analysis::ValidationError),
 }
 
 fn main() -> Result<(), CrustError> {
     let opts: Options = options().run();
-
-    println!("{opts:?}");
 
     let fname = &opts.input.display().to_string();
     let source = &fs::read_to_string(&opts.input)?;
@@ -85,7 +81,13 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let validated_ast = semantic_analysis::validate(ast)?;
+    let validated_ast = match semantic_analysis::validate(ast) {
+        Ok(program) => program,
+        Err(e) => {
+            eprintln!("Validation error: {e}");
+            std::process::exit(1);
+        }
+    };
 
     if opts.mode == CompilerMode::Validate {
         println!("{:#?}", validated_ast);

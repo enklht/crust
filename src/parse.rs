@@ -43,9 +43,9 @@ where
     let for_init = choice((
         var_decl.clone().map(ForInit::InitDecl),
         exp.clone()
-            .or_not()
             .then_ignore(just(Token::Semicolon))
             .map(ForInit::InitExp),
+        just(Token::Semicolon).to(ForInit::Null),
     ));
 
     let label = choice((
