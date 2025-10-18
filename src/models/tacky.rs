@@ -17,7 +17,7 @@ impl std::fmt::Debug for Function {
                     name,
                     instructions
                         .iter()
-                        .fold(String::new(), |acc, i| acc + &format!("        {i:?}\n"))
+                        .fold(String::new(), |acc, i| acc + &format!("        {i:?},\n"))
                 )
             }
         }

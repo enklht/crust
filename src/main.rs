@@ -60,7 +60,7 @@ fn main() -> Result<(), CrustError> {
     };
 
     if opts.mode == CompilerMode::Lex {
-        tokens.iter().for_each(|token| println!("{:?}", token));
+        tokens.iter().for_each(|token| println!("{token:?},"));
         return Ok(());
     }
 
