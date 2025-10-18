@@ -21,7 +21,8 @@ where
 {
 }
 
-pub fn parser<'tokens, I>() -> impl Parser<'tokens, I, Program, extra::Err<Rich<'tokens, Token>>>
+pub fn parser<'tokens, I>()
+-> impl Parser<'tokens, I, Program<Plain>, extra::Err<Rich<'tokens, Token>>>
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
@@ -117,7 +118,7 @@ where
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(stmt.clone())
-        .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), None));
+        .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), None, ()));
 
     stmt.define(
         choice((

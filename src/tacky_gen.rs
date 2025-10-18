@@ -8,7 +8,7 @@ fn make_temp_var() -> tacky::Val {
     tacky::Val::Var(make_temporary())
 }
 
-pub fn convert_program(program: Program) -> tacky::Program {
+pub fn convert_program(program: Program<SwitchResolved>) -> tacky::Program {
     match program {
         Program::Program(func_decls) => tacky::Program::Program(
             func_decls
@@ -19,7 +19,7 @@ pub fn convert_program(program: Program) -> tacky::Program {
     }
 }
 
-fn convert_func_decl(func_decl: FuncDecl) -> Option<tacky::FuncDef> {
+fn convert_func_decl(func_decl: FuncDecl<SwitchResolved>) -> Option<tacky::FuncDef> {
     match func_decl {
         FuncDecl::FuncDecl(name, params, Some(body)) => {
             let mut instructions = Vec::new();
@@ -31,13 +31,13 @@ fn convert_func_decl(func_decl: FuncDecl) -> Option<tacky::FuncDef> {
     }
 }
 
-fn emit_block(block: Block, instructions: &mut Vec<Instruction>) {
+fn emit_block(block: Block<SwitchResolved>, instructions: &mut Vec<Instruction>) {
     block
         .into_iter()
         .for_each(|item| emit_block_item(item, instructions));
 }
 
-fn emit_block_item(block_item: BlockItem, instructions: &mut Vec<Instruction>) {
+fn emit_block_item(block_item: BlockItem<SwitchResolved>, instructions: &mut Vec<Instruction>) {
     match block_item {
         BlockItem::S(stmt) => emit_stmt(stmt, instructions),
         BlockItem::D(Decl::VarDecl(var_decl)) => emit_var_decl(var_decl, instructions),
@@ -52,7 +52,7 @@ fn emit_var_decl(var_decl: VarDecl, instructions: &mut Vec<Instruction>) {
     }
 }
 
-fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>) {
+fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
     match stmt {
         Stmt::Return(exp) => {
             let tacky_exp = emit_exp(exp, instructions);
@@ -147,7 +147,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>) {
                 Instruction::Label(break_label),
             ])
         }
-        Stmt::SwitchResolved(cond, body, Some(label), cases, default) => {
+        Stmt::Switch(cond, body, Some(label), (cases, default)) => {
             let break_label = format!("break_{label}");
             let cond = emit_exp(cond, instructions);
             let flag = make_temp_var();

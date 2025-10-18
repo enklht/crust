@@ -3,7 +3,7 @@ use super::ValidationResult;
 use crate::models::ast::*;
 use crate::utils::make_label;
 
-pub fn label_program(program: Program) -> ValidationResult<Program> {
+pub fn label_program(program: Program<Plain>) -> ValidationResult<Program<Plain>> {
     let program = match program {
         Program::Program(func_decls) => Program::Program(
             func_decls
@@ -15,7 +15,7 @@ pub fn label_program(program: Program) -> ValidationResult<Program> {
     Ok(program)
 }
 
-fn label_func_decl(func_decl: FuncDecl) -> ValidationResult<FuncDecl> {
+fn label_func_decl(func_decl: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Plain>> {
     let func_decl = match func_decl {
         FuncDecl::FuncDecl(name, params, Some(body)) => {
             let body = body
@@ -31,10 +31,10 @@ fn label_func_decl(func_decl: FuncDecl) -> ValidationResult<FuncDecl> {
 }
 
 fn label_block_item(
-    block_item: BlockItem,
+    block_item: BlockItem<Plain>,
     break_label: &Option<String>,
     continue_label: &Option<String>,
-) -> ValidationResult<BlockItem> {
+) -> ValidationResult<BlockItem<Plain>> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(label_stmt(stmt, break_label, continue_label)?),
         decl => decl,
@@ -43,10 +43,10 @@ fn label_block_item(
 }
 
 fn label_stmt(
-    stmt: Stmt,
+    stmt: Stmt<Plain>,
     break_label: &Option<String>,
     continue_label: &Option<String>,
-) -> ValidationResult<Stmt> {
+) -> ValidationResult<Stmt<Plain>> {
     let stmt = match stmt {
         Stmt::If(cond, then, Some(else_)) => Stmt::If(
             cond,
@@ -92,10 +92,10 @@ fn label_stmt(
             let body = Box::new(label_stmt(*body, &label, &label)?);
             Stmt::For(init, cond, post, body, label)
         }
-        Stmt::Switch(cond, body, _) => {
+        Stmt::Switch(cond, body, _, ()) => {
             let label = Some(make_label("switch"));
             let body = Box::new(label_stmt(*body, &label, continue_label)?);
-            Stmt::Switch(cond, body, label)
+            Stmt::Switch(cond, body, label, ())
         }
         other => other,
     };

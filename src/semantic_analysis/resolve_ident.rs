@@ -24,7 +24,7 @@ fn copy_map(ident_map: &IdentMap) -> IdentMap {
         .collect()
 }
 
-pub fn resolve_program(program: Program) -> ValidationResult<Program> {
+pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<Plain>> {
     let ident_map = &mut FxHashMap::default();
     let program = match program {
         Program::Program(func_decl) => Program::Program(
@@ -37,7 +37,7 @@ pub fn resolve_program(program: Program) -> ValidationResult<Program> {
     Ok(program)
 }
 
-fn resolve_block(block: Block, ident_map: &mut IdentMap) -> ValidationResult<Block> {
+fn resolve_block(block: Block<Plain>, ident_map: &mut IdentMap) -> ValidationResult<Block<Plain>> {
     block
         .into_iter()
         .map(|block_item| resolve_block_item(block_item, ident_map))
@@ -45,9 +45,9 @@ fn resolve_block(block: Block, ident_map: &mut IdentMap) -> ValidationResult<Blo
 }
 
 fn resolve_block_item(
-    block_item: BlockItem,
+    block_item: BlockItem<Plain>,
     ident_map: &mut IdentMap,
-) -> ValidationResult<BlockItem> {
+) -> ValidationResult<BlockItem<Plain>> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, ident_map)?),
         BlockItem::D(decl) => BlockItem::D(resolve_decl(decl, ident_map)?),
@@ -55,7 +55,7 @@ fn resolve_block_item(
     Ok(block_item)
 }
 
-fn resolve_decl(decl: Decl, ident_map: &mut IdentMap) -> ValidationResult<Decl> {
+fn resolve_decl(decl: Decl<Plain>, ident_map: &mut IdentMap) -> ValidationResult<Decl<Plain>> {
     let decl = match decl {
         Decl::VarDecl(var_decl) => Decl::VarDecl(resolve_var_decl(var_decl, ident_map)?),
         Decl::FuncDecl(func_decl) => {
@@ -68,7 +68,10 @@ fn resolve_decl(decl: Decl, ident_map: &mut IdentMap) -> ValidationResult<Decl> 
     Ok(decl)
 }
 
-fn resolve_func_decl(func_decl: FuncDecl, ident_map: &mut IdentMap) -> ValidationResult<FuncDecl> {
+fn resolve_func_decl(
+    func_decl: FuncDecl<Plain>,
+    ident_map: &mut IdentMap,
+) -> ValidationResult<FuncDecl<Plain>> {
     let func_decl = match func_decl {
         FuncDecl::FuncDecl(name, params, body) => {
             if let Some(entry) = ident_map.get(&name)
@@ -138,7 +141,7 @@ fn resolve_var_decl(var_decl: VarDecl, ident_map: &mut IdentMap) -> ValidationRe
     Ok(var_decl)
 }
 
-fn resolve_stmt(stmt: Stmt, ident_map: &mut IdentMap) -> ValidationResult<Stmt> {
+fn resolve_stmt(stmt: Stmt<Plain>, ident_map: &mut IdentMap) -> ValidationResult<Stmt<Plain>> {
     let stmt = match stmt {
         Stmt::Return(exp) => Stmt::Return(resolve_exp(exp, ident_map)?),
         Stmt::Expression(exp) => Stmt::Expression(resolve_exp(exp, ident_map)?),
@@ -182,10 +185,10 @@ fn resolve_stmt(stmt: Stmt, ident_map: &mut IdentMap) -> ValidationResult<Stmt> 
             let body = Box::new(resolve_stmt(*body, new_ident_map)?);
             Stmt::For(init, cond, post, body, label)
         }
-        Stmt::Switch(cond, body, label) => {
+        Stmt::Switch(cond, body, label, ()) => {
             let cond = resolve_exp(cond, ident_map)?;
             let body = Box::new(resolve_stmt(*body, ident_map)?);
-            Stmt::Switch(cond, body, label)
+            Stmt::Switch(cond, body, label, ())
         }
         // Break, Continue, Null
         other => other,

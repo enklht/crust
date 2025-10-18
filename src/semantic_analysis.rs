@@ -60,15 +60,15 @@ pub enum ValidationError {
 
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
-pub fn validate(program: Program) -> ValidationResult<(Program, Symbols)> {
+pub fn validate(program: Program<Plain>) -> ValidationResult<(Program<SwitchResolved>, Symbols)> {
     let passes = [
         resolve_ident::resolve_program,
         resolve_labels::resolve_program,
         label_loops::label_program,
-        resolve_switches::resolve_program,
     ];
 
     let program = passes.iter().try_fold(program, |p, pass| pass(p))?;
+    let program = resolve_switches::resolve_program(program)?;
 
     let symbols = type_check::check_program(&program)?;
 

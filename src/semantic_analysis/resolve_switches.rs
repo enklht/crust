@@ -9,7 +9,7 @@ struct Context {
     default: Option<String>,
 }
 
-pub fn resolve_program(program: Program) -> ValidationResult<Program> {
+pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<SwitchResolved>> {
     let program = match program {
         Program::Program(func_decls) => Program::Program(
             func_decls
@@ -21,7 +21,7 @@ pub fn resolve_program(program: Program) -> ValidationResult<Program> {
     Ok(program)
 }
 
-fn resolve_func_decl(func_def: FuncDecl) -> ValidationResult<FuncDecl> {
+fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<SwitchResolved>> {
     let func_decl = match func_def {
         FuncDecl::FuncDecl(name, params, Some(body)) => {
             let body = body
@@ -31,23 +31,30 @@ fn resolve_func_decl(func_def: FuncDecl) -> ValidationResult<FuncDecl> {
 
             FuncDecl::FuncDecl(name, params, Some(body))
         }
-        other => other,
+        FuncDecl::FuncDecl(name, params, None) => FuncDecl::FuncDecl(name, params, None),
     };
     Ok(func_decl)
 }
 
 fn resolve_block_item(
-    block_item: BlockItem,
+    block_item: BlockItem<Plain>,
     context: &mut Option<&mut Context>,
-) -> ValidationResult<BlockItem> {
+) -> ValidationResult<BlockItem<SwitchResolved>> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, context)?),
-        decl => decl,
+        BlockItem::D(Decl::VarDecl(var_decl)) => BlockItem::D(Decl::VarDecl(var_decl)),
+        BlockItem::D(Decl::FuncDecl(FuncDecl::FuncDecl(name, params, None))) => {
+            BlockItem::D(Decl::FuncDecl(FuncDecl::FuncDecl(name, params, None)))
+        }
+        _ => unreachable!(),
     };
     Ok(block_item)
 }
 
-fn resolve_stmt(stmt: Stmt, context: &mut Option<&mut Context>) -> ValidationResult<Stmt> {
+fn resolve_stmt(
+    stmt: Stmt<Plain>,
+    context: &mut Option<&mut Context>,
+) -> ValidationResult<Stmt<SwitchResolved>> {
     let stmt = match stmt {
         Stmt::If(cond, then, Some(else_)) => Stmt::If(
             cond,
@@ -109,15 +116,20 @@ fn resolve_stmt(stmt: Stmt, context: &mut Option<&mut Context>) -> ValidationRes
             let body = Box::new(resolve_stmt(*body, context)?);
             Stmt::For(init, cond, post, body, label)
         }
-        Stmt::Switch(cond, body, label) => {
+        Stmt::Switch(cond, body, label, ()) => {
             let mut new_context = Context {
                 cases: FxHashMap::default(),
                 default: None,
             };
             let body = Box::new(resolve_stmt(*body, &mut Some(&mut new_context))?);
-            Stmt::SwitchResolved(cond, body, label, new_context.cases, new_context.default)
+            Stmt::Switch(cond, body, label, (new_context.cases, new_context.default))
         }
-        other => other,
+        Stmt::Return(exp) => Stmt::Return(exp),
+        Stmt::Goto(label) => Stmt::Goto(label),
+        Stmt::Expression(exp) => Stmt::Expression(exp),
+        Stmt::Break(label) => Stmt::Break(label),
+        Stmt::Continue(label) => Stmt::Continue(label),
+        Stmt::Null => Stmt::Null,
     };
     Ok(stmt)
 }
