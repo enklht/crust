@@ -5,7 +5,7 @@ mod lex;
 mod models;
 mod parse;
 mod semantic_analysis;
-// mod tacky_gen;
+mod tacky_gen;
 mod utils;
 
 use bpaf::*;
@@ -81,7 +81,7 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let validated_ast = match semantic_analysis::validate(ast) {
+    let (validated_ast, symbols) = match semantic_analysis::validate(ast) {
         Ok(program) => program,
         Err(e) => {
             eprintln!("Validation error: {e}");
@@ -94,24 +94,24 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    // let tacky = tacky_gen::convert_program(validated_ast);
-    //
-    // if opts.mode == CompilerMode::Tacky {
-    //     println!("{:?}", tacky);
-    //     return Ok(());
-    // }
-    //
-    // let asm_ast = backend::codegen(tacky);
-    //
-    // if opts.mode == CompilerMode::Codegen {
-    //     println!("{:#?}", asm_ast);
-    //     return Ok(());
-    // }
-    //
-    // let asm_text = emit::emit(asm_ast);
-    //
-    // let output = opts.output.unwrap_or(opts.input.with_extension("s"));
-    // fs::write(&output, asm_text)?;
+    let tacky = tacky_gen::convert_program(validated_ast);
+
+    if opts.mode == CompilerMode::Tacky {
+        println!("{:?}", tacky);
+        return Ok(());
+    }
+
+    let asm_ast = backend::codegen(tacky);
+
+    if opts.mode == CompilerMode::Codegen {
+        println!("{:#?}", asm_ast);
+        return Ok(());
+    }
+
+    let asm_text = emit::emit(asm_ast, &symbols);
+
+    let output = opts.output.unwrap_or(opts.input.with_extension("s"));
+    fs::write(&output, asm_text)?;
 
     Ok(())
 }

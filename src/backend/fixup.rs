@@ -1,21 +1,23 @@
 use super::asm::*;
 
-pub fn fixup(program: Program, last_offset: isize) -> Program {
+pub fn fixup(program: Program<LastOffset>) -> Program<Plain> {
     match program {
-        Program::Program(function) => Program::Program(fixup_function(function, last_offset)),
+        Program::Program(func_defs) => {
+            Program::Program(func_defs.into_iter().map(fixup_function).collect())
+        }
     }
 }
 
-fn fixup_function(function: Function, last_offset: isize) -> Function {
+fn fixup_function(function: FuncDef<LastOffset>) -> FuncDef<Plain> {
     match function {
-        Function::Function(name, instructions) => {
-            let mut fixed = vec![Instruction::AllocateStack(-last_offset as usize)];
+        FuncDef::Function(name, instructions, last_offset) => {
+            let mut fixed = vec![Instruction::AllocateStack(last_offset.next_multiple_of(16))];
 
             for instruction in instructions {
                 emit_instruction(instruction, &mut fixed);
             }
 
-            Function::Function(name, fixed)
+            FuncDef::Function(name, fixed, ())
         }
     }
 }
@@ -67,6 +69,10 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Cmp(src, Operand::Reg(Reg::R11)),
             ]);
         }
+        Instruction::Push(op @ Operand::Stack(_)) => acc.extend([
+            Instruction::Mov(op, Operand::Reg(Reg::AX)),
+            Instruction::Push(Operand::Reg(Reg::AX)),
+        ]),
         other => {
             acc.push(other);
         }

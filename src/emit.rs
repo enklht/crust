@@ -1,30 +1,35 @@
 use crate::models::assembly::*;
+use crate::models::types::Symbols;
 
-pub fn emit(program: Program) -> String {
+pub fn emit(program: Program<Plain>, symbols: &Symbols) -> String {
     let mut acc = String::new();
-    emit_program(program, &mut acc);
+    emit_program(program, &mut acc, symbols);
     acc
 }
 
-fn emit_program(program: Program, acc: &mut String) {
+fn emit_program(program: Program<Plain>, acc: &mut String, symbols: &Symbols) {
     match program {
-        Program::Program(function) => emit_function(function, acc),
+        Program::Program(func_defs) => {
+            for func_def in func_defs {
+                emit_func_def(func_def, acc, symbols);
+            }
+        }
     }
     acc.push_str("    .section .note.GNU-stack,\"\",@progbits\n")
 }
 
-fn emit_function(function: Function, acc: &mut String) {
-    match function {
-        Function::Function(name, instructions) => {
+fn emit_func_def(func_def: FuncDef<Plain>, acc: &mut String, symbols: &Symbols) {
+    match func_def {
+        FuncDef::Function(name, instructions, _) => {
             acc.push_str(&format!(
                 "    .global {name}\n{name}:\n    pushq %rbp\n    movq %rsp, %rbp\n"
             ));
-            emit_instructions(instructions, acc)
+            emit_instructions(instructions, acc, symbols)
         }
     }
 }
 
-fn emit_instructions(instructions: Vec<Instruction>, acc: &mut String) {
+fn emit_instructions(instructions: Vec<Instruction>, acc: &mut String, symbols: &Symbols) {
     for instruction in instructions {
         let fixed = match instruction {
             Instruction::Mov(src, dst) => format!("    movl {src}, {dst}\n"),
@@ -39,8 +44,14 @@ fn emit_instructions(instructions: Vec<Instruction>, acc: &mut String) {
             Instruction::Cmp(src, dst) => format!("    cmpl {src}, {dst}\n"),
             Instruction::Jmp(label) => format!("    jmp .L{label}\n"),
             Instruction::JmpCC(code, label) => format!("    j{code} .L{label}\n"),
-            Instruction::SetCC(code, op) => format!("    set{code} {}\n", op.onebyte()),
+            Instruction::SetCC(code, op) => format!("    set{code} {}\n", op.one_byte()),
             Instruction::Label(label) => format!(".L{label}:\n"),
+            Instruction::DeallocateStack(size) => format!("    addq ${size}, %rsp\n"),
+            Instruction::Push(op) => format!("    pushq {}\n", op.eight_byte()),
+            Instruction::Call(name) => match symbols.get(&name) {
+                Some(_) => format!("    call {name}\n"),
+                None => format!("    call {name}@PLT"),
+            },
         };
         acc.push_str(&fixed);
     }

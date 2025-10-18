@@ -1,13 +1,35 @@
 use derive_more::Display;
 
-#[derive(Debug)]
-pub enum Program {
-    Program(Function),
+pub trait AsmExtra {
+    type FuncDef: std::fmt::Debug;
 }
 
 #[derive(Debug)]
-pub enum Function {
-    Function(String, Vec<Instruction>),
+pub struct Plain;
+impl AsmExtra for Plain {
+    type FuncDef = ();
+}
+
+#[derive(Debug)]
+pub struct LastOffset;
+impl AsmExtra for LastOffset {
+    type FuncDef = usize;
+}
+
+#[derive(Debug)]
+pub enum Program<Extra>
+where
+    Extra: AsmExtra + std::fmt::Debug,
+{
+    Program(Vec<FuncDef<Extra>>),
+}
+
+#[derive(Debug)]
+pub enum FuncDef<Extra>
+where
+    Extra: AsmExtra + std::fmt::Debug,
+{
+    Function(String, Vec<Instruction>, Extra::FuncDef),
 }
 
 #[derive(Debug)]
@@ -25,6 +47,9 @@ pub enum Instruction {
     Label(String),
     Cdq,
     AllocateStack(usize),
+    DeallocateStack(usize),
+    Push(Operand),
+    Call(String),
     Ret,
 }
 
@@ -56,7 +81,7 @@ pub enum BinaryOp {
 pub enum Operand {
     #[display("${_0}")]
     Imm(i32),
-    #[display("{_0}")]
+    #[display("{}", _0.four_byte())]
     Reg(Reg),
     #[display("<pseudo register will never be emit>")]
     Pseudo(String),
@@ -65,9 +90,16 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn onebyte(self) -> String {
+    pub fn one_byte(self) -> String {
         match self {
-            Operand::Reg(reg) => reg.onebyte(),
+            Operand::Reg(reg) => reg.one_byte(),
+            other => other.to_string(),
+        }
+    }
+
+    pub fn eight_byte(self) -> String {
+        match self {
+            Operand::Reg(reg) => reg.eight_byte(),
             other => other.to_string(),
         }
     }
@@ -89,26 +121,59 @@ pub enum CondCode {
     GE,
 }
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Clone)]
 pub enum Reg {
-    #[display("%eax")]
     AX,
-    #[display("%ecx")]
     CX,
-    #[display("%edx")]
     DX,
-    #[display("%r10d")]
+    DI,
+    SI,
+    R8,
+    R9,
     R10,
-    #[display("%r11d")]
     R11,
 }
 
 impl Reg {
-    fn onebyte(self) -> String {
+    fn eight_byte(&self) -> String {
+        match self {
+            Reg::AX => "%rax",
+            Reg::CX => "%rcx",
+            Reg::DX => "%rdx",
+            Reg::DI => "%rdi",
+            Reg::SI => "%rsi",
+            Reg::R8 => "%r8",
+            Reg::R9 => "%r9",
+            Reg::R10 => "%r10",
+            Reg::R11 => "%r11",
+        }
+        .to_string()
+    }
+
+    fn four_byte(&self) -> String {
+        match self {
+            Reg::AX => "%eax",
+            Reg::CX => "%ecx",
+            Reg::DX => "%edx",
+            Reg::DI => "%edi",
+            Reg::SI => "%esi",
+            Reg::R8 => "%r8d",
+            Reg::R9 => "%r9d",
+            Reg::R10 => "%r10d",
+            Reg::R11 => "%r11d",
+        }
+        .to_string()
+    }
+
+    fn one_byte(&self) -> String {
         match self {
             Reg::AX => "%al",
             Reg::CX => "%cl",
             Reg::DX => "%dl",
+            Reg::DI => "%dil",
+            Reg::SI => "%sil",
+            Reg::R8 => "%r8b",
+            Reg::R9 => "%r9b",
             Reg::R10 => "%r10b",
             Reg::R11 => "%r11b",
         }

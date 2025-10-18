@@ -1,20 +1,21 @@
 #[derive(Debug)]
 pub enum Program {
-    Program(Function),
+    Program(Vec<FuncDef>),
 }
 
-pub enum Function {
-    Function(String, Vec<Instruction>),
+pub enum FuncDef {
+    FuncDef(String, Vec<String>, Vec<Instruction>),
 }
 
-impl std::fmt::Debug for Function {
+impl std::fmt::Debug for FuncDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            Function::Function(name, instructions) => {
+            FuncDef::FuncDef(name, params, instructions) => {
                 write!(
                     f,
-                    "\n    name: {}\n    instructions:\n{}",
+                    "\n    name: {}\n    params: {:?}\n    instructions:\n{}",
                     name,
+                    params,
                     instructions
                         .iter()
                         .fold(String::new(), |acc, i| acc + &format!("        {i:?},\n"))
@@ -34,6 +35,7 @@ pub enum Instruction {
     JumpIfZero(Val, String),
     JumpIfNotZero(Val, String),
     Label(String),
+    FuncCall(String, Vec<Val>, Val),
 }
 
 #[derive(Debug, Clone)]

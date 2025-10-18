@@ -5,16 +5,9 @@ mod resolve_switches;
 mod type_check;
 
 use crate::models::ast::*;
-use derive_more::Display;
+use crate::models::types::Symbols;
+use crate::models::types::Type;
 use thiserror::Error;
-
-#[derive(Debug, Clone, PartialEq, Display)]
-pub enum Type {
-    #[display("Int")]
-    Int,
-    #[display("Fn(Int{{{_0}}}) -> Int")]
-    Fn(usize),
-}
 
 #[derive(Debug, Error)]
 pub enum ValidationError {
@@ -67,7 +60,7 @@ pub enum ValidationError {
 
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
-pub fn validate(program: Program) -> ValidationResult<Program> {
+pub fn validate(program: Program) -> ValidationResult<(Program, Symbols)> {
     let passes = [
         resolve_ident::resolve_program,
         resolve_labels::resolve_program,
@@ -77,6 +70,7 @@ pub fn validate(program: Program) -> ValidationResult<Program> {
 
     let program = passes.iter().try_fold(program, |p, pass| pass(p))?;
 
-    type_check::check_program(&program)?;
-    Ok(program)
+    let symbols = type_check::check_program(&program)?;
+
+    Ok((program, symbols))
 }

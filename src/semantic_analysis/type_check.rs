@@ -1,10 +1,8 @@
+use super::Symbols;
 use super::Type;
 use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
-use rustc_hash::FxHashMap;
-
-type Symbols = FxHashMap<String, (Type, bool)>;
 
 pub fn check_program(program: &Program) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
@@ -124,7 +122,7 @@ fn check_stmt(stmt: &Stmt, symbols: &mut Symbols) -> ValidationResult<()> {
             }
             check_stmt(body, symbols)?;
         }
-        Stmt::Switch(cond, body, _) => {
+        Stmt::SwitchResolved(cond, body, _, _, _) => {
             check_exp(cond, symbols)?;
             check_stmt(body, symbols)?;
         }

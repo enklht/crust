@@ -1,50 +1,71 @@
-use crate::models::assembly as asm;
+use crate::models::assembly::*;
 use crate::models::tacky;
 use crate::models::tacky::BinaryOp as BinOp;
 
-pub fn gen_program(program: tacky::Program) -> asm::Program {
+const ARG_REGISTERS: [Reg; 6] = [Reg::DI, Reg::SI, Reg::DX, Reg::CX, Reg::R8, Reg::R9];
+
+pub fn gen_program(program: tacky::Program) -> Program<Plain> {
     match program {
-        tacky::Program::Program(function) => asm::Program::Program(gen_function(function)),
+        tacky::Program::Program(func_defs) => {
+            Program::Program(func_defs.into_iter().map(gen_func_def).collect())
+        }
     }
 }
 
-fn gen_function(function: tacky::Function) -> asm::Function {
+fn gen_func_def(function: tacky::FuncDef) -> FuncDef<Plain> {
     match function {
-        tacky::Function::Function(name, body) => {
-            asm::Function::Function(name, gen_instructions(body))
+        tacky::FuncDef::FuncDef(name, params, body) => {
+            let mut asm_instructions = Vec::new();
+            let (register_params, stack_params) = &params.split_at(params.len().min(6));
+
+            for (arg, reg) in register_params.iter().zip(ARG_REGISTERS) {
+                asm_instructions.push(Instruction::Mov(
+                    Operand::Reg(reg),
+                    Operand::Pseudo(arg.clone()),
+                ));
+            }
+
+            for (i, arg) in stack_params.iter().enumerate() {
+                asm_instructions.push(Instruction::Mov(
+                    Operand::Stack((i as isize + 2) * 8),
+                    Operand::Pseudo(arg.clone()),
+                ))
+            }
+
+            asm_instructions.extend(gen_instructions(body));
+
+            FuncDef::Function(name, asm_instructions, ())
         }
     }
 }
 
 macro_rules! reg {
     ($reg: ident) => {
-        asm::Operand::Reg(asm::Reg::$reg)
+        Operand::Reg(Reg::$reg)
     };
 }
 
-fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instruction> {
+fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<Instruction> {
     let mut asm_instructions = Vec::new();
     for instruction in instructions {
         match instruction {
             tacky::Instruction::Return(val) => {
-                asm_instructions.extend([
-                    asm::Instruction::Mov(gen_val(val), reg!(AX)),
-                    asm::Instruction::Ret,
-                ]);
+                asm_instructions
+                    .extend([Instruction::Mov(gen_val(val), reg!(AX)), Instruction::Ret]);
             }
             tacky::Instruction::Unary(tacky::UnaryOp::Not, src, dst) => {
                 let dst = gen_val(dst);
                 asm_instructions.extend([
-                    asm::Instruction::Cmp(asm::Operand::Imm(0), gen_val(src)),
-                    asm::Instruction::Mov(asm::Operand::Imm(0), dst.clone()),
-                    asm::Instruction::SetCC(asm::CondCode::E, dst),
+                    Instruction::Cmp(Operand::Imm(0), gen_val(src)),
+                    Instruction::Mov(Operand::Imm(0), dst.clone()),
+                    Instruction::SetCC(CondCode::E, dst),
                 ]);
             }
             tacky::Instruction::Unary(op, src, dst) => {
                 let dst = gen_val(dst);
                 asm_instructions.extend([
-                    asm::Instruction::Mov(gen_val(src), dst.clone()),
-                    asm::Instruction::Unary(gen_unop(op), dst),
+                    Instruction::Mov(gen_val(src), dst.clone()),
+                    Instruction::Unary(gen_unop(op), dst),
                 ]);
             }
             tacky::Instruction::Binary(op, src1, src2, dst) => match op {
@@ -56,40 +77,40 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instructi
                 | BinOp::BitXor => {
                     let dst = gen_val(dst);
                     asm_instructions.extend([
-                        asm::Instruction::Mov(gen_val(src1), dst.clone()),
-                        asm::Instruction::Binary(gen_binop(op), gen_val(src2), dst),
+                        Instruction::Mov(gen_val(src1), dst.clone()),
+                        Instruction::Binary(gen_binop(op), gen_val(src2), dst),
                     ]);
                 }
                 BinOp::Divide => {
                     asm_instructions.extend([
-                        asm::Instruction::Mov(gen_val(src1), reg!(AX)),
-                        asm::Instruction::Cdq,
-                        asm::Instruction::Idiv(gen_val(src2)),
-                        asm::Instruction::Mov(reg!(AX), gen_val(dst)),
+                        Instruction::Mov(gen_val(src1), reg!(AX)),
+                        Instruction::Cdq,
+                        Instruction::Idiv(gen_val(src2)),
+                        Instruction::Mov(reg!(AX), gen_val(dst)),
                     ]);
                 }
                 BinOp::Remainder => {
                     asm_instructions.extend([
-                        asm::Instruction::Mov(gen_val(src1), reg!(AX)),
-                        asm::Instruction::Cdq,
-                        asm::Instruction::Idiv(gen_val(src2)),
-                        asm::Instruction::Mov(reg!(DX), gen_val(dst)),
+                        Instruction::Mov(gen_val(src1), reg!(AX)),
+                        Instruction::Cdq,
+                        Instruction::Idiv(gen_val(src2)),
+                        Instruction::Mov(reg!(DX), gen_val(dst)),
                     ]);
                 }
                 BinOp::LShift => {
                     let dst = gen_val(dst);
                     asm_instructions.extend([
-                        asm::Instruction::Mov(gen_val(src1), dst.clone()),
-                        asm::Instruction::Mov(gen_val(src2), reg!(CX)),
-                        asm::Instruction::Shl(dst),
+                        Instruction::Mov(gen_val(src1), dst.clone()),
+                        Instruction::Mov(gen_val(src2), reg!(CX)),
+                        Instruction::Shl(dst),
                     ]);
                 }
                 BinOp::RShift => {
                     let dst = gen_val(dst);
                     asm_instructions.extend([
-                        asm::Instruction::Mov(gen_val(src1), dst.clone()),
-                        asm::Instruction::Mov(gen_val(src2), reg!(CX)),
-                        asm::Instruction::Shr(dst),
+                        Instruction::Mov(gen_val(src1), dst.clone()),
+                        Instruction::Mov(gen_val(src2), reg!(CX)),
+                        Instruction::Shr(dst),
                     ]);
                 }
                 BinOp::Equal
@@ -100,73 +121,101 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>) -> Vec<asm::Instructi
                 | BinOp::GreaterOrEqual => {
                     let dst = gen_val(dst);
                     asm_instructions.extend([
-                        asm::Instruction::Cmp(gen_val(src2), gen_val(src1)),
-                        asm::Instruction::Mov(asm::Operand::Imm(0), dst.clone()),
-                        asm::Instruction::SetCC(gen_rel(op), dst),
+                        Instruction::Cmp(gen_val(src2), gen_val(src1)),
+                        Instruction::Mov(Operand::Imm(0), dst.clone()),
+                        Instruction::SetCC(gen_rel(op), dst),
                     ]);
                 }
             },
             tacky::Instruction::Jump(target) => {
-                asm_instructions.push(asm::Instruction::Jmp(target));
+                asm_instructions.push(Instruction::Jmp(target));
             }
             tacky::Instruction::JumpIfZero(val, target) => {
                 asm_instructions.extend([
-                    asm::Instruction::Cmp(asm::Operand::Imm(0), gen_val(val)),
-                    asm::Instruction::JmpCC(asm::CondCode::E, target),
+                    Instruction::Cmp(Operand::Imm(0), gen_val(val)),
+                    Instruction::JmpCC(CondCode::E, target),
                 ]);
             }
             tacky::Instruction::JumpIfNotZero(val, target) => {
                 asm_instructions.extend([
-                    asm::Instruction::Cmp(asm::Operand::Imm(0), gen_val(val)),
-                    asm::Instruction::JmpCC(asm::CondCode::NE, target),
+                    Instruction::Cmp(Operand::Imm(0), gen_val(val)),
+                    Instruction::JmpCC(CondCode::NE, target),
                 ]);
             }
             tacky::Instruction::Copy(src, dst) => {
-                asm_instructions.push(asm::Instruction::Mov(gen_val(src), gen_val(dst)));
+                asm_instructions.push(Instruction::Mov(gen_val(src), gen_val(dst)));
             }
             tacky::Instruction::Label(label) => {
-                asm_instructions.push(asm::Instruction::Label(label));
+                asm_instructions.push(Instruction::Label(label));
+            }
+            tacky::Instruction::FuncCall(name, args, dst) => {
+                let (register_args, stack_args) = &args.split_at(args.len().min(6));
+
+                let stack_padding = if stack_args.len() % 2 == 1 {
+                    asm_instructions.push(Instruction::AllocateStack(8));
+                    8
+                } else {
+                    0
+                };
+
+                for (arg, reg) in register_args.iter().zip(ARG_REGISTERS) {
+                    asm_instructions
+                        .push(Instruction::Mov(gen_val(arg.clone()), Operand::Reg(reg)));
+                }
+
+                for arg in stack_args.iter().rev() {
+                    asm_instructions.push(Instruction::Push(gen_val(arg.clone())));
+                }
+
+                asm_instructions.push(Instruction::Call(name));
+
+                let bytes_to_remove = 8 * stack_args.len() + stack_padding;
+                if bytes_to_remove > 0 {
+                    asm_instructions.push(Instruction::DeallocateStack(bytes_to_remove));
+                }
+
+                asm_instructions.push(Instruction::Mov(reg!(AX), gen_val(dst)));
             }
         }
     }
     asm_instructions
 }
 
-fn gen_val(val: tacky::Val) -> asm::Operand {
+fn gen_val(val: tacky::Val) -> Operand {
     match val {
-        tacky::Val::Const(i) => asm::Operand::Imm(i),
-        tacky::Val::Var(ident) => asm::Operand::Pseudo(ident),
+        tacky::Val::Const(i) => Operand::Imm(i),
+        tacky::Val::Var(ident) => Operand::Pseudo(ident),
     }
 }
 
-fn gen_unop(op: tacky::UnaryOp) -> asm::UnaryOp {
+fn gen_unop(op: tacky::UnaryOp) -> UnaryOp {
     match op {
-        tacky::UnaryOp::Complement => asm::UnaryOp::Not,
-        tacky::UnaryOp::Negate => asm::UnaryOp::Neg,
+        tacky::UnaryOp::Complement => UnaryOp::Not,
+        tacky::UnaryOp::Negate => UnaryOp::Neg,
         _ => todo!(),
     }
 }
 
-fn gen_binop(op: BinOp) -> asm::BinaryOp {
+fn gen_binop(op: BinOp) -> BinaryOp {
     match op {
-        BinOp::Add => asm::BinaryOp::Add,
-        BinOp::Subtract => asm::BinaryOp::Subtract,
-        BinOp::Multiply => asm::BinaryOp::Multiply,
-        BinOp::BitAnd => asm::BinaryOp::BitAnd,
-        BinOp::BitOr => asm::BinaryOp::BitOr,
-        BinOp::BitXor => asm::BinaryOp::BitXor,
+        BinOp::Add => BinaryOp::Add,
+        BinOp::Subtract => BinaryOp::Subtract,
+        BinOp::Multiply => BinaryOp::Multiply,
+        BinOp::BitAnd => BinaryOp::BitAnd,
+        BinOp::BitOr => BinaryOp::BitOr,
+        BinOp::BitXor => BinaryOp::BitXor,
         _ => unreachable!(),
     }
 }
 
-fn gen_rel(op: BinOp) -> asm::CondCode {
+fn gen_rel(op: BinOp) -> CondCode {
     match op {
-        BinOp::Equal => asm::CondCode::E,
-        BinOp::NotEqual => asm::CondCode::NE,
-        BinOp::LessThan => asm::CondCode::L,
-        BinOp::LessOrEqual => asm::CondCode::LE,
-        BinOp::GreaterThan => asm::CondCode::G,
-        BinOp::GreaterOrEqual => asm::CondCode::GE,
+        BinOp::Equal => CondCode::E,
+        BinOp::NotEqual => CondCode::NE,
+        BinOp::LessThan => CondCode::L,
+        BinOp::LessOrEqual => CondCode::LE,
+        BinOp::GreaterThan => CondCode::G,
+        BinOp::GreaterOrEqual => CondCode::GE,
         _ => unreachable!(),
     }
 }
