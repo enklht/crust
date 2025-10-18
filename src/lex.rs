@@ -77,6 +77,7 @@ pub fn lexer<'src>()
         just("=").to(Token::Equal),
         just("?").to(Token::Question),
         just(":").to(Token::Colon),
+        just(",").to(Token::Comma),
     ));
 
     choice((

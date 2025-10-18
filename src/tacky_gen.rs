@@ -40,11 +40,11 @@ fn emit_block_item(block_item: BlockItem, instructions: &mut Vec<Inst>) {
 
 fn emit_decl(decl: Decl, instructions: &mut Vec<Inst>) {
     match decl {
-        Decl::Decl(name, Some(exp)) => {
+        Decl::FunDecl(name, Some(exp)) => {
             let result = emit_exp(exp, instructions);
             instructions.push(Inst::Copy(result, tacky::Val::Var(name)));
         }
-        Decl::Decl(_, None) => {}
+        Decl::FunDecl(_, None) => {}
     }
 }
 
@@ -275,6 +275,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Inst>) -> tacky::Val {
             instructions.extend([Inst::Copy(else_, result.clone()), Inst::Label(end_label)]);
             result
         }
+        _ => todo!(),
     }
 }
 

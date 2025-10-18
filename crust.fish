@@ -2,18 +2,18 @@
 
 # Parse arguments
 argparse \
-    'c/compile-only' \
-    'l/lex' \
-    'p/parse' \
-    'v/validate' \
-    't/tacky' \
-    'g/codegen' \
-    'h/help' \
+    c/compile-only \
+    l/lex \
+    p/parse \
+    v/validate \
+    t/tacky \
+    g/codegen \
+    h/help \
     -- $argv
 or exit
 
 if set -q _flag_help
-    printf "Usage: my_cc.fish [OPTIONS] /path/to/source.c\n\n"
+    printf "Usage: crust.fish [OPTIONS] /path/to/source.c\n\n"
     printf "Options:\n"
     printf "  -c, --compile-only     Compile only, do not link\n"
     printf "  -l, --lex              Stop after lexing stage\n"
@@ -38,17 +38,17 @@ if not test -f $input -a -r $input
 end
 
 # Set compilation stage flag
-set flag ""
+set flag
 if set -q _flag_lex
-    set flag "--lex"
+    set flag --lex
 else if set -q _flag_parse
-    set flag "--parse"
+    set flag --parse
 else if set -q _flag_validate
-    set flag "--validate"
+    set flag --validate
 else if set -q _flag_tacky
-    set flag "--tacky"
+    set flag --tacky
 else if set -q _flag_codegen
-    set flag "--codegen"
+    set flag --codegen
 end
 
 # Set compile-only flag

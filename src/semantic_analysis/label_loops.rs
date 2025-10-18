@@ -5,23 +5,29 @@ use crate::utils::make_label;
 
 pub fn label_program(program: Program) -> ValidationResult<Program> {
     let program = match program {
-        Program::FuncDef(func_def) => Program::FuncDef(label_func_def(func_def)?),
+        Program::Program(func_decls) => Program::Program(
+            func_decls
+                .into_iter()
+                .map(label_func_decl)
+                .collect::<Result<_, _>>()?,
+        ),
     };
     Ok(program)
 }
 
-fn label_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
-    let func_def = match func_def {
-        FuncDef::Function(name, body) => {
+fn label_func_decl(func_decl: FuncDecl) -> ValidationResult<FuncDecl> {
+    let func_decl = match func_decl {
+        FuncDecl::FuncDecl(name, params, Some(body)) => {
             let body = body
                 .into_iter()
                 .map(|block_item| label_block_item(block_item, &None, &None))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDef::Function(name, body)
+            FuncDecl::FuncDecl(name, params, Some(body))
         }
+        other => other,
     };
-    Ok(func_def)
+    Ok(func_decl)
 }
 
 fn label_block_item(

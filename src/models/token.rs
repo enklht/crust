@@ -114,4 +114,6 @@ pub enum Token {
     Question,
     #[display(":")]
     Colon,
+    #[display(",")]
+    Comma,
 }

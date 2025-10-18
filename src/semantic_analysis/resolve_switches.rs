@@ -11,23 +11,29 @@ struct Context {
 
 pub fn resolve_program(program: Program) -> ValidationResult<Program> {
     let program = match program {
-        Program::FuncDef(func_def) => Program::FuncDef(resolve_func_def(func_def)?),
+        Program::Program(func_decls) => Program::Program(
+            func_decls
+                .into_iter()
+                .map(resolve_func_decl)
+                .collect::<Result<_, _>>()?,
+        ),
     };
     Ok(program)
 }
 
-fn resolve_func_def(func_def: FuncDef) -> ValidationResult<FuncDef> {
-    let func_def = match func_def {
-        FuncDef::Function(name, body) => {
+fn resolve_func_decl(func_def: FuncDecl) -> ValidationResult<FuncDecl> {
+    let func_decl = match func_def {
+        FuncDecl::FuncDecl(name, params, Some(body)) => {
             let body = body
                 .into_iter()
                 .map(|block_item| resolve_block_item(block_item, &mut None))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDef::Function(name, body)
+            FuncDecl::FuncDecl(name, params, Some(body))
         }
+        other => other,
     };
-    Ok(func_def)
+    Ok(func_decl)
 }
 
 fn resolve_block_item(

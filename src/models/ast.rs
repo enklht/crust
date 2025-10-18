@@ -2,12 +2,23 @@ use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]
 pub enum Program {
-    FuncDef(FuncDef),
+    Program(Vec<FuncDecl>),
 }
 
 #[derive(Debug, Clone)]
-pub enum FuncDef {
-    Function(String, Block),
+pub enum Decl {
+    VarDecl(VarDecl),
+    FuncDecl(FuncDecl),
+}
+
+#[derive(Debug, Clone)]
+pub enum VarDecl {
+    VarDecl(String, Option<Exp>),
+}
+
+#[derive(Debug, Clone)]
+pub enum FuncDecl {
+    FuncDecl(String, Vec<String>, Option<Block>),
 }
 
 pub type Block = Vec<BlockItem>;
@@ -19,13 +30,8 @@ pub enum BlockItem {
 }
 
 #[derive(Debug, Clone)]
-pub enum Decl {
-    Decl(String, Option<Exp>),
-}
-
-#[derive(Debug, Clone)]
 pub enum ForInit {
-    InitDecl(Decl),
+    InitDecl(VarDecl),
     InitExp(Option<Exp>),
 }
 
@@ -68,6 +74,7 @@ pub enum Exp {
     Binary(BinaryOp, Box<Exp>, Box<Exp>),
     Assignment(Box<Exp>, Box<Exp>),
     Conditional(Box<Exp>, Box<Exp>, Box<Exp>),
+    FuncCall(String, Vec<Exp>),
 }
 
 #[derive(Debug, Clone)]

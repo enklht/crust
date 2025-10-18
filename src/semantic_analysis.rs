@@ -8,28 +8,39 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ValidationError {
-    #[error("duplicate variable definition {0}")]
-    DuplicateVariableDefinition(String),
-    #[error("lvalue of an assignement must be a variable, found {0:?}")]
-    InvalidLvalue(Exp),
+    // variable declaration
+    #[error("duplicate variable declaration {0}")]
+    DuplicateVarDecl(String),
     #[error("variable {0} is not defined")]
     UndefinedVariable(String),
-    #[error("duplicate label definition: {0}")]
-    DuplicateLabelDefinition(String),
+    #[error("invalid lvalue: {0:?}")]
+    InvalidLvalue(Exp),
+    // function declaration
+    #[error("duplicate function declaration {0}")]
+    DuplicateFuncDecl(String),
+    #[error("function {0} is not defined")]
+    UndefinedFunction(String),
+    #[error("function {0} is defined inside a function")]
+    NestedFuncDef(String),
+    // invalid labels
     #[error("label {0} is not defined")]
     UndefinedLabel(String),
+    #[error("duplicate label definition: {0}")]
+    DuplicateLabel(String),
+    // invalid loop label
     #[error("break statement outside of loop")]
     BreakOutsideLoop,
     #[error("continue statement outside of loop")]
     ContinueOutsideLoop,
+    // invalid swtich label
     #[error("case label outside of switch")]
     CaseOutsideLoop,
-    #[error("default label outside of switch")]
-    DefaultOutsideLoop,
-    #[error("non-constant case value: {0:?}")]
-    NonConstCase(Exp),
     #[error("duplicate case value: {0:?}")]
     DuplicateCaseValue(i32),
+    #[error("non-constant case value: {0:?}")]
+    NonConstCase(Exp),
+    #[error("default label outside of switch")]
+    DefaultOutsideLoop,
     #[error("multiple default statements found in switch")]
     DuplicateDefault,
 }
