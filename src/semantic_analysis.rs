@@ -1,7 +1,7 @@
 mod label_loops;
+mod resolve_ident;
 mod resolve_labels;
 mod resolve_switches;
-mod resolve_variables;
 
 use crate::models::ast::*;
 use thiserror::Error;
@@ -49,7 +49,7 @@ pub type ValidationResult<T> = Result<T, ValidationError>;
 
 pub fn validate(program: Program) -> ValidationResult<Program> {
     let passes = [
-        resolve_variables::resolve_program,
+        resolve_ident::resolve_program,
         resolve_labels::resolve_program,
         label_loops::label_program,
         resolve_switches::resolve_program,
