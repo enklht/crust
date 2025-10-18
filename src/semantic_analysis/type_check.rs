@@ -7,44 +7,21 @@ use crate::models::ast::*;
 pub fn check_program(program: &Program<SwitchResolved>) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
     match program {
-        Program::Program(func_decls) => {
-            func_decls
+        Program::Program(func_defs) => {
+            func_defs
                 .iter()
-                .try_for_each(|func_decl| check_func_decl(func_decl, &mut symbols))?;
+                .try_for_each(|func_def| check_func_def(func_def, &mut symbols))?;
         }
     }
     Ok(symbols)
 }
 
-fn check_block(block: &Block<SwitchResolved>, symbols: &mut Symbols) -> ValidationResult<()> {
-    block
-        .iter()
-        .try_for_each(|block_item| check_block_item(block_item, symbols))
-}
-
-fn check_block_item(
-    block_item: &BlockItem<SwitchResolved>,
+fn check_func_def(
+    func_def: &FuncDef<SwitchResolved>,
     symbols: &mut Symbols,
 ) -> ValidationResult<()> {
-    match block_item {
-        BlockItem::S(stmt) => check_stmt(stmt, symbols),
-        BlockItem::D(decl) => check_decl(decl, symbols),
-    }
-}
-
-fn check_decl(decl: &Decl<SwitchResolved>, symbols: &mut Symbols) -> ValidationResult<()> {
-    match decl {
-        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols),
-        Decl::VarDecl(var_decl) => check_var_decl(var_decl, symbols),
-    }
-}
-
-fn check_func_decl(
-    func_decl: &FuncDecl<SwitchResolved>,
-    symbols: &mut Symbols,
-) -> ValidationResult<()> {
-    match func_decl {
-        FuncDecl::FuncDecl(name, params, body) => {
+    match func_def {
+        FuncDef::FuncDef(name, params, body) => {
             let type_ = Type::Fn(params.len());
             let mut defined = false;
 
@@ -70,6 +47,52 @@ fn check_func_decl(
                 }
                 check_block(body, symbols)?;
             }
+        }
+    }
+    Ok(())
+}
+
+fn check_block(block: &Block<SwitchResolved>, symbols: &mut Symbols) -> ValidationResult<()> {
+    block
+        .iter()
+        .try_for_each(|block_item| check_block_item(block_item, symbols))
+}
+
+fn check_block_item(
+    block_item: &BlockItem<SwitchResolved>,
+    symbols: &mut Symbols,
+) -> ValidationResult<()> {
+    match block_item {
+        BlockItem::S(stmt) => check_stmt(stmt, symbols),
+        BlockItem::D(decl) => check_decl(decl, symbols),
+    }
+}
+
+fn check_decl(decl: &Decl, symbols: &mut Symbols) -> ValidationResult<()> {
+    match decl {
+        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols),
+        Decl::VarDecl(var_decl) => check_var_decl(var_decl, symbols),
+    }
+}
+
+fn check_func_decl(func_decl: &FuncDecl, symbols: &mut Symbols) -> ValidationResult<()> {
+    match func_decl {
+        FuncDecl::FuncDecl(name, params) => {
+            let type_ = Type::Fn(params.len());
+            let mut defined = false;
+
+            if let Some((type_old, defined_old)) = symbols.get(name) {
+                if *type_old != type_ {
+                    return Err(ValidationError::IncompatibleFuncDecl(
+                        name.clone(),
+                        type_old.clone(),
+                        type_,
+                    ));
+                }
+                defined = *defined_old
+            }
+
+            symbols.insert(name.clone(), (type_, defined));
         }
     }
     Ok(())

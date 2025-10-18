@@ -10,18 +10,15 @@ fn make_temp_var() -> tacky::Val {
 
 pub fn convert_program(program: Program<SwitchResolved>) -> tacky::Program {
     match program {
-        Program::Program(func_decls) => tacky::Program::Program(
-            func_decls
-                .into_iter()
-                .filter_map(convert_func_decl)
-                .collect(),
-        ),
+        Program::Program(func_defs) => {
+            tacky::Program::Program(func_defs.into_iter().filter_map(convert_func_def).collect())
+        }
     }
 }
 
-fn convert_func_decl(func_decl: FuncDecl<SwitchResolved>) -> Option<tacky::FuncDef> {
-    match func_decl {
-        FuncDecl::FuncDecl(name, params, Some(body)) => {
+fn convert_func_def(func_def: FuncDef<SwitchResolved>) -> Option<tacky::FuncDef> {
+    match func_def {
+        FuncDef::FuncDef(name, params, Some(body)) => {
             let mut instructions = Vec::new();
             emit_block(body, &mut instructions);
             instructions.push(Instruction::Return(tacky::Val::Const(0)));
@@ -89,11 +86,9 @@ fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
         }
         Stmt::Goto(label) => instructions.push(Instruction::Jump(label)),
         Stmt::Compound(block) => emit_block(block, instructions),
-        Stmt::Break(Some(label)) => instructions.push(Instruction::Jump(format!("break_{label}"))),
-        Stmt::Continue(Some(label)) => {
-            instructions.push(Instruction::Jump(format!("continue_{label}")))
-        }
-        Stmt::While(cond, body, Some(label)) => {
+        Stmt::Break(label) => instructions.push(Instruction::Jump(format!("break_{label}"))),
+        Stmt::Continue(label) => instructions.push(Instruction::Jump(format!("continue_{label}"))),
+        Stmt::While(cond, body, label) => {
             let break_label = format!("break_{label}");
             let continue_label = format!("continue_{label}");
 
@@ -106,7 +101,7 @@ fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
                 Instruction::Label(break_label),
             ]);
         }
-        Stmt::DoWhile(body, cond, Some(label)) => {
+        Stmt::DoWhile(body, cond, label) => {
             let start_label = format!("start_{label}");
             let break_label = format!("break_{label}");
             let continue_label = format!("continue_{label}");
@@ -120,7 +115,7 @@ fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
                 Instruction::Label(break_label),
             ]);
         }
-        Stmt::For(init, cond, post, body, Some(label)) => {
+        Stmt::For(init, cond, post, body, label) => {
             let start_label = format!("start_{label}");
             let break_label = format!("break_{label}");
             let continue_label = format!("continue_{label}");
@@ -147,7 +142,7 @@ fn emit_stmt(stmt: Stmt<SwitchResolved>, instructions: &mut Vec<Instruction>) {
                 Instruction::Label(break_label),
             ])
         }
-        Stmt::Switch(cond, body, Some(label), (cases, default)) => {
+        Stmt::Switch(cond, body, label, (cases, default)) => {
             let break_label = format!("break_{label}");
             let cond = emit_exp(cond, instructions);
             let flag = make_temp_var();

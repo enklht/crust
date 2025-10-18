@@ -9,50 +9,46 @@ struct Context {
     default: Option<String>,
 }
 
-pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<SwitchResolved>> {
+pub fn resolve_program(program: Program<Labelled>) -> ValidationResult<Program<SwitchResolved>> {
     let program = match program {
-        Program::Program(func_decls) => Program::Program(
-            func_decls
+        Program::Program(func_defs) => Program::Program(
+            func_defs
                 .into_iter()
-                .map(resolve_func_decl)
+                .map(resolve_func_def)
                 .collect::<Result<_, _>>()?,
         ),
     };
     Ok(program)
 }
 
-fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<SwitchResolved>> {
-    let func_decl = match func_def {
-        FuncDecl::FuncDecl(name, params, Some(body)) => {
+fn resolve_func_def(func_def: FuncDef<Labelled>) -> ValidationResult<FuncDef<SwitchResolved>> {
+    let func_def = match func_def {
+        FuncDef::FuncDef(name, params, Some(body)) => {
             let body = body
                 .into_iter()
                 .map(|block_item| resolve_block_item(block_item, &mut None))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDecl::FuncDecl(name, params, Some(body))
+            FuncDef::FuncDef(name, params, Some(body))
         }
-        FuncDecl::FuncDecl(name, params, None) => FuncDecl::FuncDecl(name, params, None),
+        FuncDef::FuncDef(name, params, None) => FuncDef::FuncDef(name, params, None),
     };
-    Ok(func_decl)
+    Ok(func_def)
 }
 
 fn resolve_block_item(
-    block_item: BlockItem<Plain>,
+    block_item: BlockItem<Labelled>,
     context: &mut Option<&mut Context>,
 ) -> ValidationResult<BlockItem<SwitchResolved>> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, context)?),
-        BlockItem::D(Decl::VarDecl(var_decl)) => BlockItem::D(Decl::VarDecl(var_decl)),
-        BlockItem::D(Decl::FuncDecl(FuncDecl::FuncDecl(name, params, None))) => {
-            BlockItem::D(Decl::FuncDecl(FuncDecl::FuncDecl(name, params, None)))
-        }
-        _ => unreachable!(),
+        BlockItem::D(decl) => BlockItem::D(decl),
     };
     Ok(block_item)
 }
 
 fn resolve_stmt(
-    stmt: Stmt<Plain>,
+    stmt: Stmt<Labelled>,
     context: &mut Option<&mut Context>,
 ) -> ValidationResult<Stmt<SwitchResolved>> {
     let stmt = match stmt {

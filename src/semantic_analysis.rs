@@ -64,10 +64,10 @@ pub fn validate(program: Program<Plain>) -> ValidationResult<(Program<SwitchReso
     let passes = [
         resolve_ident::resolve_program,
         resolve_labels::resolve_program,
-        label_loops::label_program,
     ];
 
     let program = passes.iter().try_fold(program, |p, pass| pass(p))?;
+    let program = label_loops::label_program(program)?;
     let program = resolve_switches::resolve_program(program)?;
 
     let symbols = type_check::check_program(&program)?;

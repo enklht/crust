@@ -41,6 +41,29 @@ where
         .labelled("declaration")
         .as_context();
 
+    let param_list = choice((
+        just(Token::KwVoid).to(Vec::new()),
+        just(Token::KwInt)
+            .ignore_then(ident)
+            .separated_by(just(Token::Comma))
+            .collect(),
+    ));
+
+    let func_decl = just(Token::KwInt)
+        .ignore_then(ident)
+        .then(
+            param_list
+                .clone()
+                .delimited_by(just(Token::LParen), just(Token::RParen)),
+        )
+        .semicolon()
+        .map(|(name, params)| FuncDecl::FuncDecl(name, params));
+
+    let decl = choice((
+        func_decl.clone().map(Decl::FuncDecl),
+        var_decl.clone().map(Decl::VarDecl),
+    ));
+
     let for_init = choice((
         var_decl.clone().map(ForInit::InitDecl),
         exp.clone()
@@ -59,7 +82,6 @@ where
 
     let mut stmt = Recursive::declare();
     let mut block = Recursive::declare();
-    let mut decl = Recursive::declare();
 
     let exp_stmt = exp.clone().semicolon().map(Stmt::Expression);
 
@@ -92,14 +114,14 @@ where
     let while_stmt = just(Token::KwWhile)
         .ignore_then(exp_paren.clone())
         .then(stmt.clone())
-        .map(|(cond, body)| Stmt::While(cond, Box::new(body), None));
+        .map(|(cond, body)| Stmt::While(cond, Box::new(body), ()));
 
     let do_while_stmt = just(Token::KwDo)
         .ignore_then(stmt.clone())
         .then_ignore(just(Token::KwWhile))
         .then(exp_paren.clone())
         .semicolon()
-        .map(|(body, cond)| Stmt::DoWhile(Box::new(body), cond, None));
+        .map(|(body, cond)| Stmt::DoWhile(Box::new(body), cond, ()));
 
     let for_stmt = just(Token::KwFor)
         .ignore_then(
@@ -110,7 +132,7 @@ where
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(stmt.clone())
-        .map(|(((init, cond), post), body)| Stmt::For(init, cond, post, Box::new(body), None));
+        .map(|(((init, cond), post), body)| Stmt::For(init, cond, post, Box::new(body), ()));
 
     let switch_stmt = just(Token::KwSwitch)
         .ignore_then(
@@ -118,7 +140,7 @@ where
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(stmt.clone())
-        .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), None, ()));
+        .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), (), ()));
 
     stmt.define(
         choice((
@@ -128,8 +150,8 @@ where
             labelled_stmt,
             goto_stmt,
             block.clone().map(Stmt::Compound),
-            just(Token::KwBreak).semicolon().to(Stmt::Break(None)),
-            just(Token::KwContinue).semicolon().to(Stmt::Continue(None)),
+            just(Token::KwBreak).semicolon().to(Stmt::Break(())),
+            just(Token::KwContinue).semicolon().to(Stmt::Continue(())),
             while_stmt,
             do_while_stmt,
             for_stmt,
@@ -149,26 +171,13 @@ where
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
     );
 
-    let param_list = choice((
-        just(Token::KwVoid).to(Vec::new()),
-        just(Token::KwInt)
-            .ignore_then(ident)
-            .separated_by(just(Token::Comma))
-            .collect(),
-    ));
-
-    let func_decl = just(Token::KwInt)
+    let func_def = just(Token::KwInt)
         .ignore_then(ident)
         .then(param_list.delimited_by(just(Token::LParen), just(Token::RParen)))
         .then(block.map(Some).or(just(Token::Semicolon).to(None)))
-        .map(|((name, params), body)| FuncDecl::FuncDecl(name, params, body));
+        .map(|((name, params), body)| FuncDef::FuncDef(name, params, body));
 
-    decl.define(choice((
-        func_decl.clone().map(Decl::FuncDecl),
-        var_decl.map(Decl::VarDecl),
-    )));
-
-    let program = func_decl.repeated().collect().map(Program::Program);
+    let program = func_def.repeated().collect().map(Program::Program);
 
     program.then_ignore(end())
 }

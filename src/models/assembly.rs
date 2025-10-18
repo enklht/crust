@@ -17,18 +17,12 @@ impl AsmExtra for LastOffset {
 }
 
 #[derive(Debug)]
-pub enum Program<Extra>
-where
-    Extra: AsmExtra + std::fmt::Debug,
-{
+pub enum Program<Extra: AsmExtra> {
     Program(Vec<FuncDef<Extra>>),
 }
 
 #[derive(Debug)]
-pub enum FuncDef<Extra>
-where
-    Extra: AsmExtra + std::fmt::Debug,
-{
+pub enum FuncDef<Extra: AsmExtra> {
     Function(String, Vec<Instruction>, Extra::FuncDef),
 }
 

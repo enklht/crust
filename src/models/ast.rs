@@ -1,30 +1,50 @@
 use rustc_hash::FxHashMap;
 
 pub trait AstExtra {
-    type Switch: std::fmt::Debug + Clone;
+    type Label: std::fmt::Debug + Clone;
+    type SwitchInfo: std::fmt::Debug + Clone;
 }
 
 #[derive(Debug, Clone)]
 pub struct Plain;
 impl AstExtra for Plain {
-    type Switch = ();
+    type Label = ();
+    type SwitchInfo = ();
+}
+
+#[derive(Debug, Clone)]
+pub struct Labelled;
+impl AstExtra for Labelled {
+    type Label = String;
+    type SwitchInfo = ();
 }
 
 #[derive(Debug, Clone)]
 pub struct SwitchResolved;
 impl AstExtra for SwitchResolved {
-    type Switch = (FxHashMap<i32, String>, Option<String>);
+    type Label = String;
+    type SwitchInfo = (FxHashMap<i32, String>, Option<String>);
 }
 
 #[derive(Debug, Clone)]
 pub enum Program<Extra: AstExtra> {
-    Program(Vec<FuncDecl<Extra>>),
+    Program(Vec<FuncDef<Extra>>),
 }
 
 #[derive(Debug, Clone)]
-pub enum Decl<Extra: AstExtra> {
+pub enum FuncDef<Extra: AstExtra> {
+    FuncDef(String, Vec<String>, Option<Block<Extra>>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Decl {
     VarDecl(VarDecl),
-    FuncDecl(FuncDecl<Extra>),
+    FuncDecl(FuncDecl),
+}
+
+#[derive(Debug, Clone)]
+pub enum FuncDecl {
+    FuncDecl(String, Vec<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -32,17 +52,12 @@ pub enum VarDecl {
     VarDecl(String, Option<Exp>),
 }
 
-#[derive(Debug, Clone)]
-pub enum FuncDecl<Extra: AstExtra> {
-    FuncDecl(String, Vec<String>, Option<Block<Extra>>),
-}
-
 pub type Block<Extra> = Vec<BlockItem<Extra>>;
 
 #[derive(Debug, Clone)]
 pub enum BlockItem<Extra: AstExtra> {
     S(Stmt<Extra>),
-    D(Decl<Extra>),
+    D(Decl),
 }
 
 #[derive(Debug, Clone)]
@@ -67,18 +82,18 @@ pub enum Stmt<Extra: AstExtra> {
     Labelled(Label, Box<Stmt<Extra>>),
     Goto(String),
     Compound(Block<Extra>),
-    Break(Option<String>),
-    Continue(Option<String>),
-    While(Exp, Box<Stmt<Extra>>, Option<String>),
-    DoWhile(Box<Stmt<Extra>>, Exp, Option<String>),
+    Break(Extra::Label),
+    Continue(Extra::Label),
+    While(Exp, Box<Stmt<Extra>>, Extra::Label),
+    DoWhile(Box<Stmt<Extra>>, Exp, Extra::Label),
     For(
         ForInit,
         Option<Exp>,
         Option<Exp>,
         Box<Stmt<Extra>>,
-        Option<String>,
+        Extra::Label,
     ),
-    Switch(Exp, Box<Stmt<Extra>>, Option<String>, Extra::Switch),
+    Switch(Exp, Box<Stmt<Extra>>, Extra::Label, Extra::SwitchInfo),
     Null,
 }
 

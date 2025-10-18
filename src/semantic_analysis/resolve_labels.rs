@@ -6,19 +6,19 @@ use rustc_hash::FxHashMap;
 
 pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<Plain>> {
     let program = match program {
-        Program::Program(func_decls) => Program::Program(
-            func_decls
+        Program::Program(func_defs) => Program::Program(
+            func_defs
                 .into_iter()
-                .map(resolve_func_decl)
+                .map(resolve_func_def)
                 .collect::<Result<_, _>>()?,
         ),
     };
     Ok(program)
 }
 
-fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Plain>> {
+fn resolve_func_def(func_def: FuncDef<Plain>) -> ValidationResult<FuncDef<Plain>> {
     let func_def = match func_def {
-        FuncDecl::FuncDecl(name, params, Some(body)) => {
+        FuncDef::FuncDef(name, params, Some(body)) => {
             let mut labels = FxHashMap::default();
             for block_item in &body {
                 if let BlockItem::S(stmt) = block_item {
@@ -31,7 +31,7 @@ fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Pla
                 .map(|block_item| resolve_block_item(block_item, &labels))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDecl::FuncDecl(name, params, Some(body))
+            FuncDef::FuncDef(name, params, Some(body))
         }
         other => other,
     };
