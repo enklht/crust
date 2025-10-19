@@ -21,6 +21,8 @@ pub fn lexer<'src>()
         "switch" => Token::KwSwitch,
         "case" => Token::KwCase,
         "default" => Token::KwDefault,
+        "static" => Token::KwStatic,
+        "extern" => Token::KwExtern,
         s => Token::Ident(s.to_string()),
     });
 

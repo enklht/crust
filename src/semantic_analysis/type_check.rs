@@ -7,10 +7,10 @@ use crate::models::ast::*;
 pub fn check_program(program: &Program<Plain>) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
     match program {
-        Program::Program(func_decls) => {
-            func_decls
+        Program::Program(decls) => {
+            decls
                 .iter()
-                .try_for_each(|func_decl| check_func_decl(func_decl, &mut symbols))?;
+                .try_for_each(|decl| check_decl(decl, &mut symbols))?;
         }
     }
     Ok(symbols)
@@ -38,7 +38,7 @@ fn check_decl(decl: &Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()>
 
 fn check_func_decl(func_decl: &FuncDecl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match func_decl {
-        FuncDecl::FuncDecl(name, params, body) => {
+        FuncDecl::FuncDecl(name, params, body, storage_class) => {
             let type_ = Type::Fn(params.len());
             let mut defined = false;
 
@@ -71,7 +71,7 @@ fn check_func_decl(func_decl: &FuncDecl<Plain>, symbols: &mut Symbols) -> Valida
 
 fn check_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> ValidationResult<()> {
     match var_decl {
-        VarDecl::VarDecl(name, init) => {
+        VarDecl::VarDecl(name, init, storage_class) => {
             symbols.insert(name.clone(), (Type::Int, true));
             if let Some(init) = init {
                 check_exp(init, symbols)?;

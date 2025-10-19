@@ -11,6 +11,16 @@ struct MapEntry {
     has_linkage: bool,
 }
 
+impl MapEntry {
+    fn new(name: String, has_linkage: bool) -> MapEntry {
+        MapEntry {
+            name,
+            from_current_scope: true,
+            has_linkage,
+        }
+    }
+}
+
 type IdentMap = FxHashMap<String, MapEntry>;
 
 fn copy_map(ident_map: &IdentMap) -> IdentMap {
@@ -30,11 +40,134 @@ pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<Plai
         Program::Program(func_decl) => Program::Program(
             func_decl
                 .into_iter()
-                .map(|func_decl| resolve_func_decl(func_decl, ident_map))
+                .map(|decl| resolve_file_scope_decl(decl, ident_map))
                 .collect::<Result<_, _>>()?,
         ),
     };
     Ok(program)
+}
+
+fn resolve_file_scope_decl(
+    decl: Decl<Plain>,
+    ident_map: &mut IdentMap,
+) -> ValidationResult<Decl<Plain>> {
+    let decl = match decl {
+        Decl::VarDecl(var_decl) => Decl::VarDecl(resolve_file_scope_var_decl(var_decl, ident_map)?),
+        Decl::FuncDecl(func_decl) => Decl::FuncDecl(resolve_func_decl(func_decl, ident_map)?),
+    };
+    Ok(decl)
+}
+
+fn resolve_local_decl(
+    decl: Decl<Plain>,
+    ident_map: &mut IdentMap,
+) -> ValidationResult<Decl<Plain>> {
+    let decl = match decl {
+        Decl::VarDecl(var_decl) => Decl::VarDecl(resolve_local_var_decl(var_decl, ident_map)?),
+        Decl::FuncDecl(func_decl) => {
+            if let FuncDecl::FuncDecl(name, _, Some(_), _) = func_decl {
+                return Err(ValidationError::NestedFuncDef(name));
+            }
+            Decl::FuncDecl(resolve_func_decl(func_decl, ident_map)?)
+        }
+    };
+    Ok(decl)
+}
+
+fn resolve_file_scope_var_decl(
+    var_decl: VarDecl,
+    ident_map: &mut IdentMap,
+) -> ValidationResult<VarDecl> {
+    let var_decl = match var_decl.clone() {
+        VarDecl::VarDecl(name, _, _) => {
+            ident_map.insert(
+                name.clone(),
+                MapEntry {
+                    name,
+                    from_current_scope: true,
+                    has_linkage: true,
+                },
+            );
+            var_decl
+        }
+    };
+    Ok(var_decl)
+}
+
+fn resolve_local_var_decl(
+    var_decl: VarDecl,
+    ident_map: &mut IdentMap,
+) -> ValidationResult<VarDecl> {
+    let var_decl = match var_decl {
+        VarDecl::VarDecl(name, init, storage_class) => {
+            if let Some(entry) = ident_map.get(&name)
+                && entry.from_current_scope
+                && !(entry.has_linkage && storage_class == Some(StorageClass::Extern))
+            {
+                return Err(ValidationError::DuplicateVarDecl(name));
+            }
+
+            let (new_name, has_linkage) = match storage_class {
+                Some(StorageClass::Extern) => (name.clone(), true),
+                _ => (make_label(&name), false),
+            };
+
+            ident_map.insert(name, MapEntry::new(new_name.clone(), has_linkage));
+
+            VarDecl::VarDecl(
+                new_name,
+                init.map(|exp| resolve_exp(exp, ident_map)).transpose()?,
+                storage_class,
+            )
+        }
+    };
+    Ok(var_decl)
+}
+
+fn resolve_func_decl(
+    func_decl: FuncDecl<Plain>,
+    ident_map: &mut IdentMap,
+) -> ValidationResult<FuncDecl<Plain>> {
+    let func_decl = match func_decl {
+        FuncDecl::FuncDecl(name, params, body, storage_class) => {
+            if let Some(entry) = ident_map.get(&name)
+                && entry.from_current_scope
+                && !entry.has_linkage
+            {
+                return Err(ValidationError::DuplicateFuncDecl(name));
+            }
+
+            ident_map.insert(name.clone(), MapEntry::new(name.clone(), true));
+
+            let inner_ident_map = &mut copy_map(ident_map);
+            let new_params = params
+                .into_iter()
+                .map(|param| resolve_ident(param, inner_ident_map))
+                .collect::<Result<_, _>>()?;
+
+            FuncDecl::FuncDecl(
+                name,
+                new_params,
+                body.map(|block| resolve_block(block, inner_ident_map))
+                    .transpose()?,
+                storage_class,
+            )
+        }
+    };
+    Ok(func_decl)
+}
+
+fn resolve_ident(name: String, ident_map: &mut IdentMap) -> ValidationResult<String> {
+    if let Some(entry) = ident_map.get(&name)
+        && entry.from_current_scope
+    {
+        return Err(ValidationError::DuplicateVarDecl(name));
+    }
+
+    let unique_name = make_label(&name);
+    ident_map.insert(name, MapEntry::new(unique_name.clone(), false));
+
+    Ok(unique_name)
 }
 
 fn resolve_block(block: Block<Plain>, ident_map: &mut IdentMap) -> ValidationResult<Block<Plain>> {
@@ -50,95 +183,9 @@ fn resolve_block_item(
 ) -> ValidationResult<BlockItem<Plain>> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, ident_map)?),
-        BlockItem::D(decl) => BlockItem::D(resolve_decl(decl, ident_map)?),
+        BlockItem::D(decl) => BlockItem::D(resolve_local_decl(decl, ident_map)?),
     };
     Ok(block_item)
-}
-
-fn resolve_decl(decl: Decl<Plain>, ident_map: &mut IdentMap) -> ValidationResult<Decl<Plain>> {
-    let decl = match decl {
-        Decl::VarDecl(var_decl) => Decl::VarDecl(resolve_var_decl(var_decl, ident_map)?),
-        Decl::FuncDecl(func_decl) => {
-            if let FuncDecl::FuncDecl(name, _, Some(_)) = func_decl {
-                return Err(ValidationError::NestedFuncDef(name));
-            }
-            Decl::FuncDecl(resolve_func_decl(func_decl, ident_map)?)
-        }
-    };
-    Ok(decl)
-}
-
-fn resolve_func_decl(
-    func_decl: FuncDecl<Plain>,
-    ident_map: &mut IdentMap,
-) -> ValidationResult<FuncDecl<Plain>> {
-    let func_decl = match func_decl {
-        FuncDecl::FuncDecl(name, params, body) => {
-            if let Some(entry) = ident_map.get(&name)
-                && entry.from_current_scope
-                && !entry.has_linkage
-            {
-                return Err(ValidationError::DuplicateFuncDecl(name));
-            }
-
-            ident_map.insert(
-                name.clone(),
-                MapEntry {
-                    name: name.clone(),
-                    from_current_scope: true,
-                    has_linkage: true,
-                },
-            );
-
-            let inner_ident_map = &mut copy_map(ident_map);
-            let new_params = params
-                .into_iter()
-                .map(|param| resolve_ident(param, inner_ident_map))
-                .collect::<Result<_, _>>()?;
-
-            FuncDecl::FuncDecl(
-                name,
-                new_params,
-                body.map(|block| resolve_block(block, inner_ident_map))
-                    .transpose()?,
-            )
-        }
-    };
-    Ok(func_decl)
-}
-
-fn resolve_ident(name: String, ident_map: &mut IdentMap) -> ValidationResult<String> {
-    if let Some(entry) = ident_map.get(&name)
-        && entry.from_current_scope
-    {
-        return Err(ValidationError::DuplicateVarDecl(name));
-    }
-
-    let unique_name = make_label(&name);
-    ident_map.insert(
-        name,
-        MapEntry {
-            name: unique_name.clone(),
-            from_current_scope: true,
-            has_linkage: false,
-        },
-    );
-
-    Ok(unique_name)
-}
-
-fn resolve_var_decl(var_decl: VarDecl, ident_map: &mut IdentMap) -> ValidationResult<VarDecl> {
-    let var_decl = match var_decl {
-        VarDecl::VarDecl(name, init) => {
-            let unique_name = resolve_ident(name, ident_map)?;
-
-            VarDecl::VarDecl(
-                unique_name,
-                init.map(|exp| resolve_exp(exp, ident_map)).transpose()?,
-            )
-        }
-    };
-    Ok(var_decl)
 }
 
 fn resolve_stmt(stmt: Stmt<Plain>, ident_map: &mut IdentMap) -> ValidationResult<Stmt<Plain>> {
@@ -199,7 +246,9 @@ fn resolve_stmt(stmt: Stmt<Plain>, ident_map: &mut IdentMap) -> ValidationResult
 fn resolve_for_init(init: ForInit, ident_map: &mut IdentMap) -> ValidationResult<ForInit> {
     let init = match init {
         ForInit::InitExp(exp) => ForInit::InitExp(resolve_exp(exp, ident_map)?),
-        ForInit::InitDecl(var_decl) => ForInit::InitDecl(resolve_var_decl(var_decl, ident_map)?),
+        ForInit::InitDecl(var_decl) => {
+            ForInit::InitDecl(resolve_local_var_decl(var_decl, ident_map)?)
+        }
         ForInit::Null => ForInit::Null,
     };
     Ok(init)

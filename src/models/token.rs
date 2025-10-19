@@ -34,6 +34,10 @@ pub enum Token {
     KwCase,
     #[display("default")]
     KwDefault,
+    #[display("static")]
+    KwStatic,
+    #[display("extern")]
+    KwExtern,
     #[display("(")]
     LParen,
     #[display(")")]

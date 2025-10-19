@@ -6,19 +6,27 @@ use rustc_hash::FxHashMap;
 
 pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<Plain>> {
     let program = match program {
-        Program::Program(func_decls) => Program::Program(
-            func_decls
+        Program::Program(decls) => Program::Program(
+            decls
                 .into_iter()
-                .map(resolve_func_decl)
+                .map(resolve_decl)
                 .collect::<Result<_, _>>()?,
         ),
     };
     Ok(program)
 }
 
+fn resolve_decl(decl: Decl<Plain>) -> ValidationResult<Decl<Plain>> {
+    let decl = match decl {
+        Decl::FuncDecl(func_decl) => Decl::FuncDecl(resolve_func_decl(func_decl)?),
+        other => other,
+    };
+    Ok(decl)
+}
+
 fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Plain>> {
     let func_def = match func_def {
-        FuncDecl::FuncDecl(name, params, Some(body)) => {
+        FuncDecl::FuncDecl(name, params, Some(body), storage_class) => {
             let mut labels = FxHashMap::default();
             for block_item in &body {
                 if let BlockItem::S(stmt) = block_item {
@@ -31,11 +39,22 @@ fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Pla
                 .map(|block_item| resolve_block_item(block_item, &labels))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDecl::FuncDecl(name, params, Some(body))
+            FuncDecl::FuncDecl(name, params, Some(body), storage_class)
         }
         other => other,
     };
     Ok(func_def)
+}
+
+fn resolve_block_item(
+    block_item: BlockItem<Plain>,
+    labels: &FxHashMap<String, String>,
+) -> ValidationResult<BlockItem<Plain>> {
+    let block_item = match block_item {
+        BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, labels)?),
+        decl => decl,
+    };
+    Ok(block_item)
 }
 
 fn collect_labels(
@@ -77,17 +96,6 @@ fn collect_labels(
         _ => {}
     }
     Ok(())
-}
-
-fn resolve_block_item(
-    block_item: BlockItem<Plain>,
-    labels: &FxHashMap<String, String>,
-) -> ValidationResult<BlockItem<Plain>> {
-    let block_item = match block_item {
-        BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, labels)?),
-        decl => decl,
-    };
-    Ok(block_item)
 }
 
 fn resolve_stmt(

@@ -8,24 +8,34 @@ pub fn label_program(program: Program<Plain>) -> ValidationResult<Program<Labell
         Program::Program(func_decls) => Program::Program(
             func_decls
                 .into_iter()
-                .map(label_func_decl)
+                .map(label_decl)
                 .collect::<Result<_, _>>()?,
         ),
     };
     Ok(program)
 }
 
+fn label_decl(decl: Decl<Plain>) -> ValidationResult<Decl<Labelled>> {
+    let decl = match decl {
+        Decl::VarDecl(var_decl) => Decl::VarDecl(var_decl),
+        Decl::FuncDecl(func_decl) => Decl::FuncDecl(label_func_decl(func_decl)?),
+    };
+    Ok(decl)
+}
+
 fn label_func_decl(func_decl: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Labelled>> {
     let func_decl = match func_decl {
-        FuncDecl::FuncDecl(name, params, Some(body)) => {
+        FuncDecl::FuncDecl(name, params, Some(body), storage_class) => {
             let body = body
                 .into_iter()
                 .map(|block_item| label_block_item(block_item, None, None))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDecl::FuncDecl(name, params, Some(body))
+            FuncDecl::FuncDecl(name, params, Some(body), storage_class)
         }
-        FuncDecl::FuncDecl(name, params, None) => FuncDecl::FuncDecl(name, params, None),
+        FuncDecl::FuncDecl(name, params, None, storage_class) => {
+            FuncDecl::FuncDecl(name, params, None, storage_class)
+        }
     };
     Ok(func_decl)
 }
@@ -37,22 +47,9 @@ fn label_block_item(
 ) -> ValidationResult<BlockItem<Labelled>> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(label_stmt(stmt, break_label, continue_label)?),
-        BlockItem::D(decl) => BlockItem::D(convert_decl(decl)),
+        BlockItem::D(decl) => BlockItem::D(label_decl(decl)?),
     };
     Ok(block_item)
-}
-
-fn convert_decl(decl: Decl<Plain>) -> Decl<Labelled> {
-    match decl {
-        Decl::VarDecl(var_decl) => Decl::VarDecl(var_decl),
-        Decl::FuncDecl(func_decl) => {
-            let func_decl = match func_decl {
-                FuncDecl::FuncDecl(name, params, None) => FuncDecl::FuncDecl(name, params, None),
-                _ => unreachable!(),
-            };
-            Decl::FuncDecl(func_decl)
-        }
-    }
 }
 
 fn label_stmt(

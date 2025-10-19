@@ -21,6 +21,36 @@ where
 {
 }
 
+enum Specifier {
+    Int,
+    Static,
+    Extern,
+}
+
+fn parse_specs<'tokens>(
+    specs: Vec<Specifier>,
+    span: SimpleSpan,
+) -> Result<Option<StorageClass>, Rich<'tokens, Token>> {
+    let mut types = Vec::new();
+    let mut storage_classes = Vec::new();
+
+    for spec in specs {
+        match spec {
+            Specifier::Int => types.push(Specifier::Int),
+            Specifier::Static => storage_classes.push(StorageClass::Static),
+            Specifier::Extern => storage_classes.push(StorageClass::Extern),
+        }
+    }
+
+    if types.len() != 1 {
+        Err(Rich::custom(span, "Invalid type specifier"))
+    } else if storage_classes.len() > 1 {
+        Err(Rich::custom(span, "Invalid storage class"))
+    } else {
+        Ok(storage_classes.pop())
+    }
+}
+
 pub fn parser<'tokens, I>()
 -> impl Parser<'tokens, I, Program<Plain>, extra::Err<Rich<'tokens, Token>>>
 where
@@ -33,11 +63,21 @@ where
         .clone()
         .delimited_by(just(Token::LParen), just(Token::RParen));
 
-    let var_decl = just(Token::KwInt)
-        .ignore_then(ident)
+    let specifiers = select! {
+        Token::KwInt => Specifier::Int,
+        Token::KwStatic => Specifier::Static,
+        Token::KwExtern => Specifier::Extern,
+    }
+    .repeated()
+    .at_least(1)
+    .collect()
+    .try_map(|specs, span| parse_specs(specs, span));
+
+    let var_decl = specifiers
+        .then(ident)
         .then(just(Token::Equal).ignore_then(exp.clone()).or_not())
         .semicolon()
-        .map(|(name, init)| VarDecl::VarDecl(name, init))
+        .map(|((storage_class, name), init)| VarDecl::VarDecl(name, init, storage_class))
         .labelled("declaration")
         .as_context();
 
@@ -157,18 +197,20 @@ where
             .collect(),
     ));
 
-    let func_decl = just(Token::KwInt)
-        .ignore_then(ident)
+    let func_decl = specifiers
+        .then(ident)
         .then(param_list.delimited_by(just(Token::LParen), just(Token::RParen)))
         .then(block.map(Some).or(just(Token::Semicolon).to(None)))
-        .map(|((name, params), body)| FuncDecl::FuncDecl(name, params, body));
+        .map(|(((storage_class, name), params), body)| {
+            FuncDecl::FuncDecl(name, params, body, storage_class)
+        });
 
     decl.define(choice((
         func_decl.clone().map(Decl::FuncDecl),
         var_decl.map(Decl::VarDecl),
     )));
 
-    let program = func_decl.repeated().collect().map(Program::Program);
+    let program = decl.repeated().collect().map(Program::Program);
 
     program.then_ignore(end())
 }

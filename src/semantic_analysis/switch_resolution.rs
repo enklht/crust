@@ -14,24 +14,34 @@ pub fn resolve_program(program: Program<Labelled>) -> ValidationResult<Program<S
         Program::Program(func_decls) => Program::Program(
             func_decls
                 .into_iter()
-                .map(resolve_func_decl)
+                .map(resolve_decl)
                 .collect::<Result<_, _>>()?,
         ),
     };
     Ok(program)
 }
 
+fn resolve_decl(decl: Decl<Labelled>) -> ValidationResult<Decl<SwitchResolved>> {
+    let decl = match decl {
+        Decl::FuncDecl(func_decl) => Decl::FuncDecl(resolve_func_decl(func_decl)?),
+        Decl::VarDecl(var_decl) => Decl::VarDecl(var_decl),
+    };
+    Ok(decl)
+}
+
 fn resolve_func_decl(func_def: FuncDecl<Labelled>) -> ValidationResult<FuncDecl<SwitchResolved>> {
     let func_decl = match func_def {
-        FuncDecl::FuncDecl(name, params, Some(body)) => {
+        FuncDecl::FuncDecl(name, params, Some(body), storage_class) => {
             let body = body
                 .into_iter()
                 .map(|block_item| resolve_block_item(block_item, &mut None))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDecl::FuncDecl(name, params, Some(body))
+            FuncDecl::FuncDecl(name, params, Some(body), storage_class)
         }
-        FuncDecl::FuncDecl(name, params, None) => FuncDecl::FuncDecl(name, params, None),
+        FuncDecl::FuncDecl(name, params, None, storage_class) => {
+            FuncDecl::FuncDecl(name, params, None, storage_class)
+        }
     };
     Ok(func_decl)
 }
@@ -42,22 +52,9 @@ fn resolve_block_item(
 ) -> ValidationResult<BlockItem<SwitchResolved>> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, context)?),
-        BlockItem::D(decl) => BlockItem::D(convert_decl(decl)),
+        BlockItem::D(decl) => BlockItem::D(resolve_decl(decl)?),
     };
     Ok(block_item)
-}
-
-fn convert_decl(decl: Decl<Labelled>) -> Decl<SwitchResolved> {
-    match decl {
-        Decl::VarDecl(var_decl) => Decl::VarDecl(var_decl),
-        Decl::FuncDecl(func_decl) => {
-            let func_decl = match func_decl {
-                FuncDecl::FuncDecl(name, params, None) => FuncDecl::FuncDecl(name, params, None),
-                _ => unreachable!(),
-            };
-            Decl::FuncDecl(func_decl)
-        }
-    }
 }
 
 fn resolve_stmt(

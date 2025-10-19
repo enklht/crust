@@ -28,23 +28,29 @@ impl AstEx for SwitchResolved {
 
 #[derive(Debug, Clone)]
 pub enum Program<Ex: AstEx> {
-    Program(Vec<FuncDecl<Ex>>),
+    Program(Vec<Decl<Ex>>),
 }
 
 #[derive(Debug, Clone)]
 pub enum Decl<Ex: AstEx> {
-    VarDecl(VarDecl),
     FuncDecl(FuncDecl<Ex>),
-}
-
-#[derive(Debug, Clone)]
-pub enum VarDecl {
-    VarDecl(String, Option<Exp>),
+    VarDecl(VarDecl),
 }
 
 #[derive(Debug, Clone)]
 pub enum FuncDecl<Ex: AstEx> {
-    FuncDecl(String, Vec<String>, Option<Block<Ex>>),
+    FuncDecl(String, Vec<String>, Option<Block<Ex>>, Option<StorageClass>),
+}
+
+#[derive(Debug, Clone)]
+pub enum VarDecl {
+    VarDecl(String, Option<Exp>, Option<StorageClass>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StorageClass {
+    Static,
+    Extern,
 }
 
 pub type Block<Ex> = Vec<BlockItem<Ex>>;
