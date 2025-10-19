@@ -5,8 +5,7 @@ mod switch_resolution;
 mod type_check;
 
 use crate::models::ast::*;
-use crate::models::types::Symbols;
-use crate::models::types::Type;
+use crate::models::symbol::*;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -25,8 +24,8 @@ pub enum ValidationError {
     UndefinedFunction(String),
     #[error("Function '{0}' cannot be defined inside another function")]
     NestedFuncDef(String),
-    #[error("Function '{0}' is previously defined as {1}, now defined as {2}")]
-    IncompatibleFuncDecl(String, Type, Type),
+    #[error("Function '{0}' is previously defined as {{1}}, now defined as {{2}}")]
+    IncompatibleFuncDecl(String),
     // invalid label
     #[error("Cannot find label '{0}' in this scope")]
     UndefinedLabel(String),

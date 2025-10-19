@@ -2,28 +2,28 @@ use rustc_hash::FxHashMap;
 
 pub trait AstEx {
     type Label: std::fmt::Debug + Clone;
-    type Switch: std::fmt::Debug + Clone;
+    type SwitchInfo: std::fmt::Debug + Clone;
 }
 
 #[derive(Debug, Clone)]
 pub struct Plain;
 impl AstEx for Plain {
     type Label = ();
-    type Switch = ();
+    type SwitchInfo = ();
 }
 
 #[derive(Debug, Clone)]
 pub struct Labelled;
 impl AstEx for Labelled {
     type Label = String;
-    type Switch = ();
+    type SwitchInfo = ();
 }
 
 #[derive(Debug, Clone)]
 pub struct SwitchResolved;
 impl AstEx for SwitchResolved {
     type Label = String;
-    type Switch = (FxHashMap<i32, String>, Option<String>);
+    type SwitchInfo = (FxHashMap<i32, String>, Option<String>);
 }
 
 #[derive(Debug, Clone)]
@@ -39,18 +39,19 @@ pub enum Decl<Ex: AstEx> {
 
 #[derive(Debug, Clone)]
 pub enum FuncDecl<Ex: AstEx> {
-    FuncDecl(String, Vec<String>, Option<Block<Ex>>, Option<StorageClass>),
+    FuncDecl(String, Vec<String>, Option<Block<Ex>>, StorageClass),
 }
 
 #[derive(Debug, Clone)]
 pub enum VarDecl {
-    VarDecl(String, Option<Exp>, Option<StorageClass>),
+    VarDecl(String, Option<Exp>, StorageClass),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StorageClass {
     Static,
     Extern,
+    None,
 }
 
 pub type Block<Ex> = Vec<BlockItem<Ex>>;
@@ -88,7 +89,7 @@ pub enum Stmt<Ex: AstEx> {
     While(Exp, Box<Stmt<Ex>>, Ex::Label),
     DoWhile(Box<Stmt<Ex>>, Exp, Ex::Label),
     For(ForInit, Option<Exp>, Option<Exp>, Box<Stmt<Ex>>, Ex::Label),
-    Switch(Exp, Box<Stmt<Ex>>, Ex::Label, Ex::Switch),
+    Switch(Exp, Box<Stmt<Ex>>, Ex::Label, Ex::SwitchInfo),
     Null,
 }
 

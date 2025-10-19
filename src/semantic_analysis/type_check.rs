@@ -1,8 +1,7 @@
-use super::Symbols;
-use super::Type;
 use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
+use crate::models::symbol::*;
 
 pub fn check_program(program: &Program<Plain>) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
@@ -10,10 +9,195 @@ pub fn check_program(program: &Program<Plain>) -> ValidationResult<Symbols> {
         Program::Program(decls) => {
             decls
                 .iter()
-                .try_for_each(|decl| check_decl(decl, &mut symbols))?;
+                .try_for_each(|decl| check_file_scope_decl(decl, &mut symbols))?;
         }
     }
     Ok(symbols)
+}
+
+fn check_file_scope_decl(decl: &Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
+    match decl {
+        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, false),
+        Decl::VarDecl(var_decl) => check_file_scope_var_decl(var_decl, symbols),
+    }
+}
+
+fn check_local_decl(decl: &Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
+    match decl {
+        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, true),
+        Decl::VarDecl(var_decl) => check_local_var_decl(var_decl, symbols),
+    }
+}
+
+fn check_func_decl(
+    func_decl: &FuncDecl<Plain>,
+    symbols: &mut Symbols,
+    block_scope: bool,
+) -> ValidationResult<()> {
+    match func_decl {
+        FuncDecl::FuncDecl(name, params, body, storage_class) => {
+            if block_scope && *storage_class == StorageClass::Static {
+                panic!()
+            }
+
+            let mut defined = false;
+            let mut global = *storage_class != StorageClass::Static;
+
+            if let Some(old_symbol) = symbols.get(name) {
+                match old_symbol {
+                    Symbol::Func {
+                        arity,
+                        defined: old_defined,
+                        global: old_global,
+                    } if *arity == params.len() => {
+                        if *old_defined && body.is_some() {
+                            return Err(ValidationError::DuplicateFuncDecl(name.clone()));
+                        }
+                        if *old_global && *storage_class == StorageClass::Static {
+                            panic!()
+                        }
+
+                        defined = *old_defined;
+                        global = *old_global;
+                    }
+                    _ => return Err(ValidationError::IncompatibleFuncDecl(name.clone())),
+                }
+            };
+
+            let symbol = Symbol::Func {
+                arity: params.len(),
+                defined: defined | body.is_some(),
+                global,
+            };
+
+            symbols.insert(name.clone(), symbol);
+
+            if let Some(body) = body {
+                for param in params {
+                    symbols.insert(
+                        param.clone(),
+                        Symbol::LocalVar {
+                            type_: VarType::Int,
+                        },
+                    );
+                }
+                check_block(body, symbols)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn check_file_scope_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> ValidationResult<()> {
+    match var_decl {
+        VarDecl::VarDecl(name, init, storage_class) => {
+            let mut init_value = match init {
+                Some(Exp::Const(i)) => InitialValue::Initial(*i),
+                None if *storage_class == StorageClass::Extern => InitialValue::NoInitializer,
+                None => InitialValue::Tentative,
+                _ => panic!("non-const initializer"),
+            };
+            let mut global = *storage_class != StorageClass::Static;
+
+            if let Some(old_symbol) = symbols.get(name) {
+                match old_symbol {
+                    Symbol::StaticVar {
+                        type_,
+                        init: old_init,
+                        global: old_global,
+                    } => {
+                        if *storage_class == StorageClass::Extern {
+                            global = *old_global;
+                        } else if *old_global != global {
+                            panic!();
+                        }
+
+                        match (old_init, &mut init_value) {
+                            (InitialValue::Initial(_), InitialValue::Initial(_)) => {
+                                panic!()
+                            }
+                            (InitialValue::Initial(i), _) => {
+                                init_value = InitialValue::Initial(*i);
+                            }
+                            (InitialValue::Tentative, InitialValue::Initial(_)) => {}
+                            (InitialValue::Tentative, _) => init_value = InitialValue::Tentative,
+                            _ => {}
+                        }
+                    }
+                    Symbol::LocalVar { .. } => {}
+                    _ => panic!(),
+                }
+            };
+
+            let symbol = Symbol::StaticVar {
+                type_: VarType::Int,
+                init: init_value,
+                global,
+            };
+
+            symbols.insert(name.clone(), symbol);
+
+            if let Some(init) = init {
+                check_exp(init, symbols)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn check_local_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> ValidationResult<()> {
+    match var_decl {
+        VarDecl::VarDecl(name, init, storage_class) => {
+            match storage_class {
+                StorageClass::Extern => {
+                    if init.is_some() {
+                        panic!()
+                    }
+                    match symbols.get(name) {
+                        Some(Symbol::Func { .. }) => panic!(),
+                        Some(_) => {}
+                        None => {
+                            symbols.insert(
+                                name.clone(),
+                                Symbol::StaticVar {
+                                    type_: VarType::Int,
+                                    init: InitialValue::NoInitializer,
+                                    global: true,
+                                },
+                            );
+                        }
+                    }
+                }
+                StorageClass::Static => {
+                    let init_value = match init {
+                        Some(Exp::Const(i)) => InitialValue::Initial(*i),
+                        None => InitialValue::Initial(0),
+                        _ => panic!(),
+                    };
+                    symbols.insert(
+                        name.clone(),
+                        Symbol::StaticVar {
+                            type_: VarType::Int,
+                            init: init_value,
+                            global: false,
+                        },
+                    );
+                }
+                StorageClass::None => {
+                    symbols.insert(
+                        name.clone(),
+                        Symbol::LocalVar {
+                            type_: VarType::Int,
+                        },
+                    );
+                    if let Some(init) = init {
+                        check_exp(init, symbols)?;
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 fn check_block(block: &Block<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
@@ -25,59 +209,7 @@ fn check_block(block: &Block<Plain>, symbols: &mut Symbols) -> ValidationResult<
 fn check_block_item(block_item: &BlockItem<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match block_item {
         BlockItem::S(stmt) => check_stmt(stmt, symbols),
-        BlockItem::D(decl) => check_decl(decl, symbols),
-    }
-}
-
-fn check_decl(decl: &Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
-    match decl {
-        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols),
-        Decl::VarDecl(var_decl) => check_var_decl(var_decl, symbols),
-    }
-}
-
-fn check_func_decl(func_decl: &FuncDecl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
-    match func_decl {
-        FuncDecl::FuncDecl(name, params, body, storage_class) => {
-            let type_ = Type::Fn(params.len());
-            let mut defined = false;
-
-            if let Some((type_old, defined_old)) = symbols.get(name) {
-                if *type_old != type_ {
-                    return Err(ValidationError::IncompatibleFuncDecl(
-                        name.clone(),
-                        type_old.clone(),
-                        type_,
-                    ));
-                }
-                if *defined_old && body.is_some() {
-                    return Err(ValidationError::DuplicateFuncDecl(name.clone()));
-                }
-                defined = *defined_old
-            }
-
-            symbols.insert(name.clone(), (type_, defined || body.is_some()));
-
-            if let Some(body) = body {
-                for param in params {
-                    symbols.insert(param.clone(), (Type::Int, defined));
-                }
-                check_block(body, symbols)?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn check_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> ValidationResult<()> {
-    match var_decl {
-        VarDecl::VarDecl(name, init, storage_class) => {
-            symbols.insert(name.clone(), (Type::Int, true));
-            if let Some(init) = init {
-                check_exp(init, symbols)?;
-            }
-            Ok(())
-        }
+        BlockItem::D(decl) => check_local_decl(decl, symbols),
     }
 }
 
@@ -134,7 +266,10 @@ fn check_stmt(stmt: &Stmt<Plain>, symbols: &mut Symbols) -> ValidationResult<()>
 
 fn check_for_init(for_init: &ForInit, symbols: &mut Symbols) -> ValidationResult<()> {
     match for_init {
-        ForInit::InitDecl(decl) => check_var_decl(decl, symbols),
+        ForInit::InitDecl(decl) => match decl {
+            VarDecl::VarDecl(_, _, StorageClass::None) => check_local_var_decl(decl, symbols),
+            _ => panic!(),
+        },
         ForInit::InitExp(exp) => check_exp(exp, symbols),
         ForInit::Null => Ok(()),
     }
@@ -148,8 +283,10 @@ fn check_exp(exp: &Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(right, symbols)?;
         }
         Exp::Var(name) => match symbols.get(name) {
-            Some(&(Type::Int, _)) => {}
-            Some(_) => return Err(ValidationError::FunctionAsVariable(name.clone())),
+            Some(Symbol::Func { .. }) => {
+                return Err(ValidationError::FunctionAsVariable(name.clone()));
+            }
+            Some(_) => {}
             None => {}
         },
         Exp::Unary(_, exp) => {
@@ -165,17 +302,17 @@ fn check_exp(exp: &Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(else_, symbols)?;
         }
         Exp::FuncCall(name, args) => match symbols.get(name) {
-            Some((Type::Int, _)) => return Err(ValidationError::VariableAsFunction(name.clone())),
-            Some((Type::Fn(param_count), _)) if *param_count == args.len() => {
+            Some(Symbol::Func { arity, .. }) if *arity == args.len() => {
                 args.iter().try_for_each(|arg| check_exp(arg, symbols))?;
             }
-            Some((Type::Fn(param_count), _)) => {
+            Some(Symbol::Func { arity, .. }) => {
                 return Err(ValidationError::WrongArity(
                     name.clone(),
-                    *param_count,
+                    *arity,
                     args.len(),
                 ));
             }
+            Some(_) => return Err(ValidationError::VariableAsFunction(name.clone())),
             _ => unreachable!(),
         },
     };

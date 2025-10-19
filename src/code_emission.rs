@@ -1,5 +1,5 @@
 use crate::models::assembly::*;
-use crate::models::types::Symbols;
+use crate::models::symbol::Symbols;
 
 pub fn emit(program: Program<Plain>, symbols: &Symbols) -> String {
     let mut acc = String::new();
@@ -48,10 +48,13 @@ fn emit_instructions(instructions: Vec<Instruction>, acc: &mut String, symbols: 
             Instruction::Label(label) => format!(".L{label}:\n"),
             Instruction::DeallocateStack(size) => format!("    addq ${size}, %rsp\n"),
             Instruction::Push(op) => format!("    pushq {}\n", op.eight_byte()),
-            Instruction::Call(name) => match symbols.get(&name) {
-                Some(_) => format!("    call {name}\n"),
-                None => format!("    call {name}@PLT"),
-            },
+            Instruction::Call(name) => {
+                if symbols.contains_key(&name) {
+                    format!("    call {name}\n")
+                } else {
+                    format!("    call {name}@PLT")
+                }
+            }
         };
         acc.push_str(&fixed);
     }

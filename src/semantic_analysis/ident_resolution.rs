@@ -102,13 +102,13 @@ fn resolve_local_var_decl(
         VarDecl::VarDecl(name, init, storage_class) => {
             if let Some(entry) = ident_map.get(&name)
                 && entry.from_current_scope
-                && !(entry.has_linkage && storage_class == Some(StorageClass::Extern))
+                && !(entry.has_linkage && storage_class == StorageClass::Extern)
             {
                 return Err(ValidationError::DuplicateVarDecl(name));
             }
 
             let (new_name, has_linkage) = match storage_class {
-                Some(StorageClass::Extern) => (name.clone(), true),
+                StorageClass::Extern => (name.clone(), true),
                 _ => (make_label(&name), false),
             };
 
@@ -142,7 +142,7 @@ fn resolve_func_decl(
             let inner_ident_map = &mut copy_map(ident_map);
             let new_params = params
                 .into_iter()
-                .map(|param| resolve_ident(param, inner_ident_map))
+                .map(|param| resolve_param(param, inner_ident_map))
                 .collect::<Result<_, _>>()?;
 
             FuncDecl::FuncDecl(
@@ -157,7 +157,7 @@ fn resolve_func_decl(
     Ok(func_decl)
 }
 
-fn resolve_ident(name: String, ident_map: &mut IdentMap) -> ValidationResult<String> {
+fn resolve_param(name: String, ident_map: &mut IdentMap) -> ValidationResult<String> {
     if let Some(entry) = ident_map.get(&name)
         && entry.from_current_scope
     {

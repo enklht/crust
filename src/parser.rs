@@ -30,7 +30,7 @@ enum Specifier {
 fn parse_specs<'tokens>(
     specs: Vec<Specifier>,
     span: SimpleSpan,
-) -> Result<Option<StorageClass>, Rich<'tokens, Token>> {
+) -> Result<StorageClass, Rich<'tokens, Token>> {
     let mut types = Vec::new();
     let mut storage_classes = Vec::new();
 
@@ -47,7 +47,7 @@ fn parse_specs<'tokens>(
     } else if storage_classes.len() > 1 {
         Err(Rich::custom(span, "Invalid storage class"))
     } else {
-        Ok(storage_classes.pop())
+        Ok(storage_classes.pop().unwrap_or(StorageClass::None))
     }
 }
 
