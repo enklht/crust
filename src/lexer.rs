@@ -8,6 +8,7 @@ pub fn lexer<'src>()
 -> impl Parser<'src, &'src str, Vec<Spanned<Token>>, extra::Err<Rich<'src, char>>> {
     let ident = text::ident().map(|s| match s {
         "int" => Token::KwInt,
+        "long" => Token::KwLong,
         "return" => Token::KwReturn,
         "void" => Token::KwVoid,
         "if" => Token::KwIf,
@@ -26,11 +27,34 @@ pub fn lexer<'src>()
         s => Token::Ident(s.to_string()),
     });
 
-    let constant = text::int(10)
-        .then_ignore(any().filter(|c: &char| !c.is_ascii_alphanumeric()).rewind())
-        .from_str()
-        .unwrapped()
-        .map(Token::Const);
+    let const_long = text::int(10)
+        .then_ignore(one_of("lL"))
+        .then_ignore(any().filter(char::is_ascii_alphanumeric).not().rewind())
+        .try_map_with(|s: &str, e| {
+            if let Ok(i) = s.parse::<i64>() {
+                Ok(Token::ConstLong(i))
+            } else {
+                Err(Rich::custom(
+                    e.span(),
+                    "Constant is too large to represent as long",
+                ))
+            }
+        });
+
+    let const_int = text::int(10)
+        .then_ignore(any().filter(char::is_ascii_alphanumeric).not().rewind())
+        .try_map_with(|s: &str, e| {
+            if let Ok(i) = s.parse::<i32>() {
+                Ok(Token::ConstInt(i))
+            } else if let Ok(i) = s.parse::<i64>() {
+                Ok(Token::ConstLong(i))
+            } else {
+                Err(Rich::custom(
+                    e.span(),
+                    "Constant is too large to represent as int or long",
+                ))
+            }
+        });
 
     let three_chars_long = choice((
         just("<<=").to(Token::LShiftEqual),
@@ -84,10 +108,11 @@ pub fn lexer<'src>()
 
     choice((
         ident,
-        constant,
         three_chars_long,
         two_chars_long,
         one_char_long,
+        const_long,
+        const_int,
     ))
     .padded()
     .map_with(|t, e| (t, e.span()))

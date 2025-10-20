@@ -5,9 +5,13 @@ pub enum Token {
     #[display("{_0}")]
     Ident(String),
     #[display("{_0}")]
-    Const(i32),
+    ConstInt(i32),
+    #[display("{_0}")]
+    ConstLong(i64),
     #[display("int")]
     KwInt,
+    #[display("long")]
+    KwLong,
     #[display("void")]
     KwVoid,
     #[display("return")]

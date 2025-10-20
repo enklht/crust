@@ -5,17 +5,17 @@ pub type Symbols = FxHashMap<String, Symbol>;
 
 pub enum Symbol {
     Func {
-        arity: usize,
+        typ: Type,
         defined: bool,
         global: bool,
     },
     StaticVar {
-        type_: VarType,
+        typ: Type,
         init: InitialValue,
         global: bool,
     },
     LocalVar {
-        type_: VarType,
+        typ: Type,
     },
 }
 
@@ -26,7 +26,11 @@ pub enum InitialValue {
 }
 
 #[derive(Debug, Clone, PartialEq, Display)]
-pub enum VarType {
+pub enum Type {
     #[display("Int")]
     Int,
+    #[display("long")]
+    Long,
+    #[display("Fn")]
+    Func(Vec<Type>, Box<Type>),
 }

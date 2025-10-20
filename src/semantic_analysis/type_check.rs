@@ -46,10 +46,10 @@ fn check_func_decl(
             if let Some(old_symbol) = symbols.get(name) {
                 match old_symbol {
                     Symbol::Func {
-                        arity,
+                        typ: Type::Func(param_types, ret_type),
                         defined: old_defined,
                         global: old_global,
-                    } if *arity == params.len() => {
+                    } if param_types.len() == params.len() => {
                         if *old_defined && body.is_some() {
                             return Err(ValidationError::DuplicateFuncDecl(name.clone()));
                         }
@@ -65,7 +65,8 @@ fn check_func_decl(
             };
 
             let symbol = Symbol::Func {
-                arity: params.len(),
+                // TODO: replace the place holders
+                typ: Type::Func(vec![], Box::new(Type::Int)),
                 defined: defined | body.is_some(),
                 global,
             };
@@ -74,12 +75,7 @@ fn check_func_decl(
 
             if let Some(body) = body {
                 for param in params {
-                    symbols.insert(
-                        param.clone(),
-                        Symbol::LocalVar {
-                            type_: VarType::Int,
-                        },
-                    );
+                    symbols.insert(param.clone(), Symbol::LocalVar { typ: Type::Int });
                 }
                 check_block(body, symbols)?;
             }
@@ -106,7 +102,7 @@ fn check_file_scope_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Valid
             if let Some(old_symbol) = symbols.get(name) {
                 match old_symbol {
                     Symbol::StaticVar {
-                        type_,
+                        typ,
                         init: old_init,
                         global: old_global,
                     } => {
@@ -134,7 +130,7 @@ fn check_file_scope_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Valid
             };
 
             let symbol = Symbol::StaticVar {
-                type_: VarType::Int,
+                typ: Type::Int,
                 init: init_value,
                 global,
             };
@@ -166,7 +162,7 @@ fn check_local_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Validation
                             symbols.insert(
                                 name.clone(),
                                 Symbol::StaticVar {
-                                    type_: VarType::Int,
+                                    typ: Type::Int,
                                     init: InitialValue::NoInitializer,
                                     global: true,
                                 },
@@ -187,19 +183,14 @@ fn check_local_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Validation
                     symbols.insert(
                         name.clone(),
                         Symbol::StaticVar {
-                            type_: VarType::Int,
+                            typ: Type::Int,
                             init: init_value,
                             global: false,
                         },
                     );
                 }
                 StorageClass::None => {
-                    symbols.insert(
-                        name.clone(),
-                        Symbol::LocalVar {
-                            type_: VarType::Int,
-                        },
-                    );
+                    symbols.insert(name.clone(), Symbol::LocalVar { typ: Type::Int });
                     if let Some(init) = init {
                         check_exp(init, symbols)?;
                     }
@@ -314,13 +305,19 @@ fn check_exp(exp: &Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(else_, symbols)?;
         }
         Exp::FuncCall(name, args) => match symbols.get(name) {
-            Some(Symbol::Func { arity, .. }) if *arity == args.len() => {
+            Some(Symbol::Func {
+                typ: Type::Func(params, _),
+                ..
+            }) if params.len() == args.len() => {
                 args.iter().try_for_each(|arg| check_exp(arg, symbols))?;
             }
-            Some(Symbol::Func { arity, .. }) => {
+            Some(Symbol::Func {
+                typ: Type::Func(params, _),
+                ..
+            }) => {
                 return Err(ValidationError::WrongArity(
                     name.clone(),
-                    *arity,
+                    params.len(),
                     args.len(),
                 ));
             }

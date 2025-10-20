@@ -1,5 +1,7 @@
 use rustc_hash::FxHashMap;
 
+use crate::models::symbol::Type;
+
 pub trait AstEx {
     type Label: std::fmt::Debug + Clone;
     type SwitchInfo: std::fmt::Debug + Clone;
@@ -39,12 +41,12 @@ pub enum Decl<Ex: AstEx> {
 
 #[derive(Debug, Clone)]
 pub enum FuncDecl<Ex: AstEx> {
-    FuncDecl(String, Vec<String>, Option<Block<Ex>>, StorageClass),
+    FuncDecl(String, Vec<String>, Option<Block<Ex>>, Type, StorageClass),
 }
 
 #[derive(Debug, Clone)]
 pub enum VarDecl {
-    VarDecl(String, Option<Exp>, StorageClass),
+    VarDecl(String, Option<Exp>, Type, StorageClass),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -95,8 +97,9 @@ pub enum Stmt<Ex: AstEx> {
 
 #[derive(Debug, Clone)]
 pub enum Exp {
-    Const(i32),
+    Const(Const),
     Var(String),
+    Cast(Type, Box<Exp>),
     Unary(UnaryOp, Box<Exp>),
     Binary(BinaryOp, Box<Exp>, Box<Exp>),
     Assignment(Box<Exp>, Box<Exp>),
@@ -133,4 +136,10 @@ pub enum BinaryOp {
     LessOrEqual,
     GreaterThan,
     GreaterOrEqual,
+}
+
+#[derive(Debug, Clone)]
+pub enum Const {
+    Int(i32),
+    Long(i64),
 }

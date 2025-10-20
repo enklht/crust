@@ -1,8 +1,17 @@
 use crate::models::ast::*;
+use crate::models::symbol::Type;
 use crate::models::token::Token;
 use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
+
+type ParserError<'tokens> = extra::Err<Rich<'tokens, Token>>;
+
+macro_rules! ParserOutput {
+    ($output:ty) => {
+        impl Parser<'tokens, I, $output, ParserError<'tokens>> + Clone
+    };
+}
 
 trait SemicolonExt<'token, I, T>:
     Parser<'token, I, T, extra::Err<Rich<'token, Token>>> + Clone
@@ -23,36 +32,67 @@ where
 
 enum Specifier {
     Int,
+    Long,
     Static,
     Extern,
+}
+
+#[inline]
+fn parse_type<'tokens>(specs: Vec<Type>, span: SimpleSpan) -> Result<Type, Rich<'tokens, Token>> {
+    if specs == vec![Type::Int] {
+        Ok(Type::Int)
+    } else if specs == vec![Type::Int, Type::Long]
+        || specs == vec![Type::Long, Type::Int]
+        || specs == vec![Type::Long]
+    {
+        Ok(Type::Long)
+    } else {
+        Err(Rich::custom(span, "Invalid type specifier"))
+    }
 }
 
 fn parse_specs<'tokens>(
     specs: Vec<Specifier>,
     span: SimpleSpan,
-) -> Result<StorageClass, Rich<'tokens, Token>> {
+) -> Result<(Type, StorageClass), Rich<'tokens, Token>> {
     let mut types = Vec::new();
     let mut storage_classes = Vec::new();
 
     for spec in specs {
         match spec {
-            Specifier::Int => types.push(Specifier::Int),
+            Specifier::Int => types.push(Type::Int),
+            Specifier::Long => types.push(Type::Long),
             Specifier::Static => storage_classes.push(StorageClass::Static),
             Specifier::Extern => storage_classes.push(StorageClass::Extern),
         }
     }
 
-    if types.len() != 1 {
-        Err(Rich::custom(span, "Invalid type specifier"))
-    } else if storage_classes.len() > 1 {
-        Err(Rich::custom(span, "Invalid storage class"))
+    let typ = parse_type(types, span)?;
+
+    let storage_class = if storage_classes.len() > 1 {
+        return Err(Rich::custom(span, "Invalid storage class"));
     } else {
-        Ok(storage_classes.pop().unwrap_or(StorageClass::None))
-    }
+        storage_classes.pop().unwrap_or(StorageClass::None)
+    };
+
+    Ok((typ, storage_class))
 }
 
-pub fn parser<'tokens, I>()
--> impl Parser<'tokens, I, Program<Plain>, extra::Err<Rich<'tokens, Token>>>
+fn type_specifiers<'tokens, I>() -> impl Parser<'tokens, I, Type, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    select! {
+        Token::KwInt => Type::Int,
+        Token::KwLong => Type::Long,
+    }
+    .repeated()
+    .at_least(1)
+    .collect()
+    .try_map(parse_type)
+}
+
+pub fn parser<'tokens, I>() -> impl Parser<'tokens, I, Program<Plain>, ParserError<'tokens>>
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
@@ -63,8 +103,11 @@ where
         .clone()
         .delimited_by(just(Token::LParen), just(Token::RParen));
 
+    let type_specifiers = type_specifiers();
+
     let specifiers = select! {
         Token::KwInt => Specifier::Int,
+        Token::KwLong => Specifier::Long,
         Token::KwStatic => Specifier::Static,
         Token::KwExtern => Specifier::Extern,
     }
@@ -77,7 +120,9 @@ where
         .then(ident)
         .then(just(Token::Equal).ignore_then(exp.clone()).or_not())
         .semicolon()
-        .map(|((storage_class, name), init)| VarDecl::VarDecl(name, init, storage_class))
+        .map(|(((typ, storage_class), name), init)| {
+            VarDecl::VarDecl(name, init, typ, storage_class)
+        })
         .labelled("declaration")
         .as_context();
 
@@ -191,8 +236,8 @@ where
 
     let param_list = choice((
         just(Token::KwVoid).to(Vec::new()),
-        just(Token::KwInt)
-            .ignore_then(ident)
+        type_specifiers
+            .then(ident)
             .separated_by(just(Token::Comma))
             .collect(),
     ));
@@ -201,8 +246,10 @@ where
         .then(ident)
         .then(param_list.delimited_by(just(Token::LParen), just(Token::RParen)))
         .then(block.map(Some).or(just(Token::Semicolon).to(None)))
-        .map(|(((storage_class, name), params), body)| {
-            FuncDecl::FuncDecl(name, params, body, storage_class)
+        .map(|((((typ, storage_class), name), params), body)| {
+            let (param_types, params): (Vec<_>, Vec<_>) = params.into_iter().unzip();
+            let typ = Type::Func(param_types, Box::new(typ));
+            FuncDecl::FuncDecl(name, params, body, typ, storage_class)
         });
 
     decl.define(choice((
@@ -215,7 +262,7 @@ where
     program.then_ignore(end())
 }
 
-fn exp<'tokens, I>() -> impl Parser<'tokens, I, Exp, extra::Err<Rich<'tokens, Token>>> + Clone
+fn exp<'tokens, I>() -> impl Parser<'tokens, I, Exp, ParserError<'tokens>> + Clone
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
@@ -230,7 +277,8 @@ where
             func_call,
             select! {
                 Token::Ident(ident) => Exp::Var(ident.clone()),
-                Token::Const(i) => Exp::Const(i)
+                Token::ConstInt(i) => Exp::Const(Const::Int(i)),
+                Token::ConstLong(i) => Exp::Const(Const::Long(i)),
             },
             exp.clone()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
@@ -248,7 +296,7 @@ where
                     Box::new(Exp::Binary(
                         BinaryOp::Add,
                         Box::new(v),
-                        Box::new(Exp::Const(1)),
+                        Box::new(Exp::Const(Const::Int(1))),
                     )),
                 )
             }),
@@ -258,7 +306,7 @@ where
                     Box::new(Exp::Binary(
                         BinaryOp::Subtract,
                         Box::new(v),
-                        Box::new(Exp::Const(1)),
+                        Box::new(Exp::Const(Const::Int(1))),
                     )),
                 )
             }),
@@ -266,6 +314,11 @@ where
                 13,
                 one_of([Token::Hyphen, Token::Tilde, Token::Bang]),
                 |op, v, _| Exp::Unary(convert_unop(op), Box::new(v)),
+            ),
+            prefix(
+                13,
+                type_specifiers().delimited_by(just(Token::LParen), just(Token::RParen)),
+                |typ, v, _| Exp::Cast(typ, Box::new(v)),
             ),
             infix(
                 left(12),
