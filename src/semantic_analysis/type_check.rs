@@ -37,7 +37,7 @@ fn check_func_decl(
     match func_decl {
         FuncDecl::FuncDecl(name, params, body, storage_class) => {
             if block_scope && *storage_class == StorageClass::Static {
-                panic!()
+                return Err(ValidationError::IncompatibleStorageClass(name.clone()));
             }
 
             let mut defined = false;
@@ -54,7 +54,7 @@ fn check_func_decl(
                             return Err(ValidationError::DuplicateFuncDecl(name.clone()));
                         }
                         if *old_global && *storage_class == StorageClass::Static {
-                            panic!()
+                            return Err(ValidationError::IncompatibleLinkage(name.clone()));
                         }
 
                         defined = *old_defined;
@@ -95,7 +95,11 @@ fn check_file_scope_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Valid
                 Some(Exp::Const(i)) => InitialValue::Initial(*i),
                 None if *storage_class == StorageClass::Extern => InitialValue::NoInitializer,
                 None => InitialValue::Tentative,
-                _ => panic!("non-const initializer"),
+                _ => {
+                    return Err(ValidationError::StaticVarWithNonConstInitializer(
+                        name.clone(),
+                    ));
+                }
             };
             let mut global = *storage_class != StorageClass::Static;
 
@@ -109,12 +113,12 @@ fn check_file_scope_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Valid
                         if *storage_class == StorageClass::Extern {
                             global = *old_global;
                         } else if *old_global != global {
-                            panic!();
+                            return Err(ValidationError::IncompatibleLinkage(name.clone()));
                         }
 
                         match (old_init, &mut init_value) {
                             (InitialValue::Initial(_), InitialValue::Initial(_)) => {
-                                panic!()
+                                return Err(ValidationError::DuplicateVarDecl(name.clone()));
                             }
                             (InitialValue::Initial(i), _) => {
                                 init_value = InitialValue::Initial(*i);
@@ -125,7 +129,7 @@ fn check_file_scope_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Valid
                         }
                     }
                     Symbol::LocalVar { .. } => {}
-                    _ => panic!(),
+                    _ => return Err(ValidationError::IncompatibleVarDecl(name.clone())),
                 }
             };
 
@@ -151,10 +155,12 @@ fn check_local_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Validation
             match storage_class {
                 StorageClass::Extern => {
                     if init.is_some() {
-                        panic!()
+                        return Err(ValidationError::ExternVarWithInitializer(name.clone()));
                     }
                     match symbols.get(name) {
-                        Some(Symbol::Func { .. }) => panic!(),
+                        Some(Symbol::Func { .. }) => {
+                            return Err(ValidationError::IncompatibleVarDecl(name.clone()));
+                        }
                         Some(_) => {}
                         None => {
                             symbols.insert(
@@ -172,7 +178,11 @@ fn check_local_var_decl(var_decl: &VarDecl, symbols: &mut Symbols) -> Validation
                     let init_value = match init {
                         Some(Exp::Const(i)) => InitialValue::Initial(*i),
                         None => InitialValue::Initial(0),
-                        _ => panic!(),
+                        _ => {
+                            return Err(ValidationError::StaticVarWithNonConstInitializer(
+                                name.clone(),
+                            ));
+                        }
                     };
                     symbols.insert(
                         name.clone(),
@@ -268,7 +278,9 @@ fn check_for_init(for_init: &ForInit, symbols: &mut Symbols) -> ValidationResult
     match for_init {
         ForInit::InitDecl(decl) => match decl {
             VarDecl::VarDecl(_, _, StorageClass::None) => check_local_var_decl(decl, symbols),
-            _ => panic!(),
+            VarDecl::VarDecl(name, _, _) => {
+                Err(ValidationError::IncompatibleStorageClass(name.clone()))
+            }
         },
         ForInit::InitExp(exp) => check_exp(exp, symbols),
         ForInit::Null => Ok(()),
