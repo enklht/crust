@@ -1,19 +1,19 @@
 use derive_more::Display;
 
 pub trait AsmExtra {
-    type FuncDef: std::fmt::Debug;
+    type TopLevel: std::fmt::Debug;
 }
 
 #[derive(Debug)]
 pub struct Plain;
 impl AsmExtra for Plain {
-    type FuncDef = ();
+    type TopLevel = ();
 }
 
 #[derive(Debug)]
 pub struct LastOffset;
 impl AsmExtra for LastOffset {
-    type FuncDef = usize;
+    type TopLevel = usize;
 }
 
 #[derive(Debug)]
@@ -21,15 +21,16 @@ pub enum Program<Extra>
 where
     Extra: AsmExtra + std::fmt::Debug,
 {
-    Program(Vec<FuncDef<Extra>>),
+    Program(Vec<TopLevel<Extra>>),
 }
 
 #[derive(Debug)]
-pub enum FuncDef<Extra>
+pub enum TopLevel<Extra>
 where
     Extra: AsmExtra + std::fmt::Debug,
 {
-    Function(String, Vec<Instruction>, Extra::FuncDef),
+    Function(String, bool, Vec<Instruction>, Extra::TopLevel),
+    StaticVar(String, bool, i32),
 }
 
 #[derive(Debug)]
@@ -87,6 +88,8 @@ pub enum Operand {
     Pseudo(String),
     #[display("{_0}(%rbp)")]
     Stack(isize),
+    #[display("{_0}(%rip)")]
+    Data(String),
 }
 
 impl Operand {

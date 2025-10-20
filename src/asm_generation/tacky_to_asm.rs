@@ -6,15 +6,15 @@ const ARG_REGISTERS: [Reg; 6] = [Reg::DI, Reg::SI, Reg::DX, Reg::CX, Reg::R8, Re
 
 pub fn gen_program(program: tacky::Program) -> Program<Plain> {
     match program {
-        tacky::Program::Program(func_defs) => {
-            Program::Program(func_defs.into_iter().map(gen_func_def).collect())
+        tacky::Program::Program(top_levels) => {
+            Program::Program(top_levels.into_iter().map(gen_top_level).collect())
         }
     }
 }
 
-fn gen_func_def(function: tacky::FuncDef) -> FuncDef<Plain> {
+fn gen_top_level(function: tacky::TopLevel) -> TopLevel<Plain> {
     match function {
-        tacky::FuncDef::FuncDef(name, params, body) => {
+        tacky::TopLevel::Function(name, global, params, body) => {
             let mut asm_instructions = Vec::new();
             let (register_params, stack_params) = &params.split_at(params.len().min(6));
 
@@ -34,8 +34,9 @@ fn gen_func_def(function: tacky::FuncDef) -> FuncDef<Plain> {
 
             asm_instructions.extend(gen_instructions(body));
 
-            FuncDef::Function(name, asm_instructions, ())
+            TopLevel::Function(name, global, asm_instructions, ())
         }
+        tacky::TopLevel::StaticVar(name, global, init) => TopLevel::StaticVar(name, global, init),
     }
 }
 

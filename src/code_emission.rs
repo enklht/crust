@@ -18,13 +18,27 @@ fn emit_program(program: Program<Plain>, acc: &mut String, symbols: &Symbols) {
     acc.push_str("    .section .note.GNU-stack,\"\",@progbits\n")
 }
 
-fn emit_func_def(func_def: FuncDef<Plain>, acc: &mut String, symbols: &Symbols) {
+fn emit_func_def(func_def: TopLevel<Plain>, acc: &mut String, symbols: &Symbols) {
     match func_def {
-        FuncDef::Function(name, instructions, _) => {
+        TopLevel::Function(name, global, instructions, _) => {
+            if global {
+                acc.push_str(&format!("    .globl {name}\n"))
+            };
             acc.push_str(&format!(
-                "    .global {name}\n{name}:\n    pushq %rbp\n    movq %rsp, %rbp\n"
+                "    .text\n{name}:\n    pushq %rbp\n    movq %rsp, %rbp\n"
             ));
             emit_instructions(instructions, acc, symbols)
+        }
+        TopLevel::StaticVar(name, global, init) => {
+            if global {
+                acc.push_str(&format!("    .globl {name}\n"))
+            };
+            acc.push_str(&format!("    .data\n    .balign 4\n{name}:\n"));
+            if init == 0 {
+                acc.push_str("    .zero 4\n");
+            } else {
+                acc.push_str(&format!("    .long {init}\n"));
+            }
         }
     }
 }

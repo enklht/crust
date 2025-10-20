@@ -1,28 +1,11 @@
 #[derive(Debug)]
 pub enum Program {
-    Program(Vec<FuncDef>),
+    Program(Vec<TopLevel>),
 }
 
-pub enum FuncDef {
-    FuncDef(String, Vec<String>, Vec<Instruction>),
-}
-
-impl std::fmt::Debug for FuncDef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            FuncDef::FuncDef(name, params, instructions) => {
-                write!(
-                    f,
-                    "\n    name: {}\n    params: {:?}\n    instructions:\n{}",
-                    name,
-                    params,
-                    instructions
-                        .iter()
-                        .fold(String::new(), |acc, i| acc + &format!("        {i:?},\n"))
-                )
-            }
-        }
-    }
+pub enum TopLevel {
+    Function(String, bool, Vec<String>, Vec<Instruction>),
+    StaticVar(String, bool, i32),
 }
 
 #[derive(Debug)]
@@ -69,4 +52,26 @@ pub enum BinaryOp {
     LessOrEqual,
     GreaterThan,
     GreaterOrEqual,
+}
+
+impl std::fmt::Debug for TopLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            TopLevel::Function(name, _global, params, instructions) => {
+                write!(
+                    f,
+                    "\n    name: {name}
+    params: {params:?}
+    instructions:
+{}",
+                    instructions
+                        .iter()
+                        .fold(String::new(), |acc, i| acc + &format!("        {i:?},\n"))
+                )
+            }
+            TopLevel::StaticVar(name, global, init) => {
+                write!(f, "\n    static {name} := {init}, (global: {global})")
+            }
+        }
+    }
 }

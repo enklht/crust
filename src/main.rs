@@ -5,7 +5,7 @@ mod lexer;
 mod models;
 mod parser;
 mod semantic_analysis;
-// mod tacky_generation;
+mod tacky_generation;
 mod utils;
 
 use bpaf::*;
@@ -95,24 +95,24 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    // let tacky = tacky_generation::convert_program(validated_ast);
-    //
-    // if opts.mode == CompilerMode::Tacky {
-    //     println!("{:?}", tacky);
-    //     return Ok(());
-    // }
-    //
-    // let asm_ast = asm_generation::codegen(tacky);
-    //
-    // if opts.mode == CompilerMode::Codegen {
-    //     println!("{:#?}", asm_ast);
-    //     return Ok(());
-    // }
-    //
-    // let asm_text = code_emission::emit(asm_ast, &symbols);
-    //
-    // let output = opts.output.unwrap_or(opts.input.with_extension("s"));
-    // fs::write(&output, asm_text)?;
-    //
+    let tacky = tacky_generation::convert_program(validated_ast, &symbols);
+
+    if opts.mode == CompilerMode::Tacky {
+        println!("{:?}", tacky);
+        return Ok(());
+    }
+
+    let asm_ast = asm_generation::codegen(tacky, &symbols);
+
+    if opts.mode == CompilerMode::Codegen {
+        println!("{:#?}", asm_ast);
+        return Ok(());
+    }
+
+    let asm_text = code_emission::emit(asm_ast, &symbols);
+
+    let output = opts.output.unwrap_or(opts.input.with_extension("s"));
+    fs::write(&output, asm_text)?;
+
     Ok(())
 }

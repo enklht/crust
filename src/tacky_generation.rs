@@ -1,6 +1,10 @@
 use crate::models::ast::*;
+use crate::models::symbol::InitialValue;
+use crate::models::symbol::Symbol;
+use crate::models::symbol::Symbols;
 use crate::models::tacky;
 use crate::models::tacky::Instruction;
+use crate::models::tacky::TopLevel;
 use crate::utils::make_label;
 use crate::utils::make_temporary;
 
@@ -8,24 +12,56 @@ fn make_temp_var() -> tacky::Val {
     tacky::Val::Var(make_temporary())
 }
 
-pub fn convert_program(program: Program<SwitchResolved>) -> tacky::Program {
+pub fn convert_program(program: Program<SwitchResolved>, symbols: &Symbols) -> tacky::Program {
     match program {
-        Program::Program(func_decls) => tacky::Program::Program(
-            func_decls
+        Program::Program(decls) => {
+            let mut decls = decls
                 .into_iter()
-                .filter_map(convert_func_decl)
-                .collect(),
-        ),
+                .filter_map(|decl| convert_decl(decl, symbols))
+                .collect::<Vec<_>>();
+            decls.extend(convert_symbols(symbols));
+
+            tacky::Program::Program(decls)
+        }
     }
 }
 
-fn convert_func_decl(func_decl: FuncDecl<SwitchResolved>) -> Option<tacky::FuncDef> {
+fn convert_symbols(symbols: &Symbols) -> Vec<TopLevel> {
+    symbols
+        .iter()
+        .filter_map(|(name, symbol)| {
+            if let Symbol::StaticVar { init, global, .. } = symbol {
+                match init {
+                    InitialValue::Initial(i) => {
+                        Some(TopLevel::StaticVar(name.clone(), *global, *i))
+                    }
+                    InitialValue::Tentative => Some(TopLevel::StaticVar(name.clone(), *global, 0)),
+                    InitialValue::NoInitializer => None,
+                }
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn convert_decl(decl: Decl<SwitchResolved>, symbols: &Symbols) -> Option<TopLevel> {
+    match decl {
+        Decl::FuncDecl(func_decl) => convert_func_decl(func_decl, symbols),
+        Decl::VarDecl(_) => None,
+    }
+}
+
+fn convert_func_decl(func_decl: FuncDecl<SwitchResolved>, symbols: &Symbols) -> Option<TopLevel> {
     match func_decl {
-        FuncDecl::FuncDecl(name, params, Some(body)) => {
+        FuncDecl::FuncDecl(name, params, Some(body), _) => {
             let mut instructions = Vec::new();
             emit_block(body, &mut instructions);
             instructions.push(Instruction::Return(tacky::Val::Const(0)));
-            Some(tacky::FuncDef::FuncDef(name, params, instructions))
+            let Some(&Symbol::Func { global, .. }) = symbols.get(&name) else {
+                unreachable!()
+            };
+            Some(TopLevel::Function(name, global, params, instructions))
         }
         _ => None,
     }
@@ -46,7 +82,7 @@ fn emit_block_item(block_item: BlockItem<SwitchResolved>, instructions: &mut Vec
 }
 
 fn emit_var_decl(var_decl: VarDecl, instructions: &mut Vec<Instruction>) {
-    if let VarDecl::VarDecl(name, Some(exp)) = var_decl {
+    if let VarDecl::VarDecl(name, Some(exp), StorageClass::None) = var_decl {
         let result = emit_exp(exp, instructions);
         instructions.push(Instruction::Copy(result, tacky::Val::Var(name)));
     }

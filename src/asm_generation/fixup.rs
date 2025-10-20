@@ -1,4 +1,4 @@
-use super::asm::*;
+use crate::models::assembly::*;
 
 pub fn fixup(program: Program<LastOffset>) -> Program<Plain> {
     match program {
@@ -8,23 +8,27 @@ pub fn fixup(program: Program<LastOffset>) -> Program<Plain> {
     }
 }
 
-fn fixup_function(function: FuncDef<LastOffset>) -> FuncDef<Plain> {
+fn fixup_function(function: TopLevel<LastOffset>) -> TopLevel<Plain> {
     match function {
-        FuncDef::Function(name, instructions, last_offset) => {
+        TopLevel::Function(name, global, instructions, last_offset) => {
             let mut fixed = vec![Instruction::AllocateStack(last_offset.next_multiple_of(16))];
 
             for instruction in instructions {
                 emit_instruction(instruction, &mut fixed);
             }
 
-            FuncDef::Function(name, fixed, ())
+            TopLevel::Function(name, global, fixed, ())
         }
+        TopLevel::StaticVar(name, global, init) => TopLevel::StaticVar(name, global, init),
     }
 }
 
 fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
     match instruction {
-        Instruction::Mov(src @ Operand::Stack(_), dst @ Operand::Stack(_)) => {
+        Instruction::Mov(
+            src @ (Operand::Stack(_) | Operand::Data(_)),
+            dst @ (Operand::Stack(_) | Operand::Data(_)),
+        ) => {
             acc.extend([
                 Instruction::Mov(src, Operand::Reg(Reg::R10)),
                 Instruction::Mov(Operand::Reg(Reg::R10), dst),
@@ -36,15 +40,19 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             | BinaryOp::BitAnd
             | BinaryOp::BitOr
             | BinaryOp::BitXor),
-            src @ Operand::Stack(_),
-            dst @ Operand::Stack(_),
+            src @ (Operand::Stack(_) | Operand::Data(_)),
+            dst @ (Operand::Stack(_) | Operand::Data(_)),
         ) => {
             acc.extend([
                 Instruction::Mov(src, Operand::Reg(Reg::R10)),
                 Instruction::Binary(op, Operand::Reg(Reg::R10), dst),
             ]);
         }
-        Instruction::Binary(BinaryOp::Multiply, src, dst @ Operand::Stack(_)) => {
+        Instruction::Binary(
+            BinaryOp::Multiply,
+            src,
+            dst @ (Operand::Stack(_) | Operand::Data(_)),
+        ) => {
             acc.extend([
                 Instruction::Mov(dst.clone(), Operand::Reg(Reg::R11)),
                 Instruction::Binary(BinaryOp::Multiply, src, Operand::Reg(Reg::R11)),
@@ -57,7 +65,10 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Idiv(Operand::Reg(Reg::R10)),
             ]);
         }
-        Instruction::Cmp(src @ Operand::Stack(_), dst @ Operand::Stack(_)) => {
+        Instruction::Cmp(
+            src @ (Operand::Stack(_) | Operand::Data(_)),
+            dst @ (Operand::Stack(_) | Operand::Data(_)),
+        ) => {
             acc.extend([
                 Instruction::Mov(src, Operand::Reg(Reg::R10)),
                 Instruction::Cmp(Operand::Reg(Reg::R10), dst),
@@ -69,7 +80,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Cmp(src, Operand::Reg(Reg::R11)),
             ]);
         }
-        Instruction::Push(op @ Operand::Stack(_)) => acc.extend([
+        Instruction::Push(op @ (Operand::Stack(_) | Operand::Data(_))) => acc.extend([
             Instruction::Mov(op, Operand::Reg(Reg::AX)),
             Instruction::Push(Operand::Reg(Reg::AX)),
         ]),
