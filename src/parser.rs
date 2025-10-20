@@ -71,7 +71,7 @@ where
     .repeated()
     .at_least(1)
     .collect()
-    .try_map(|specs, span| parse_specs(specs, span));
+    .try_map(parse_specs);
 
     let var_decl = specifiers
         .then(ident)
