@@ -47,9 +47,8 @@ impl ScopeManager {
 pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<Plain>> {
     let scope_manager = &mut ScopeManager::new();
     let program = match program {
-        Program::Program(func_decl) => Program::Program(
-            func_decl
-                .into_iter()
+        Program::Program(decl) => Program::Program(
+            decl.into_iter()
                 .map(|decl| resolve_file_scope_decl(decl, scope_manager))
                 .collect::<Result<_, _>>()?,
         ),
@@ -308,4 +307,3 @@ fn resolve_exp(exp: Exp, scope_manager: &mut ScopeManager) -> ValidationResult<E
     };
     Ok(exp)
 }
-
