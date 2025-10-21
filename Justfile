@@ -5,3 +5,6 @@ test *flags:
 run fname *flags:
   cargo build
   ./crust.fish {{flags}} {{fname}}
+
+check:
+  RUSTFLAGS=-Awarnings cargo check

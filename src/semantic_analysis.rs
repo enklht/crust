@@ -66,7 +66,7 @@ pub enum ValidationError {
     #[error("'case' statement can only appear inside a switch")]
     CaseOutsideSwitch,
     #[error("Duplicate case value {0:?} in switch statement")]
-    DuplicateCaseValue(i32),
+    DuplicateCaseValue(Const),
     #[error("Case value must be a constant expression, found: {0:?}")]
     NonConstCase(Exp),
     #[error("'default' statement can only appear inside a switch")]
@@ -77,14 +77,19 @@ pub enum ValidationError {
 
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
-pub fn validate(program: Program<Plain>) -> ValidationResult<(Program<SwitchResolved>, Symbols)> {
-    let program = ident_resolution::resolve_program(program)?;
-    let program = label_resolution::resolve_program(program)?;
+pub fn validate(
+    mut program: Program<Plain>,
+) -> ValidationResult<(Program<SwitchResolved>, Symbols)> {
+    ident_resolution::resolve_program(&mut program)?;
 
-    let symbols = type_check::check_program(&program)?;
+    let mut program = label_resolution::resolve_program(program)?;
+
+    let (symbols, types) = type_check::check_program(&mut program)?;
+
+    dbg!(&symbols);
 
     let program = block_labelling::label_program(program)?;
-    let program = switch_resolution::resolve_program(program)?;
+    let program = switch_resolution::resolve_program(program, &types)?;
 
     Ok((program, symbols))
 }

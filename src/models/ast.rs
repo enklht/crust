@@ -25,7 +25,7 @@ impl AstEx for Labelled {
 pub struct SwitchResolved;
 impl AstEx for SwitchResolved {
     type Label = String;
-    type SwitchInfo = (FxHashMap<i32, String>, Option<String>);
+    type SwitchInfo = (FxHashMap<Const, String>, Option<String>);
 }
 
 #[derive(Debug, Clone)]
@@ -95,7 +95,7 @@ pub enum Stmt<Ex: AstEx> {
     Null,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Exp {
     Const(Const),
     Var(String),
@@ -107,7 +107,7 @@ pub enum Exp {
     FuncCall(String, Vec<Exp>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum UnaryOp {
     Negate,
     BitNot,
@@ -116,7 +116,7 @@ pub enum UnaryOp {
     PostfixDecrement,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -138,7 +138,7 @@ pub enum BinaryOp {
     GreaterOrEqual,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Const {
     Int(i32),
     Long(i64),

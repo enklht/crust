@@ -26,7 +26,7 @@ fn resolve_decl(decl: Decl<Plain>) -> ValidationResult<Decl<Plain>> {
 
 fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Plain>> {
     let func_def = match func_def {
-        FuncDecl::FuncDecl(name, params, Some(body), storage_class) => {
+        FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class) => {
             let mut labels = FxHashMap::default();
             for block_item in &body {
                 if let BlockItem::S(stmt) = block_item {
@@ -39,7 +39,7 @@ fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Pla
                 .map(|block_item| resolve_block_item(block_item, &labels))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDecl::FuncDecl(name, params, Some(body), storage_class)
+            FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class)
         }
         other => other,
     };

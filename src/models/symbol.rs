@@ -1,8 +1,11 @@
+use crate::models::ast::Exp;
 use derive_more::Display;
 use rustc_hash::FxHashMap;
 
+pub type Types = FxHashMap<Exp, Type>;
 pub type Symbols = FxHashMap<String, Symbol>;
 
+#[derive(Debug)]
 pub enum Symbol {
     Func {
         typ: Type,
@@ -19,13 +22,30 @@ pub enum Symbol {
     },
 }
 
+impl Symbol {
+    pub fn typ(&self) -> Type {
+        match self {
+            Symbol::Func { typ, .. } => typ.clone(),
+            Symbol::StaticVar { typ, .. } => typ.clone(),
+            Symbol::LocalVar { typ, .. } => typ.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum InitialValue {
     Tentative,
-    Initial(i32),
+    Initial(StaticInit),
     NoInitializer,
 }
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone)]
+pub enum StaticInit {
+    IntInit(i32),
+    LongInit(i64),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
 pub enum Type {
     #[display("Int")]
     Int,

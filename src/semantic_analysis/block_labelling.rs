@@ -25,16 +25,16 @@ fn label_decl(decl: Decl<Plain>) -> ValidationResult<Decl<Labelled>> {
 
 fn label_func_decl(func_decl: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Labelled>> {
     let func_decl = match func_decl {
-        FuncDecl::FuncDecl(name, params, Some(body), storage_class) => {
+        FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class) => {
             let body = body
                 .into_iter()
                 .map(|block_item| label_block_item(block_item, None, None))
                 .collect::<ValidationResult<_>>()?;
 
-            FuncDecl::FuncDecl(name, params, Some(body), storage_class)
+            FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class)
         }
-        FuncDecl::FuncDecl(name, params, None, storage_class) => {
-            FuncDecl::FuncDecl(name, params, None, storage_class)
+        FuncDecl::FuncDecl(name, params, None, typ, storage_class) => {
+            FuncDecl::FuncDecl(name, params, None, typ, storage_class)
         }
     };
     Ok(func_decl)
