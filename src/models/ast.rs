@@ -1,46 +1,20 @@
 use crate::models::typ::Type;
 use rustc_hash::FxHashMap;
 
-pub trait AstEx {
-    type Label: std::fmt::Debug + Clone;
-    type SwitchInfo: std::fmt::Debug + Clone;
+#[derive(Debug, Clone)]
+pub enum Program {
+    Program(Vec<Decl>),
 }
 
 #[derive(Debug, Clone)]
-pub struct Plain;
-impl AstEx for Plain {
-    type Label = ();
-    type SwitchInfo = ();
-}
-
-#[derive(Debug, Clone)]
-pub struct Labelled;
-impl AstEx for Labelled {
-    type Label = String;
-    type SwitchInfo = ();
-}
-
-#[derive(Debug, Clone)]
-pub struct SwitchResolved;
-impl AstEx for SwitchResolved {
-    type Label = String;
-    type SwitchInfo = (FxHashMap<Const, String>, Option<String>);
-}
-
-#[derive(Debug, Clone)]
-pub enum Program<Ex: AstEx> {
-    Program(Vec<Decl<Ex>>),
-}
-
-#[derive(Debug, Clone)]
-pub enum Decl<Ex: AstEx> {
-    FuncDecl(FuncDecl<Ex>),
+pub enum Decl {
+    FuncDecl(FuncDecl),
     VarDecl(VarDecl),
 }
 
 #[derive(Debug, Clone)]
-pub enum FuncDecl<Ex: AstEx> {
-    FuncDecl(String, Vec<String>, Option<Block<Ex>>, Type, StorageClass),
+pub enum FuncDecl {
+    FuncDecl(String, Vec<String>, Option<Block>, Type, StorageClass),
 }
 
 #[derive(Debug, Clone)]
@@ -55,12 +29,12 @@ pub enum StorageClass {
     None,
 }
 
-pub type Block<Ex> = Vec<BlockItem<Ex>>;
+pub type Block = Vec<BlockItem>;
 
 #[derive(Debug, Clone)]
-pub enum BlockItem<Ex: AstEx> {
-    S(Stmt<Ex>),
-    D(Decl<Ex>),
+pub enum BlockItem {
+    S(Stmt),
+    D(Decl),
 }
 
 #[derive(Debug, Clone)]
@@ -77,20 +51,23 @@ pub enum Label {
     Default,
 }
 
+type BlockLabel = Option<String>;
+type SwitchInfo = Option<(FxHashMap<Const, String>, Option<String>)>;
+
 #[derive(Debug, Clone)]
-pub enum Stmt<Ex: AstEx> {
+pub enum Stmt {
     Return(Exp),
     Expression(Exp),
-    If(Exp, Box<Stmt<Ex>>, Option<Box<Stmt<Ex>>>),
-    Labelled(Label, Box<Stmt<Ex>>),
+    If(Exp, Box<Stmt>, Option<Box<Stmt>>),
+    Labelled(Label, Box<Stmt>),
     Goto(String),
-    Compound(Block<Ex>),
-    Break(Ex::Label),
-    Continue(Ex::Label),
-    While(Exp, Box<Stmt<Ex>>, Ex::Label),
-    DoWhile(Box<Stmt<Ex>>, Exp, Ex::Label),
-    For(ForInit, Option<Exp>, Option<Exp>, Box<Stmt<Ex>>, Ex::Label),
-    Switch(Exp, Box<Stmt<Ex>>, Ex::Label, Ex::SwitchInfo),
+    Compound(Block),
+    Break(BlockLabel),
+    Continue(BlockLabel),
+    While(Exp, Box<Stmt>, BlockLabel),
+    DoWhile(Box<Stmt>, Exp, BlockLabel),
+    For(ForInit, Option<Exp>, Option<Exp>, Box<Stmt>, BlockLabel),
+    Switch(Exp, Box<Stmt>, BlockLabel, SwitchInfo),
     Null,
 }
 

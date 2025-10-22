@@ -3,114 +3,79 @@ use super::ValidationResult;
 use crate::models::ast::*;
 use crate::utils::make_label;
 
-pub fn label_program(program: Program<Plain>) -> ValidationResult<Program<Labelled>> {
-    let program = match program {
-        Program::Program(func_decls) => Program::Program(
-            func_decls
-                .into_iter()
-                .map(label_decl)
-                .collect::<Result<_, _>>()?,
-        ),
-    };
-    Ok(program)
+pub fn label_program(program: &mut Program) -> ValidationResult<()> {
+    match program {
+        Program::Program(func_decls) => func_decls.iter_mut().try_for_each(label_decl),
+    }
 }
 
-fn label_decl(decl: Decl<Plain>) -> ValidationResult<Decl<Labelled>> {
-    let decl = match decl {
-        Decl::VarDecl(var_decl) => Decl::VarDecl(var_decl),
-        Decl::FuncDecl(func_decl) => Decl::FuncDecl(label_func_decl(func_decl)?),
-    };
-    Ok(decl)
+fn label_decl(decl: &mut Decl) -> ValidationResult<()> {
+    match decl {
+        Decl::FuncDecl(func_decl) => label_func_decl(func_decl),
+        Decl::VarDecl(_) => Ok(()),
+    }
 }
 
-fn label_func_decl(func_decl: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Labelled>> {
-    let func_decl = match func_decl {
-        FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class) => {
-            let body = body
-                .into_iter()
-                .map(|block_item| label_block_item(block_item, None, None))
-                .collect::<ValidationResult<_>>()?;
-
-            FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class)
-        }
-        FuncDecl::FuncDecl(name, params, None, typ, storage_class) => {
-            FuncDecl::FuncDecl(name, params, None, typ, storage_class)
-        }
-    };
-    Ok(func_decl)
+fn label_func_decl(func_decl: &mut FuncDecl) -> ValidationResult<()> {
+    match func_decl {
+        FuncDecl::FuncDecl(_, _, Some(body), _, _) => body
+            .iter_mut()
+            .try_for_each(|block_item| label_block_item(block_item, None, None)),
+        _ => Ok(()),
+    }
 }
 
 fn label_block_item(
-    block_item: BlockItem<Plain>,
+    block_item: &mut BlockItem,
     break_label: Option<&String>,
     continue_label: Option<&String>,
-) -> ValidationResult<BlockItem<Labelled>> {
-    let block_item = match block_item {
-        BlockItem::S(stmt) => BlockItem::S(label_stmt(stmt, break_label, continue_label)?),
-        BlockItem::D(decl) => BlockItem::D(label_decl(decl)?),
-    };
-    Ok(block_item)
+) -> ValidationResult<()> {
+    match block_item {
+        BlockItem::S(stmt) => label_stmt(stmt, break_label, continue_label),
+        BlockItem::D(decl) => label_decl(decl),
+    }
 }
 
 fn label_stmt(
-    stmt: Stmt<Plain>,
+    stmt: &mut Stmt,
     break_label: Option<&String>,
     continue_label: Option<&String>,
-) -> ValidationResult<Stmt<Labelled>> {
-    let stmt = match stmt {
-        Stmt::If(cond, then, Some(else_)) => Stmt::If(
-            cond,
-            Box::new(label_stmt(*then, break_label, continue_label)?),
-            Some(Box::new(label_stmt(*else_, break_label, continue_label)?)),
-        ),
-        Stmt::If(cond, then, None) => Stmt::If(
-            cond,
-            Box::new(label_stmt(*then, break_label, continue_label)?),
-            None,
-        ),
-        Stmt::Labelled(label, stmt) => Stmt::Labelled(
-            label,
-            Box::new(label_stmt(*stmt, break_label, continue_label)?),
-        ),
-        Stmt::Compound(block) => {
-            let block = block
-                .into_iter()
-                .map(|block_item| label_block_item(block_item, break_label, continue_label))
-                .collect::<Result<_, _>>()?;
-            Stmt::Compound(block)
+) -> ValidationResult<()> {
+    match stmt {
+        Stmt::If(_, then, else_) => {
+            label_stmt(then, break_label, continue_label)?;
+            if let Some(else_) = else_ {
+                label_stmt(else_, break_label, continue_label)?;
+            }
         }
-        Stmt::Break(_) => match break_label.cloned() {
-            Some(label) => Stmt::Break(label),
+        Stmt::Labelled(_, stmt) => {
+            label_stmt(stmt, break_label, continue_label)?;
+        }
+        Stmt::Compound(block) => block
+            .iter_mut()
+            .try_for_each(|block_item| label_block_item(block_item, break_label, continue_label))?,
+        Stmt::Break(label) => match break_label.cloned() {
+            Some(_) => *label = break_label.cloned(),
             None => return Err(ValidationError::BreakOutsideLoop),
         },
-        Stmt::Continue(_) => match continue_label {
-            Some(label) => Stmt::Continue(label.clone()),
+        Stmt::Continue(label) => match continue_label {
+            Some(_) => *label = continue_label.cloned(),
             None => return Err(ValidationError::ContinueOutsideLoop),
         },
-        Stmt::While(cond, body, _) => {
-            let label = make_label("loop");
-            let body = Box::new(label_stmt(*body, Some(&label), Some(&label))?);
-            Stmt::While(cond, body, label)
+        Stmt::While(_, body, label)
+        | Stmt::DoWhile(body, _, label)
+        | Stmt::For(_, _, _, body, label) => {
+            let new_label = make_label("loop");
+            label_stmt(body, Some(&new_label), Some(&new_label))?;
+            *label = Some(new_label);
         }
-        Stmt::DoWhile(body, cond, _) => {
-            let label = make_label("loop");
-            let body = Box::new(label_stmt(*body, Some(&label), Some(&label))?);
-            Stmt::DoWhile(body, cond, label)
+        Stmt::Switch(_, body, label, _) => {
+            let new_label = make_label("switch");
+            label_stmt(body, Some(&new_label), continue_label)?;
+            *label = Some(new_label);
         }
-        Stmt::For(init, cond, post, body, _) => {
-            let label = make_label("loop");
-            let body = Box::new(label_stmt(*body, Some(&label), Some(&label))?);
-            Stmt::For(init, cond, post, body, label)
-        }
-        Stmt::Switch(cond, body, _, ()) => {
-            let label = make_label("switch");
-            let body = Box::new(label_stmt(*body, Some(&label), continue_label)?);
-            Stmt::Switch(cond, body, label, ())
-        }
-        Stmt::Return(exp) => Stmt::Return(exp),
-        Stmt::Goto(label) => Stmt::Goto(label),
-        Stmt::Expression(exp) => Stmt::Expression(exp),
-        Stmt::Null => Stmt::Null,
-    };
-    Ok(stmt)
+        // Return, Goto, Expression, Null
+        _ => {}
+    }
+    Ok(())
 }

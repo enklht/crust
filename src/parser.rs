@@ -14,7 +14,7 @@ use utils::SemicolonExt;
 
 type ParserError<'tokens> = extra::Err<Rich<'tokens, Token>>;
 
-pub fn parser<'tokens, I>() -> impl Parser<'tokens, I, Program<Plain>, ParserError<'tokens>>
+pub fn parser<'tokens, I>() -> impl Parser<'tokens, I, Program, ParserError<'tokens>>
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
@@ -81,14 +81,14 @@ where
     let while_stmt = just(Token::KwWhile)
         .ignore_then(exp_paren.clone())
         .then(stmt.clone())
-        .map(|(cond, body)| Stmt::While(cond, Box::new(body), ()));
+        .map(|(cond, body)| Stmt::While(cond, Box::new(body), None));
 
     let do_while_stmt = just(Token::KwDo)
         .ignore_then(stmt.clone())
         .then_ignore(just(Token::KwWhile))
         .then(exp_paren.clone())
         .semicolon()
-        .map(|(body, cond)| Stmt::DoWhile(Box::new(body), cond, ()));
+        .map(|(body, cond)| Stmt::DoWhile(Box::new(body), cond, None));
 
     let for_stmt = just(Token::KwFor)
         .ignore_then(
@@ -99,12 +99,12 @@ where
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then(stmt.clone())
-        .map(|(((init, cond), post), body)| Stmt::For(init, cond, post, Box::new(body), ()));
+        .map(|(((init, cond), post), body)| Stmt::For(init, cond, post, Box::new(body), None));
 
     let switch_stmt = just(Token::KwSwitch)
         .ignore_then(exp().delimited_by(just(Token::LParen), just(Token::RParen)))
         .then(stmt.clone())
-        .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), (), ()));
+        .map(|(cond, body)| Stmt::Switch(cond, Box::new(body), None, None));
 
     stmt.define(
         choice((
@@ -114,8 +114,8 @@ where
             labelled_stmt,
             goto_stmt,
             block.clone().map(Stmt::Compound),
-            just(Token::KwBreak).semicolon().to(Stmt::Break(())),
-            just(Token::KwContinue).semicolon().to(Stmt::Continue(())),
+            just(Token::KwBreak).semicolon().to(Stmt::Break(None)),
+            just(Token::KwContinue).semicolon().to(Stmt::Continue(None)),
             while_stmt,
             do_while_stmt,
             for_stmt,

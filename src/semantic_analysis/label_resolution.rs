@@ -4,7 +4,7 @@ use crate::models::ast::*;
 use crate::utils::make_label;
 use rustc_hash::FxHashMap;
 
-pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<Plain>> {
+pub fn resolve_program(program: Program) -> ValidationResult<Program> {
     let program = match program {
         Program::Program(decls) => Program::Program(
             decls
@@ -16,7 +16,7 @@ pub fn resolve_program(program: Program<Plain>) -> ValidationResult<Program<Plai
     Ok(program)
 }
 
-fn resolve_decl(decl: Decl<Plain>) -> ValidationResult<Decl<Plain>> {
+fn resolve_decl(decl: Decl) -> ValidationResult<Decl> {
     let decl = match decl {
         Decl::FuncDecl(func_decl) => Decl::FuncDecl(resolve_func_decl(func_decl)?),
         other => other,
@@ -24,7 +24,7 @@ fn resolve_decl(decl: Decl<Plain>) -> ValidationResult<Decl<Plain>> {
     Ok(decl)
 }
 
-fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Plain>> {
+fn resolve_func_decl(func_def: FuncDecl) -> ValidationResult<FuncDecl> {
     let func_def = match func_def {
         FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class) => {
             let mut labels = FxHashMap::default();
@@ -47,9 +47,9 @@ fn resolve_func_decl(func_def: FuncDecl<Plain>) -> ValidationResult<FuncDecl<Pla
 }
 
 fn resolve_block_item(
-    block_item: BlockItem<Plain>,
+    block_item: BlockItem,
     labels: &FxHashMap<String, String>,
-) -> ValidationResult<BlockItem<Plain>> {
+) -> ValidationResult<BlockItem> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, labels)?),
         decl => decl,
@@ -57,10 +57,7 @@ fn resolve_block_item(
     Ok(block_item)
 }
 
-fn collect_labels(
-    stmt: &Stmt<Plain>,
-    labels: &mut FxHashMap<String, String>,
-) -> ValidationResult<()> {
+fn collect_labels(stmt: &Stmt, labels: &mut FxHashMap<String, String>) -> ValidationResult<()> {
     match stmt {
         Stmt::If(_, then, Some(else_)) => {
             collect_labels(then, labels)?;
@@ -90,7 +87,7 @@ fn collect_labels(
         Stmt::While(_, body, _)
         | Stmt::DoWhile(body, _, _)
         | Stmt::For(_, _, _, body, _)
-        | Stmt::Switch(_, body, _, ()) => {
+        | Stmt::Switch(_, body, _, _) => {
             collect_labels(body, labels)?;
         }
         _ => {}
@@ -98,10 +95,7 @@ fn collect_labels(
     Ok(())
 }
 
-fn resolve_stmt(
-    stmt: Stmt<Plain>,
-    labels: &FxHashMap<String, String>,
-) -> ValidationResult<Stmt<Plain>> {
+fn resolve_stmt(stmt: Stmt, labels: &FxHashMap<String, String>) -> ValidationResult<Stmt> {
     let stmt = match stmt {
         Stmt::If(cond, then, Some(else_)) => Stmt::If(
             cond,
@@ -143,8 +137,8 @@ fn resolve_stmt(
             Box::new(resolve_stmt(*body, labels)?),
             label,
         ),
-        Stmt::Switch(cond, body, label, ()) => {
-            Stmt::Switch(cond, Box::new(resolve_stmt(*body, labels)?), label, ())
+        Stmt::Switch(cond, body, label, None) => {
+            Stmt::Switch(cond, Box::new(resolve_stmt(*body, labels)?), label, None)
         }
         other => other,
     };

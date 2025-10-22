@@ -32,8 +32,8 @@ pub enum ValidationError {
     // invalid function declaration
     #[error("Function '{0}' has already been declared")]
     DuplicateFuncDecl(String),
-    #[error("Function '{0}' is previously defined as {{1}}, now defined as {{2}}")]
-    IncompatibleFuncDecl(String),
+    #[error("Function '{0}' is previously defined as {1}, now defined as {2}")]
+    IncompatibleFuncDecl(String, Type, Type),
     #[error("Function '{0}' cannot be defined inside another function")]
     NestedFuncDef(String),
 
@@ -78,17 +78,15 @@ pub enum ValidationError {
 
 pub type ValidationResult<T> = Result<T, ValidationError>;
 
-pub fn validate(
-    mut program: Program<Plain>,
-) -> ValidationResult<(Program<SwitchResolved>, Symbols)> {
+pub fn validate(mut program: Program) -> ValidationResult<(Program, Symbols)> {
     ident_resolution::resolve_program(&mut program)?;
 
     let mut program = label_resolution::resolve_program(program)?;
 
     let symbols = type_check::check_program(&mut program)?;
 
-    let program = block_labelling::label_program(program)?;
-    let program = switch_resolution::resolve_program(program)?;
+    block_labelling::label_program(&mut program)?;
+    switch_resolution::resolve_program(&mut program)?;
 
     Ok((program, symbols))
 }

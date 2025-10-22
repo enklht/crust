@@ -44,7 +44,7 @@ impl ScopeManager {
     }
 }
 
-pub fn resolve_program(program: &mut Program<Plain>) -> ValidationResult<()> {
+pub fn resolve_program(program: &mut Program) -> ValidationResult<()> {
     let scope_manager = &mut ScopeManager::new();
     match program {
         Program::Program(decls) => decls
@@ -54,7 +54,7 @@ pub fn resolve_program(program: &mut Program<Plain>) -> ValidationResult<()> {
 }
 
 fn resolve_file_scope_decl(
-    decl: &mut Decl<Plain>,
+    decl: &mut Decl,
     scope_manager: &mut ScopeManager,
 ) -> ValidationResult<()> {
     match decl {
@@ -63,10 +63,7 @@ fn resolve_file_scope_decl(
     }
 }
 
-fn resolve_local_decl(
-    decl: &mut Decl<Plain>,
-    scope_manager: &mut ScopeManager,
-) -> ValidationResult<()> {
+fn resolve_local_decl(decl: &mut Decl, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
     match decl {
         Decl::VarDecl(var_decl) => resolve_local_var_decl(var_decl, scope_manager)?,
         Decl::FuncDecl(func_decl) => {
@@ -119,7 +116,7 @@ fn resolve_local_var_decl(
 }
 
 fn resolve_func_decl(
-    func_decl: &mut FuncDecl<Plain>,
+    func_decl: &mut FuncDecl,
     scope_manager: &mut ScopeManager,
 ) -> ValidationResult<()> {
     let FuncDecl::FuncDecl(name, params, body, _, _) = func_decl;
@@ -155,17 +152,14 @@ fn resolve_param(name: &mut String, scope_manager: &mut ScopeManager) -> Validat
     Ok(())
 }
 
-fn resolve_block(
-    block: &mut Block<Plain>,
-    scope_manager: &mut ScopeManager,
-) -> ValidationResult<()> {
+fn resolve_block(block: &mut Block, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
     block
         .iter_mut()
         .try_for_each(|block_item| resolve_block_item(block_item, scope_manager))
 }
 
 fn resolve_block_item(
-    block_item: &mut BlockItem<Plain>,
+    block_item: &mut BlockItem,
     scope_manager: &mut ScopeManager,
 ) -> ValidationResult<()> {
     match block_item {
@@ -174,7 +168,7 @@ fn resolve_block_item(
     }
 }
 
-fn resolve_stmt(stmt: &mut Stmt<Plain>, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
+fn resolve_stmt(stmt: &mut Stmt, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
     match stmt {
         Stmt::Return(exp) => {
             resolve_exp(exp, scope_manager)?;

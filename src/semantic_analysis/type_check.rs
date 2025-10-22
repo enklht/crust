@@ -4,7 +4,7 @@ use crate::models::ast::*;
 use crate::models::symbol::*;
 use crate::models::typ::Type;
 
-pub fn check_program(program: &mut Program<Plain>) -> ValidationResult<Symbols> {
+pub fn check_program(program: &mut Program) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
     match program {
         Program::Program(decls) => {
@@ -16,14 +16,14 @@ pub fn check_program(program: &mut Program<Plain>) -> ValidationResult<Symbols> 
     Ok(symbols)
 }
 
-fn check_file_scope_decl(decl: &mut Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_file_scope_decl(decl: &mut Decl, symbols: &mut Symbols) -> ValidationResult<()> {
     match decl {
         Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, false),
         Decl::VarDecl(var_decl) => check_file_scope_var_decl(var_decl, symbols),
     }
 }
 
-fn check_local_decl(decl: &mut Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_local_decl(decl: &mut Decl, symbols: &mut Symbols) -> ValidationResult<()> {
     match decl {
         Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, true),
         Decl::VarDecl(var_decl) => check_local_var_decl(var_decl, symbols),
@@ -31,7 +31,7 @@ fn check_local_decl(decl: &mut Decl<Plain>, symbols: &mut Symbols) -> Validation
 }
 
 fn check_func_decl(
-    func_decl: &mut FuncDecl<Plain>,
+    func_decl: &mut FuncDecl,
     symbols: &mut Symbols,
     block_scope: bool,
 ) -> ValidationResult<()> {
@@ -61,7 +61,13 @@ fn check_func_decl(
                         defined = *old_defined;
                         global = *old_global;
                     }
-                    _ => return Err(ValidationError::IncompatibleFuncDecl(name.clone())),
+                    symbol => {
+                        return Err(ValidationError::IncompatibleFuncDecl(
+                            name.clone(),
+                            symbol.typ().clone(),
+                            typ.clone(),
+                        ));
+                    }
                 }
             };
 
@@ -242,23 +248,20 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
     }
 }
 
-fn check_block(block: &mut Block<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_block(block: &mut Block, symbols: &mut Symbols) -> ValidationResult<()> {
     block
         .iter_mut()
         .try_for_each(|block_item| check_block_item(block_item, symbols))
 }
 
-fn check_block_item(
-    block_item: &mut BlockItem<Plain>,
-    symbols: &mut Symbols,
-) -> ValidationResult<()> {
+fn check_block_item(block_item: &mut BlockItem, symbols: &mut Symbols) -> ValidationResult<()> {
     match block_item {
         BlockItem::S(stmt) => check_stmt(stmt, symbols),
         BlockItem::D(decl) => check_local_decl(decl, symbols),
     }
 }
 
-fn check_stmt(stmt: &mut Stmt<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols) -> ValidationResult<()> {
     match stmt {
         Stmt::Return(exp) => {
             check_exp(exp, symbols)?;

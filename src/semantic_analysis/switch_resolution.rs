@@ -12,70 +12,58 @@ struct Context {
     typ: Type,
 }
 
-pub fn resolve_program(program: Program<Labelled>) -> ValidationResult<Program<SwitchResolved>> {
-    let program = match program {
-        Program::Program(func_decls) => Program::Program(
-            func_decls
-                .into_iter()
-                .map(resolve_decl)
-                .collect::<Result<_, _>>()?,
-        ),
+pub fn resolve_program(program: &mut Program) -> ValidationResult<()> {
+    match program {
+        Program::Program(func_decls) => func_decls.iter_mut().try_for_each(resolve_decl)?,
     };
-    Ok(program)
+    Ok(())
 }
 
-fn resolve_decl(decl: Decl<Labelled>) -> ValidationResult<Decl<SwitchResolved>> {
-    let decl = match decl {
-        Decl::FuncDecl(func_decl) => Decl::FuncDecl(resolve_func_decl(func_decl)?),
-        Decl::VarDecl(var_decl) => Decl::VarDecl(var_decl),
+fn resolve_decl(decl: &mut Decl) -> ValidationResult<()> {
+    match decl {
+        Decl::FuncDecl(func_decl) => resolve_func_decl(func_decl)?,
+        Decl::VarDecl(_) => {}
     };
-    Ok(decl)
+    Ok(())
 }
 
-fn resolve_func_decl(func_def: FuncDecl<Labelled>) -> ValidationResult<FuncDecl<SwitchResolved>> {
-    let func_decl = match func_def {
-        FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class) => {
-            let body = body
-                .into_iter()
-                .map(|block_item| resolve_block_item(block_item, &mut None))
-                .collect::<ValidationResult<_>>()?;
-
-            FuncDecl::FuncDecl(name, params, Some(body), typ, storage_class)
-        }
-        FuncDecl::FuncDecl(name, params, None, typ, storage_class) => {
-            FuncDecl::FuncDecl(name, params, None, typ, storage_class)
-        }
-    };
-    Ok(func_decl)
+fn resolve_func_decl(func_def: &mut FuncDecl) -> ValidationResult<()> {
+    if let FuncDecl::FuncDecl(_, _, Some(body), _, _) = func_def {
+        body.iter_mut()
+            .try_for_each(|block_item| resolve_block_item(block_item, &mut None))
+    } else {
+        Ok(())
+    }
 }
 
 fn resolve_block_item(
-    block_item: BlockItem<Labelled>,
+    block_item: &mut BlockItem,
     context: &mut Option<&mut Context>,
-) -> ValidationResult<BlockItem<SwitchResolved>> {
-    let block_item = match block_item {
-        BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, context)?),
-        BlockItem::D(decl) => BlockItem::D(resolve_decl(decl)?),
-    };
-    Ok(block_item)
+) -> ValidationResult<()> {
+    match block_item {
+        BlockItem::S(stmt) => resolve_stmt(stmt, context)?,
+        BlockItem::D(decl) => resolve_decl(decl)?,
+    }
+    Ok(())
 }
 
-fn resolve_stmt(
-    stmt: Stmt<Labelled>,
-    context: &mut Option<&mut Context>,
-) -> ValidationResult<Stmt<SwitchResolved>> {
-    let stmt = match stmt {
-        Stmt::If(cond, then, Some(else_)) => Stmt::If(
-            cond,
-            Box::new(resolve_stmt(*then, context)?),
-            Some(Box::new(resolve_stmt(*else_, context)?)),
-        ),
-        Stmt::If(cond, then, None) => Stmt::If(cond, Box::new(resolve_stmt(*then, context)?), None),
-        Stmt::Labelled(Label::Case(exp), stmt) => {
-            let label = make_label("case");
+fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> ValidationResult<()> {
+    match stmt {
+        Stmt::If(_, then, else_) => {
+            resolve_stmt(then, context)?;
+            if let Some(else_) = else_ {
+                resolve_stmt(else_, context)?;
+            }
+        }
+        Stmt::Labelled(label @ Label::Case(_), stmt) => {
+            let new_label = make_label("case");
+            let Label::Case(exp) = std::mem::replace(label, Label::Ident(new_label.clone())) else {
+                unreachable!()
+            };
+
             if let Some(context) = context.as_mut() {
                 let Exp::Const(c) = exp else {
-                    return Err(ValidationError::NonConstCase(exp));
+                    return Err(ValidationError::NonConstCase(exp.clone()));
                 };
                 let c = match (&context.typ, c) {
                     (Type::Int, Const::Int(i)) => Const::Int(i),
@@ -87,66 +75,47 @@ fn resolve_stmt(
                 if context.cases.contains_key(&c) {
                     return Err(ValidationError::DuplicateCaseValue(c));
                 }
-                context.cases.insert(c, label.clone());
+                context.cases.insert(c, new_label.clone());
             } else {
                 return Err(ValidationError::CaseOutsideSwitch);
             }
 
-            let stmt = Box::new(resolve_stmt(*stmt, context)?);
-            Stmt::Labelled(Label::Ident(label), stmt)
+            resolve_stmt(stmt, context)?;
         }
-        Stmt::Labelled(Label::Default, stmt) => {
-            let label = make_label("default");
+        Stmt::Labelled(label @ Label::Default, stmt) => {
+            let new_label = make_label("default");
+            *label = Label::Ident(new_label.clone());
+
             if let Some(context) = context.as_mut() {
                 match context.default {
                     Some(_) => return Err(ValidationError::DuplicateDefault),
-                    None => context.default = Some(label.clone()),
+                    None => context.default = Some(new_label),
                 }
             } else {
                 return Err(ValidationError::DefaultOutsideSwitch);
             }
 
-            let stmt = Box::new(resolve_stmt(*stmt, context)?);
-            Stmt::Labelled(Label::Ident(label), stmt)
+            resolve_stmt(stmt, context)?;
         }
-        Stmt::Labelled(label, body) => {
-            let body = Box::new(resolve_stmt(*body, context)?);
-            Stmt::Labelled(label, body)
-        }
+        Stmt::Labelled(_, body) => resolve_stmt(body, context)?,
         Stmt::Compound(block) => {
-            let block = block
-                .into_iter()
-                .map(|block_item| resolve_block_item(block_item, context))
-                .collect::<Result<_, _>>()?;
-            Stmt::Compound(block)
+            block
+                .iter_mut()
+                .try_for_each(|block_item| resolve_block_item(block_item, context))?;
         }
-        Stmt::While(cond, body, label) => {
-            let body = Box::new(resolve_stmt(*body, context)?);
-            Stmt::While(cond, body, label)
-        }
-        Stmt::DoWhile(body, cond, label) => {
-            let body = Box::new(resolve_stmt(*body, context)?);
-            Stmt::DoWhile(body, cond, label)
-        }
-        Stmt::For(init, cond, post, body, label) => {
-            let body = Box::new(resolve_stmt(*body, context)?);
-            Stmt::For(init, cond, post, body, label)
-        }
-        Stmt::Switch(cond, body, label, ()) => {
+        Stmt::While(_, body, _) => resolve_stmt(body, context)?,
+        Stmt::DoWhile(body, _, _) => resolve_stmt(body, context)?,
+        Stmt::For(_, _, _, body, _) => resolve_stmt(body, context)?,
+        Stmt::Switch(cond, body, _, _) => {
             let mut new_context = Context {
                 cases: FxHashMap::default(),
                 default: None,
                 typ: cond.typ().clone(),
             };
-            let body = Box::new(resolve_stmt(*body, &mut Some(&mut new_context))?);
-            Stmt::Switch(cond, body, label, (new_context.cases, new_context.default))
+            resolve_stmt(body, &mut Some(&mut new_context))?;
         }
-        Stmt::Return(exp) => Stmt::Return(exp),
-        Stmt::Goto(label) => Stmt::Goto(label),
-        Stmt::Expression(exp) => Stmt::Expression(exp),
-        Stmt::Break(label) => Stmt::Break(label),
-        Stmt::Continue(label) => Stmt::Continue(label),
-        Stmt::Null => Stmt::Null,
+        // Return, Goto, Expression, Break, Continue, Null
+        _ => {}
     };
-    Ok(stmt)
+    Ok(())
 }
