@@ -110,7 +110,7 @@ fn emit_block_item(
 }
 
 fn emit_var_decl(var_decl: VarDecl, instructions: &mut Vec<Instruction>, symbols: &mut Symbols) {
-    if let VarDecl::VarDecl(name, Some(exp), typ, StorageClass::None) = var_decl {
+    if let VarDecl::VarDecl(name, Some(exp), _, StorageClass::None) = var_decl {
         let result = emit_exp(exp, instructions, symbols);
         instructions.push(Instruction::Copy(result, tacky::Val::Var(name)));
     }
@@ -236,10 +236,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             instructions.push(Instruction::Label(break_label));
         }
         Stmt::Null => {}
-        other => {
-            println!("{other:?}");
-            panic!()
-        }
+        other => panic!(),
     }
 }
 

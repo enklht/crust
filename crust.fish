@@ -8,6 +8,7 @@ argparse \
     v/validate \
     t/tacky \
     g/codegen \
+    e/emit \
     h/help \
     -- $argv
 or exit
@@ -21,6 +22,7 @@ if set -q _flag_help
     printf "  -v, --validate         Stop after validation stage\n"
     printf "  -t, --tacky            Stop after tacky generation stage\n"
     printf "  -g, --codegen          Stop after code generation stage\n"
+    printf "  -e, --emit             Stop after code emission stage\n"
     printf "  -h, --help             Show this help message\n"
     exit 0
 end
@@ -49,6 +51,8 @@ else if set -q _flag_tacky
     set flag --tacky
 else if set -q _flag_codegen
     set flag --codegen
+else if set -q _flag_emit
+    set flag --emit
 end
 
 # Set compile-only flag

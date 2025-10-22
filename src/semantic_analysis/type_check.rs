@@ -176,7 +176,6 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                     if init.is_some() {
                         return Err(ValidationError::ExternVarWithInitializer(name.clone()));
                     }
-                    println!("{:?}", symbols.get(name));
                     match symbols.get(name) {
                         Some(Symbol::Func { typ: old_typ, .. }) => {
                             return Err(ValidationError::IncompatibleVarDecl(

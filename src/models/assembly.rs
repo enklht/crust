@@ -7,13 +7,16 @@ pub enum Program {
     Program(Vec<TopLevel>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Display)]
 pub enum AssemblyType {
+    #[display("b")]
+    Byte,
+    #[display("l")]
     Longword,
+    #[display("q")]
     Quadword,
 }
 
-#[derive(Debug)]
 pub enum TopLevel {
     Function(String, bool, Vec<Instruction>, Option<usize>),
     StaticVar(String, bool, usize, StaticInit),
@@ -41,56 +44,34 @@ pub enum Instruction {
 
 #[derive(Debug, Display)]
 pub enum UnaryOp {
-    #[display("negl")]
+    #[display("neg")]
     Neg,
-    #[display("notl")]
+    #[display("not")]
     Not,
 }
 
 #[derive(Debug, Display)]
 pub enum BinaryOp {
-    #[display("addl")]
+    #[display("add")]
     Add,
-    #[display("subl")]
+    #[display("sub")]
     Subtract,
-    #[display("imull")]
+    #[display("imul")]
     Multiply,
-    #[display("andl")]
+    #[display("and")]
     BitAnd,
-    #[display("orl")]
+    #[display("or")]
     BitOr,
-    #[display("xorl")]
+    #[display("xor")]
     BitXor,
 }
-
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Clone)]
 pub enum Operand {
-    #[display("${_0}")]
     Imm(i64),
-    #[display("{}", _0.four_byte())]
     Reg(Reg),
-    #[display("<pseudo register will never be emit>")]
     Pseudo(String),
-    #[display("{_0}(%rbp)")]
     Stack(isize),
-    #[display("{_0}(%rip)")]
     Data(String),
-}
-
-impl Operand {
-    pub fn one_byte(self) -> String {
-        match self {
-            Operand::Reg(reg) => reg.one_byte(),
-            other => other.to_string(),
-        }
-    }
-
-    pub fn eight_byte(self) -> String {
-        match self {
-            Operand::Reg(reg) => reg.eight_byte(),
-            other => other.to_string(),
-        }
-    }
 }
 
 #[derive(Debug, Display)]
@@ -123,52 +104,122 @@ pub enum Reg {
     SP,
 }
 
+pub fn fmt<'a>(op: &'a Operand, typ: AssemblyType) -> OperandFmt<'a> {
+    OperandFmt { op, typ }
+}
+
+pub struct OperandFmt<'a> {
+    op: &'a Operand,
+    typ: AssemblyType,
+}
+
+impl<'a> std::fmt::Display for OperandFmt<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.typ {
+            AssemblyType::Byte => self.op.one_byte(f),
+            AssemblyType::Longword => self.op.four_byte(f),
+            AssemblyType::Quadword => self.op.eight_byte(f),
+        }
+    }
+}
+
+impl Operand {
+    pub fn one_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operand::Reg(reg) => reg.one_byte(f),
+            Operand::Imm(val) => write!(f, "${}", val),
+            Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
+            Operand::Data(label) => write!(f, "{}(%rip)", label),
+            Operand::Pseudo(_) => panic!("<pseudo register will never be emit>"),
+        }
+    }
+
+    pub fn four_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operand::Reg(reg) => reg.four_byte(f),
+            Operand::Imm(val) => write!(f, "${}", val),
+            Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
+            Operand::Data(label) => write!(f, "{}(%rip)", label),
+            Operand::Pseudo(_) => panic!("<pseudo register will never be emit>"),
+        }
+    }
+
+    pub fn eight_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operand::Reg(reg) => reg.eight_byte(f),
+            Operand::Imm(val) => write!(f, "${}", val),
+            Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
+            Operand::Data(label) => write!(f, "{}(%rip)", label),
+            Operand::Pseudo(_) => panic!("<pseudo register will never be emit>"),
+        }
+    }
+}
+
 impl Reg {
-    fn eight_byte(&self) -> String {
+    pub fn one_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Reg::AX => "%rax",
-            Reg::CX => "%rcx",
-            Reg::DX => "%rdx",
-            Reg::DI => "%rdi",
-            Reg::SI => "%rsi",
-            Reg::R8 => "%r8",
-            Reg::R9 => "%r9",
-            Reg::R10 => "%r10",
-            Reg::R11 => "%r11",
-            Reg::SP => "%rsp",
+            Reg::AX => write!(f, "%al"),
+            Reg::CX => write!(f, "%cl"),
+            Reg::DX => write!(f, "%dl"),
+            Reg::DI => write!(f, "%dil"),
+            Reg::SI => write!(f, "%sil"),
+            Reg::R8 => write!(f, "%r8b"),
+            Reg::R9 => write!(f, "%r9b"),
+            Reg::R10 => write!(f, "%r10b"),
+            Reg::R11 => write!(f, "%r11b"),
+            Reg::SP => write!(f, "%spl"),
         }
-        .to_string()
     }
 
-    fn four_byte(&self) -> String {
+    fn four_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Reg::AX => "%eax",
-            Reg::CX => "%ecx",
-            Reg::DX => "%edx",
-            Reg::DI => "%edi",
-            Reg::SI => "%esi",
-            Reg::R8 => "%r8d",
-            Reg::R9 => "%r9d",
-            Reg::R10 => "%r10d",
-            Reg::R11 => "%r11d",
-            _ => panic!(),
+            Reg::AX => write!(f, "%eax"),
+            Reg::CX => write!(f, "%ecx"),
+            Reg::DX => write!(f, "%edx"),
+            Reg::DI => write!(f, "%edi"),
+            Reg::SI => write!(f, "%esi"),
+            Reg::R8 => write!(f, "%r8d"),
+            Reg::R9 => write!(f, "%r9d"),
+            Reg::R10 => write!(f, "%r10d"),
+            Reg::R11 => write!(f, "%r11d"),
+            Reg::SP => write!(f, "%esp"),
         }
-        .to_string()
     }
 
-    fn one_byte(&self) -> String {
+    fn eight_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Reg::AX => "%al",
-            Reg::CX => "%cl",
-            Reg::DX => "%dl",
-            Reg::DI => "%dil",
-            Reg::SI => "%sil",
-            Reg::R8 => "%r8b",
-            Reg::R9 => "%r9b",
-            Reg::R10 => "%r10b",
-            Reg::R11 => "%r11b",
-            _ => panic!(),
+            Reg::AX => write!(f, "%rax"),
+            Reg::CX => write!(f, "%rcx"),
+            Reg::DX => write!(f, "%rdx"),
+            Reg::DI => write!(f, "%rdi"),
+            Reg::SI => write!(f, "%rsi"),
+            Reg::R8 => write!(f, "%r8"),
+            Reg::R9 => write!(f, "%r9"),
+            Reg::R10 => write!(f, "%r10"),
+            Reg::R11 => write!(f, "%r11"),
+            Reg::SP => write!(f, "%rsp"),
         }
-        .to_string()
+    }
+}
+
+impl std::fmt::Debug for TopLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            TopLevel::Function(name, global, instructions, _) => {
+                write!(
+                    f,
+                    "\n    name: {name}
+    global: {global:?}
+    instructions:
+{}",
+                    instructions
+                        .iter()
+                        .fold(String::new(), |acc, i| acc + &format!("        {i:?},\n"))
+                )
+            }
+            TopLevel::StaticVar(name, global, _, init) => {
+                write!(f, "\n    static {name} := {init:?}, (global: {global})")
+            }
+        }
     }
 }

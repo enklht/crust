@@ -49,10 +49,10 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Mov(reg!(AX), dst, Quadword),
             ]);
         }
-        Instruction::Mov(_src @ Operand::Imm(i), dst, Longword) => {
+        Instruction::Mov(Operand::Imm(i), dst, Longword) if !fits_in_i32(&i) => {
             acc.extend([
-                Instruction::Mov(Operand::Imm(i & 0xffffffff), reg!(AX), Quadword),
-                Instruction::Mov(reg!(AX), dst, Quadword),
+                Instruction::Mov(Operand::Imm(i & 0xffffffff), reg!(AX), Longword),
+                Instruction::Mov(reg!(AX), dst, Longword),
             ]);
         }
         Instruction::Movsx(src @ Operand::Imm(_), dst @ memory!()) => {

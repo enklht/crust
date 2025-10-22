@@ -1,5 +1,5 @@
 mod asm_generation;
-// mod code_emission;
+mod code_emission;
 mod error_reporting;
 mod lexer;
 mod models;
@@ -34,6 +34,7 @@ enum CompilerMode {
     Validate,
     Tacky,
     Codegen,
+    Emit,
     Full,
 }
 
@@ -103,17 +104,22 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let asm_ast = asm_generation::codegen(tacky, symbols);
+    let (asm_ast, asm_symbols) = asm_generation::codegen(tacky, symbols);
 
     if opts.mode == CompilerMode::Codegen {
         println!("{asm_ast:#?}");
         return Ok(());
     }
 
-    // let asm_text = code_emission::emit(asm_ast, &symbols);
-    //
-    // let output = opts.output.unwrap_or(opts.input.with_extension("s"));
-    // fs::write(&output, asm_text)?;
+    let asm_text = code_emission::emit(asm_ast, &asm_symbols);
+
+    if opts.mode == CompilerMode::Emit {
+        println!("{asm_text}");
+        return Ok(());
+    }
+
+    let output = opts.output.unwrap_or(opts.input.with_extension("s"));
+    fs::write(&output, asm_text)?;
 
     Ok(())
 }

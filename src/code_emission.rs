@@ -1,18 +1,15 @@
+use crate::models::asm_symbol::AsmSymbols;
 use crate::models::assembly::*;
-use crate::models::symbol::Symbols;
+use crate::models::symbol::StaticInit;
 use std::fmt::Write;
 
-pub fn emit(program: Program<Plain>, symbols: &Symbols) -> String {
+pub fn emit(program: Program, symbols: &AsmSymbols) -> String {
     let mut acc = String::new();
     emit_program(program, &mut acc, symbols).unwrap();
     acc
 }
 
-fn emit_program(
-    program: Program<Plain>,
-    acc: &mut impl Write,
-    symbols: &Symbols,
-) -> std::fmt::Result {
+fn emit_program(program: Program, acc: &mut impl Write, symbols: &AsmSymbols) -> std::fmt::Result {
     let Program::Program(top_levels) = program;
     for top_level in top_levels {
         emit_top_level(top_level, acc, symbols)?;
@@ -21,9 +18,9 @@ fn emit_program(
 }
 
 fn emit_top_level(
-    top_level: TopLevel<Plain>,
+    top_level: TopLevel,
     acc: &mut impl Write,
-    symbols: &Symbols,
+    symbols: &AsmSymbols,
 ) -> std::fmt::Result {
     match top_level {
         TopLevel::Function(name, global, instructions, _) => {
@@ -36,17 +33,23 @@ fn emit_top_level(
             writeln!(acc, "    movq %rsp, %rbp")?;
             emit_instructions(instructions, acc, symbols)
         }
-        TopLevel::StaticVar(name, global, init) => {
+        TopLevel::StaticVar(name, global, alignment, init) => {
             if global {
                 writeln!(acc, "    .globl {name}")?;
             }
-            writeln!(acc, "    .data")?;
-            writeln!(acc, "    .balign 4")?;
+            match init {
+                StaticInit::IntInit(0) => writeln!(acc, "    .bss")?,
+                StaticInit::LongInit(0) => writeln!(acc, "    .bss")?,
+                StaticInit::IntInit(_) => writeln!(acc, "    .data")?,
+                StaticInit::LongInit(_) => writeln!(acc, "    .data")?,
+            }
+            writeln!(acc, "    .balign {alignment}")?;
             writeln!(acc, "{name}:")?;
-            if init == 0 {
-                writeln!(acc, "    .zero 4")
-            } else {
-                writeln!(acc, "    .long {init}")
+            match init {
+                StaticInit::IntInit(0) => writeln!(acc, "    .zero 4"),
+                StaticInit::IntInit(i) => writeln!(acc, "    .long {i}"),
+                StaticInit::LongInit(0) => writeln!(acc, "    .zero 8"),
+                StaticInit::LongInit(i) => writeln!(acc, "    .quad {i}"),
             }
         }
     }
@@ -55,25 +58,40 @@ fn emit_top_level(
 fn emit_instructions(
     instructions: Vec<Instruction>,
     acc: &mut impl Write,
-    symbols: &Symbols,
+    symbols: &AsmSymbols,
 ) -> std::fmt::Result {
+    use AssemblyType::*;
     for instruction in instructions {
         match instruction {
-            Instruction::Mov(src, dst) => writeln!(acc, "    movl {src}, {dst}")?,
-            Instruction::Unary(op, operand) => writeln!(acc, "    {op} {operand}")?,
-            Instruction::Binary(op, src, dst) => writeln!(acc, "    {op} {src}, {dst}")?,
-            Instruction::Cmp(src, dst) => writeln!(acc, "    cmpl {src}, {dst}")?,
-            Instruction::Idiv(op) => writeln!(acc, "    idivl {op}")?,
-            Instruction::Cdq => writeln!(acc, "    cdq")?,
-            Instruction::Shl(dst) => writeln!(acc, "    sall %cl, {dst}")?,
-            Instruction::Shr(dst) => writeln!(acc, "    sarl %cl, {dst}")?,
+            Instruction::Mov(src, dst, typ) => {
+                writeln!(acc, "    mov{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
+            }
+            Instruction::Movsx(src, dst) => writeln!(
+                acc,
+                "    movslq {}, {}",
+                fmt(&src, Longword),
+                fmt(&dst, Quadword)
+            )?,
+            Instruction::Unary(op, operand, typ) => {
+                writeln!(acc, "    {op}{typ} {}", fmt(&operand, typ))?
+            }
+            Instruction::Binary(op, src, dst, typ) => {
+                writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
+            }
+            Instruction::Cmp(src, dst, typ) => {
+                writeln!(acc, "    cmp{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
+            }
+            Instruction::Idiv(op, typ) => writeln!(acc, "    idiv{typ} {}", fmt(&op, typ),)?,
+            Instruction::Cdq(AssemblyType::Byte) => panic!(),
+            Instruction::Cdq(AssemblyType::Longword) => writeln!(acc, "    cdq")?,
+            Instruction::Cdq(AssemblyType::Quadword) => writeln!(acc, "    cqo")?,
+            Instruction::Shl(dst, typ) => writeln!(acc, "    sal{typ} %cl, {}", fmt(&dst, typ))?,
+            Instruction::Shr(dst, typ) => writeln!(acc, "    sar{typ} %cl, {}", fmt(&dst, typ))?,
             Instruction::Jmp(label) => writeln!(acc, "    jmp .L{label}")?,
             Instruction::JmpCC(code, label) => writeln!(acc, "    j{code} .L{label}")?,
-            Instruction::SetCC(code, op) => writeln!(acc, "    set{code} {}", op.one_byte())?,
+            Instruction::SetCC(code, op) => writeln!(acc, "    set{code} {}", fmt(&op, Byte))?,
             Instruction::Label(label) => writeln!(acc, ".L{label}:")?,
-            Instruction::AllocateStack(size) => writeln!(acc, "    subq ${size}, %rsp")?,
-            Instruction::DeallocateStack(size) => writeln!(acc, "    addq ${size}, %rsp")?,
-            Instruction::Push(op) => writeln!(acc, "    pushq {}", op.eight_byte())?,
+            Instruction::Push(op) => writeln!(acc, "    pushq {}", fmt(&op, Quadword))?,
             Instruction::Call(name) => {
                 if symbols.contains_key(&name) {
                     writeln!(acc, "    call {name}")?;
@@ -90,4 +108,3 @@ fn emit_instructions(
     }
     Ok(())
 }
-
