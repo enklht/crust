@@ -75,12 +75,6 @@ fn replace_pseudos_in_instruction(
         Instruction::Idiv(op, _) => {
             replace_operand(op, state, symbols);
         }
-        Instruction::Shl(dst, _) => {
-            replace_operand(dst, state, symbols);
-        }
-        Instruction::Shr(dst, _) => {
-            replace_operand(dst, state, symbols);
-        }
         Instruction::Cmp(src, dst, _) => {
             replace_operand(src, state, symbols);
             replace_operand(dst, state, symbols);

@@ -136,14 +136,14 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                         asm_instructions.extend([
                             Instruction::Mov(gen_val(src1), dst.clone(), src1_type),
                             Instruction::Mov(gen_val(src2), reg!(CX), src1_type),
-                            Instruction::Shl(dst, src1_type),
+                            Instruction::Binary(BinaryOp::LShift, reg!(CX), dst, src1_type),
                         ]);
                     }
                     BinOp::RShift => {
                         asm_instructions.extend([
                             Instruction::Mov(gen_val(src1), dst.clone(), src1_type),
                             Instruction::Mov(gen_val(src2), reg!(CX), src1_type),
-                            Instruction::Shr(dst, src1_type),
+                            Instruction::Binary(BinaryOp::RShift, reg!(CX), dst, src1_type),
                         ]);
                     }
                     BinOp::Equal

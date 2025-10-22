@@ -31,8 +31,6 @@ pub enum Instruction {
     Cmp(Operand, Operand, AssemblyType),
     Idiv(Operand, AssemblyType),
     Cdq(AssemblyType),
-    Shl(Operand, AssemblyType),
-    Shr(Operand, AssemblyType),
     Jmp(String),
     JmpCC(CondCode, String),
     SetCC(CondCode, Operand),
@@ -64,7 +62,12 @@ pub enum BinaryOp {
     BitOr,
     #[display("xor")]
     BitXor,
+    #[display("sal")]
+    LShift,
+    #[display("sar")]
+    RShift,
 }
+
 #[derive(Debug, Clone)]
 pub enum Operand {
     Imm(i64),
@@ -130,7 +133,7 @@ impl Operand {
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
             Operand::Data(label) => write!(f, "{}(%rip)", label),
-            Operand::Pseudo(_) => panic!("<pseudo register will never be emit>"),
+            Operand::Pseudo(_) => panic!("pseudo register will never be emit"),
         }
     }
 
@@ -140,7 +143,7 @@ impl Operand {
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
             Operand::Data(label) => write!(f, "{}(%rip)", label),
-            Operand::Pseudo(_) => panic!("<pseudo register will never be emit>"),
+            Operand::Pseudo(_) => panic!("pseudo register will never be emit"),
         }
     }
 
@@ -150,7 +153,7 @@ impl Operand {
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
             Operand::Data(label) => write!(f, "{}(%rip)", label),
-            Operand::Pseudo(_) => panic!("<pseudo register will never be emit>"),
+            Operand::Pseudo(_) => panic!("pseudo register will never be emit"),
         }
     }
 }

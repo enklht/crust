@@ -75,6 +75,12 @@ fn emit_instructions(
             Instruction::Unary(op, operand, typ) => {
                 writeln!(acc, "    {op}{typ} {}", fmt(&operand, typ))?
             }
+            Instruction::Binary(BinaryOp::LShift, _, dst, typ) => {
+                writeln!(acc, "    sal{typ} %cl, {}", fmt(&dst, typ))?
+            }
+            Instruction::Binary(BinaryOp::RShift, _, dst, typ) => {
+                writeln!(acc, "    sar{typ} %cl, {}", fmt(&dst, typ))?
+            }
             Instruction::Binary(op, src, dst, typ) => {
                 writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
             }
@@ -85,8 +91,6 @@ fn emit_instructions(
             Instruction::Cdq(AssemblyType::Byte) => panic!(),
             Instruction::Cdq(AssemblyType::Longword) => writeln!(acc, "    cdq")?,
             Instruction::Cdq(AssemblyType::Quadword) => writeln!(acc, "    cqo")?,
-            Instruction::Shl(dst, typ) => writeln!(acc, "    sal{typ} %cl, {}", fmt(&dst, typ))?,
-            Instruction::Shr(dst, typ) => writeln!(acc, "    sar{typ} %cl, {}", fmt(&dst, typ))?,
             Instruction::Jmp(label) => writeln!(acc, "    jmp .L{label}")?,
             Instruction::JmpCC(code, label) => writeln!(acc, "    j{code} .L{label}")?,
             Instruction::SetCC(code, op) => writeln!(acc, "    set{code} {}", fmt(&op, Byte))?,
