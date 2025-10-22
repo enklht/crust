@@ -12,7 +12,7 @@ pub enum Decl {
     VarDecl(VarDecl),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum FuncDecl {
     FuncDecl(String, Vec<String>, Option<Block>, Type, StorageClass),
 }
@@ -134,4 +134,22 @@ pub enum BinaryOp {
 pub enum Const {
     Int(i32),
     Long(i64),
+}
+
+impl std::fmt::Debug for FuncDecl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FuncDecl::FuncDecl(name, params, body, typ, storage_class) => {
+                writeln!(f, "name: {name}")?;
+                writeln!(f, "type: {typ:?}")?;
+                writeln!(f, "storage_class: {storage_class:?}")?;
+                writeln!(f, "params: {params:?}")?;
+                if let Some(body) = body {
+                    write!(f, "instructions: {:?}", crate::utils::PrettyVec(body))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
 }

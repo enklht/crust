@@ -100,7 +100,7 @@ fn main() -> Result<(), CrustError> {
     let tacky = tacky_generation::convert_program(validated_ast, &mut symbols);
 
     if opts.mode == CompilerMode::Tacky {
-        println!("{tacky:?}");
+        println!("{tacky:#?}");
         return Ok(());
     }
 

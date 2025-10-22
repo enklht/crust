@@ -216,8 +216,8 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                         asm_instructions.push(Instruction::Push(arg))
                     } else {
                         asm_instructions.extend([
-                            Instruction::Mov(arg.clone(), reg!(AX), asm_type),
-                            Instruction::Push(arg),
+                            Instruction::Mov(arg.clone(), reg!(AX), AssemblyType::Longword),
+                            Instruction::Push(reg!(AX)),
                         ])
                     }
                 }

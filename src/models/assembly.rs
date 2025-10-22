@@ -206,19 +206,17 @@ impl std::fmt::Debug for TopLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             TopLevel::Function(name, global, instructions, _) => {
+                writeln!(f, "\nname: {name}")?;
+                writeln!(f, "global: {global}")?;
                 write!(
                     f,
-                    "\n    name: {name}
-    global: {global:?}
-    instructions:
-{}",
-                    instructions
-                        .iter()
-                        .fold(String::new(), |acc, i| acc + &format!("        {i:?},\n"))
+                    "instructions: {:?}",
+                    crate::utils::PrettyVec(instructions)
                 )
             }
             TopLevel::StaticVar(name, global, _, init) => {
-                write!(f, "\n    static {name} := {init:?}, (global: {global})")
+                writeln!(f, "\nstatic {name} := {init:?}")?;
+                write!(f, "global: {global}")
             }
         }
     }

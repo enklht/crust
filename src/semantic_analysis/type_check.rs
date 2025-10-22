@@ -4,6 +4,20 @@ use crate::models::ast::*;
 use crate::models::symbol::*;
 use crate::models::typ::Type;
 
+fn get_common_type(typ1: &Type, typ2: &Type) -> Type {
+    if typ1 == typ2 {
+        typ1.clone()
+    } else {
+        Type::Long
+    }
+}
+
+fn convert_to(exp: &mut Exp, typ: &Type) {
+    if exp.typ() != typ {
+        *exp = Exp::Cast(typ.clone(), Box::new(exp.clone()))
+    }
+}
+
 pub fn check_program(program: &mut Program) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
     match program {
@@ -71,7 +85,7 @@ fn check_func_decl(
                 }
             };
 
-            let Type::Func(param_types, _) = typ.clone() else {
+            let Type::Func(param_types, ret_type) = typ.clone() else {
                 unreachable!()
             };
 
@@ -87,7 +101,7 @@ fn check_func_decl(
                 for (param, param_type) in params.iter().zip(param_types) {
                     symbols.insert(param.clone(), Symbol::LocalVar { typ: param_type });
                 }
-                check_block(body, symbols)?;
+                check_block(body, symbols, &*ret_type)?;
             }
         }
     }
@@ -247,48 +261,53 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
     }
 }
 
-fn check_block(block: &mut Block, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_block(block: &mut Block, symbols: &mut Symbols, ret_type: &Type) -> ValidationResult<()> {
     block
         .iter_mut()
-        .try_for_each(|block_item| check_block_item(block_item, symbols))
+        .try_for_each(|block_item| check_block_item(block_item, symbols, ret_type))
 }
 
-fn check_block_item(block_item: &mut BlockItem, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_block_item(
+    block_item: &mut BlockItem,
+    symbols: &mut Symbols,
+    ret_type: &Type,
+) -> ValidationResult<()> {
     match block_item {
-        BlockItem::S(stmt) => check_stmt(stmt, symbols),
+        BlockItem::S(stmt) => check_stmt(stmt, symbols, ret_type),
         BlockItem::D(decl) => check_local_decl(decl, symbols),
     }
 }
 
-fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols) -> ValidationResult<()> {
+fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols, ret_type: &Type) -> ValidationResult<()> {
     match stmt {
         Stmt::Return(exp) => {
             check_exp(exp, symbols)?;
+            convert_to(exp, ret_type);
         }
         Stmt::Expression(exp) => {
             check_exp(exp, symbols)?;
         }
         Stmt::If(cond, then, Some(else_)) => {
             check_exp(cond, symbols)?;
-            check_stmt(then, symbols)?;
-            check_stmt(else_, symbols)?;
+            check_stmt(then, symbols, ret_type)?;
+            check_stmt(else_, symbols, ret_type)?;
         }
         Stmt::If(cond, then, None) => {
             check_exp(cond, symbols)?;
-            check_stmt(then, symbols)?;
+            check_stmt(then, symbols, ret_type)?;
         }
         Stmt::Labelled(_, stmt) => {
-            check_stmt(stmt, symbols)?;
+            check_stmt(stmt, symbols, ret_type)?;
         }
         Stmt::Compound(block) => {
-            check_block(block, symbols)?;
+            check_block(block, symbols, ret_type)?;
         }
         Stmt::While(cond, body, _) => {
             check_exp(cond, symbols)?;
-            check_stmt(body, symbols)?;
+            check_stmt(body, symbols, ret_type)?;
         }
         Stmt::DoWhile(body, cond, _) => {
-            check_stmt(body, symbols)?;
+            check_stmt(body, symbols, ret_type)?;
             check_exp(cond, symbols)?;
         }
         Stmt::For(init, cond, post, body, _) => {
@@ -299,11 +318,11 @@ fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols) -> ValidationResult<()> {
             if let Some(post) = post {
                 check_exp(post, symbols)?;
             }
-            check_stmt(body, symbols)?;
+            check_stmt(body, symbols, ret_type)?;
         }
         Stmt::Switch(cond, body, _, _) => {
             check_exp(cond, symbols)?;
-            check_stmt(body, symbols)?;
+            check_stmt(body, symbols, ret_type)?;
         }
         // Goto, Break, Continue, Null
         _ => {}
@@ -370,7 +389,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 convert_to(e2, &common_type);
                 match op {
                     Add | Subtract | Multiply | Divide | Remainder | LShift | RShift | BitAnd
-                    | BitOr => *typ = Some(common_type),
+                    | BitOr | BitXor => *typ = Some(common_type),
                     _ => *typ = Some(Type::Int),
                 };
             }
@@ -379,7 +398,10 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(cond, symbols)?;
             check_exp(then, symbols)?;
             check_exp(else_, symbols)?;
-            *typ = Some(Type::Int);
+            let common_type = get_common_type(then.typ(), else_.typ());
+            convert_to(then, &common_type);
+            convert_to(else_, &common_type);
+            *typ = Some(common_type);
         }
         Exp::FuncCall(name, args, typ) => {
             let Symbol::Func {
@@ -409,18 +431,4 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
         }
     };
     Ok(())
-}
-
-fn get_common_type(typ1: &Type, typ2: &Type) -> Type {
-    if typ1 == typ2 {
-        typ1.clone()
-    } else {
-        Type::Long
-    }
-}
-
-fn convert_to(exp: &mut Exp, typ: &Type) {
-    if exp.typ() != typ {
-        *exp = Exp::Cast(typ.clone(), Box::new(exp.clone()))
-    }
 }
