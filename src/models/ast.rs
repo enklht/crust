@@ -106,8 +106,6 @@ pub enum UnaryOp {
     Negate,
     BitNot,
     Not,
-    PostfixIncrement,
-    PostfixDecrement,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

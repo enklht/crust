@@ -97,22 +97,23 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
 
             resolve_stmt(stmt, context)?;
         }
-        Stmt::Labelled(_, body) => resolve_stmt(body, context)?,
         Stmt::Compound(block) => {
             block
                 .iter_mut()
                 .try_for_each(|block_item| resolve_block_item(block_item, context))?;
         }
-        Stmt::While(_, body, _) => resolve_stmt(body, context)?,
-        Stmt::DoWhile(body, _, _) => resolve_stmt(body, context)?,
-        Stmt::For(_, _, _, body, _) => resolve_stmt(body, context)?,
-        Stmt::Switch(cond, body, _, _) => {
+        Stmt::Labelled(_, body)
+        | Stmt::While(_, body, _)
+        | Stmt::DoWhile(body, _, _)
+        | Stmt::For(_, _, _, body, _) => resolve_stmt(body, context)?,
+        Stmt::Switch(cond, body, _, info) => {
             let mut new_context = Context {
                 cases: FxHashMap::default(),
                 default: None,
                 typ: cond.typ().clone(),
             };
             resolve_stmt(body, &mut Some(&mut new_context))?;
+            *info = Some((new_context.cases, new_context.default));
         }
         // Return, Goto, Expression, Break, Continue, Null
         _ => {}

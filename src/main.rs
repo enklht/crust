@@ -5,7 +5,7 @@ mod lexer;
 mod models;
 mod parser;
 mod semantic_analysis;
-// mod tacky_generation;
+mod tacky_generation;
 mod utils;
 
 use bpaf::*;
@@ -83,7 +83,7 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let (validated_ast, symbols) = match semantic_analysis::validate(ast) {
+    let (validated_ast, mut symbols) = match semantic_analysis::validate(ast) {
         Ok(program) => program,
         Err(e) => {
             eprintln!("Validation error: {e}");
@@ -97,13 +97,13 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    // let tacky = tacky_generation::convert_program(validated_ast, &symbols);
-    //
-    // if opts.mode == CompilerMode::Tacky {
-    //     println!("{:?}", tacky);
-    //     return Ok(());
-    // }
-    //
+    let tacky = tacky_generation::convert_program(validated_ast, &mut symbols);
+
+    if opts.mode == CompilerMode::Tacky {
+        println!("{:?}", tacky);
+        return Ok(());
+    }
+
     // let asm_ast = asm_generation::codegen(tacky, &symbols);
     //
     // if opts.mode == CompilerMode::Codegen {

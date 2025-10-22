@@ -1,3 +1,6 @@
+use crate::models::ast::Const;
+use crate::models::symbol::StaticInit;
+
 #[derive(Debug)]
 pub enum Program {
     Program(Vec<TopLevel>),
@@ -5,12 +8,14 @@ pub enum Program {
 
 pub enum TopLevel {
     Function(String, bool, Vec<String>, Vec<Instruction>),
-    StaticVar(String, bool, i32),
+    StaticVar(String, bool, StaticInit),
 }
 
 #[derive(Debug)]
 pub enum Instruction {
     Return(Val),
+    SignExtend(Val, Val),
+    Truncate(Val, Val),
     Unary(UnaryOp, Val, Val),
     Binary(BinaryOp, Val, Val, Val),
     Copy(Val, Val),
@@ -23,7 +28,7 @@ pub enum Instruction {
 
 #[derive(Debug, Clone)]
 pub enum Val {
-    Const(i32),
+    Const(Const),
     Var(String),
 }
 
@@ -70,7 +75,7 @@ impl std::fmt::Debug for TopLevel {
                 )
             }
             TopLevel::StaticVar(name, global, init) => {
-                write!(f, "\n    static {name} := {init}, (global: {global})")
+                write!(f, "\n    static {name} := {init:?}, (global: {global})")
             }
         }
     }

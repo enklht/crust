@@ -242,12 +242,6 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
             None => return Err(ValidationError::UndefinedVariable(name.clone())),
         },
         Exp::Cast(_, exp) => resolve_exp(exp, scope_manager)?,
-        Exp::Unary(UnaryOp::PostfixIncrement | UnaryOp::PostfixDecrement, exp, _) => {
-            match exp.as_mut() {
-                e @ Exp::Var(_, _) => resolve_exp(e, scope_manager)?,
-                other => return Err(ValidationError::InvalidLvalue(other.clone())),
-            }
-        }
         Exp::Unary(_, exp, _) => resolve_exp(exp, scope_manager)?,
         Exp::Binary(_, e1, e2, _) => {
             resolve_exp(e1, scope_manager)?;

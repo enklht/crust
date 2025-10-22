@@ -35,11 +35,28 @@ where
         ));
 
         atom.pratt((
-            postfix(
-                14,
-                one_of([Token::DoublePlus, Token::DoubleHyphen]),
-                |v, op, _| Exp::Unary(convert_unop(op), Box::new(v), None),
-            ),
+            postfix(14, just(Token::DoublePlus), |v: Exp, _, _| {
+                binary(
+                    BinaryOp::Subtract,
+                    Exp::Assignment(
+                        Box::new(v.clone()),
+                        Box::new(binary(BinaryOp::Add, v, Exp::Const(Const::Int(1)))),
+                        None,
+                    ),
+                    Exp::Const(Const::Int(1)),
+                )
+            }),
+            postfix(14, just(Token::DoubleHyphen), |v: Exp, _, _| {
+                binary(
+                    BinaryOp::Add,
+                    Exp::Assignment(
+                        Box::new(v.clone()),
+                        Box::new(binary(BinaryOp::Subtract, v, Exp::Const(Const::Int(1)))),
+                        None,
+                    ),
+                    Exp::Const(Const::Int(1)),
+                )
+            }),
             prefix(13, just(Token::DoublePlus), |_, v: Exp, _| {
                 Exp::Assignment(
                     Box::new(v.clone()),
@@ -187,8 +204,6 @@ fn convert_unop(token: Token) -> UnaryOp {
         Token::Hyphen => UnaryOp::Negate,
         Token::Tilde => UnaryOp::BitNot,
         Token::Bang => UnaryOp::Not,
-        Token::DoublePlus => UnaryOp::PostfixIncrement,
-        Token::DoubleHyphen => UnaryOp::PostfixDecrement,
         _ => unreachable!(),
     }
 }
