@@ -236,35 +236,35 @@ fn resolve_for_init(init: &mut ForInit, scope_manager: &mut ScopeManager) -> Val
 fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
     match exp {
         Exp::Const(_) => {}
-        Exp::Assignment(left, right) => match left.as_mut() {
-            left @ Exp::Var(_) => {
+        Exp::Assignment(left, right, _) => match left.as_mut() {
+            left @ Exp::Var(_, _) => {
                 resolve_exp(left, scope_manager)?;
                 resolve_exp(right, scope_manager)?;
             }
             other => return Err(ValidationError::InvalidLvalue(other.clone())),
         },
-        Exp::Var(name) => match scope_manager.get(name) {
+        Exp::Var(name, _) => match scope_manager.get(name) {
             Some((unique_name, _)) => *name = unique_name.clone(),
             None => return Err(ValidationError::UndefinedVariable(name.clone())),
         },
         Exp::Cast(_, exp) => resolve_exp(exp, scope_manager)?,
-        Exp::Unary(UnaryOp::PostfixIncrement | UnaryOp::PostfixDecrement, exp) => {
+        Exp::Unary(UnaryOp::PostfixIncrement | UnaryOp::PostfixDecrement, exp, _) => {
             match exp.as_mut() {
-                e @ Exp::Var(_) => resolve_exp(e, scope_manager)?,
+                e @ Exp::Var(_, _) => resolve_exp(e, scope_manager)?,
                 other => return Err(ValidationError::InvalidLvalue(other.clone())),
             }
         }
-        Exp::Unary(_, exp) => resolve_exp(exp, scope_manager)?,
-        Exp::Binary(_, e1, e2) => {
+        Exp::Unary(_, exp, _) => resolve_exp(exp, scope_manager)?,
+        Exp::Binary(_, e1, e2, _) => {
             resolve_exp(e1, scope_manager)?;
             resolve_exp(e2, scope_manager)?;
         }
-        Exp::Conditional(cond, then, else_) => {
+        Exp::Conditional(cond, then, else_, _) => {
             resolve_exp(cond, scope_manager)?;
             resolve_exp(then, scope_manager)?;
             resolve_exp(else_, scope_manager)?;
         }
-        Exp::FuncCall(name, args) => {
+        Exp::FuncCall(name, args, _) => {
             let Some((new_name, _)) = scope_manager.get(name) else {
                 return Err(ValidationError::UndefinedFunction(name.clone()));
             };

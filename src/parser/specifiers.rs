@@ -1,6 +1,6 @@
 use crate::models::ast::StorageClass;
-use crate::models::symbol::Type;
 use crate::models::token::Token;
+use crate::models::typ::Type;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 

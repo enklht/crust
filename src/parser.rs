@@ -3,8 +3,8 @@ mod specifiers;
 mod utils;
 
 use crate::models::ast::*;
-use crate::models::symbol::Type;
 use crate::models::token::Token;
+use crate::models::typ::Type;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use exp::exp;

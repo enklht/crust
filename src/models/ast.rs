@@ -1,6 +1,5 @@
+use crate::models::typ::Type;
 use rustc_hash::FxHashMap;
-
-use crate::models::symbol::Type;
 
 pub trait AstEx {
     type Label: std::fmt::Debug + Clone;
@@ -98,13 +97,31 @@ pub enum Stmt<Ex: AstEx> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Exp {
     Const(Const),
-    Var(String),
+    Var(String, Option<Type>),
     Cast(Type, Box<Exp>),
-    Unary(UnaryOp, Box<Exp>),
-    Binary(BinaryOp, Box<Exp>, Box<Exp>),
-    Assignment(Box<Exp>, Box<Exp>),
-    Conditional(Box<Exp>, Box<Exp>, Box<Exp>),
-    FuncCall(String, Vec<Exp>),
+    Unary(UnaryOp, Box<Exp>, Option<Type>),
+    Binary(BinaryOp, Box<Exp>, Box<Exp>, Option<Type>),
+    Assignment(Box<Exp>, Box<Exp>, Option<Type>),
+    Conditional(Box<Exp>, Box<Exp>, Box<Exp>, Option<Type>),
+    FuncCall(String, Vec<Exp>, Option<Type>),
+}
+
+impl Exp {
+    pub fn typ(&self) -> &Type {
+        use Exp as E;
+        match self {
+            E::Const(Const::Int(_)) => &Type::Int,
+            E::Const(Const::Long(_)) => &Type::Long,
+            E::Var(_, Some(typ)) => typ,
+            E::Cast(typ, _) => typ,
+            E::Unary(_, _, Some(typ)) => typ,
+            E::Binary(_, _, _, Some(typ)) => typ,
+            E::Assignment(_, _, Some(typ)) => typ,
+            E::Conditional(_, _, _, Some(typ)) => typ,
+            E::FuncCall(_, _, Some(typ)) => typ,
+            _ => panic!("the type is not assigned"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

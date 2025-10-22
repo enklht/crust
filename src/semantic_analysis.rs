@@ -6,6 +6,7 @@ mod type_check;
 
 use crate::models::ast::*;
 use crate::models::symbol::*;
+use crate::models::typ::Type;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -15,16 +16,16 @@ pub enum ValidationError {
     IncompatibleStorageClass(String),
     #[error("Incompatible linkage for {0}")]
     IncompatibleLinkage(String),
-    #[error("Static variable {0} has a non-constant initializer")]
-    StaticVarWithNonConstInitializer(String),
+    #[error("Static variable {0} has a non-constant initializer {1:?}")]
+    StaticVarWithNonConstInitializer(String, Exp),
     #[error("Extern variable {0} has an initializer")]
     ExternVarWithInitializer(String),
 
     // invalid variable declaration
     #[error("Variable '{0}' has already been declared in this scope")]
     DuplicateVarDecl(String),
-    #[error("Variable '{0}' is previously defined as {{1}}, now defined as {{2}}")]
-    IncompatibleVarDecl(String),
+    #[error("Variable '{0}' is previously defined as {1}, now defined as {2}")]
+    IncompatibleVarDecl(String, Type, Type),
     #[error("Expression '{0:?}' cannot be used as an lvalue")]
     InvalidLvalue(Exp),
 
@@ -84,12 +85,10 @@ pub fn validate(
 
     let mut program = label_resolution::resolve_program(program)?;
 
-    let (symbols, types) = type_check::check_program(&mut program)?;
-
-    dbg!(&symbols);
+    let symbols = type_check::check_program(&mut program)?;
 
     let program = block_labelling::label_program(program)?;
-    let program = switch_resolution::resolve_program(program, &types)?;
+    let program = switch_resolution::resolve_program(program)?;
 
     Ok((program, symbols))
 }

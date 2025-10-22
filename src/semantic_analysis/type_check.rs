@@ -2,42 +2,31 @@ use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
 use crate::models::symbol::*;
-use rustc_hash::FxHashMap;
+use crate::models::typ::Type;
 
-type Types = FxHashMap<Exp, Type>;
-
-pub fn check_program(program: &mut Program<Plain>) -> ValidationResult<(Symbols, Types)> {
+pub fn check_program(program: &mut Program<Plain>) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
-    let mut types: Types = FxHashMap::default();
     match program {
         Program::Program(decls) => {
             decls
                 .iter_mut()
-                .try_for_each(|decl| check_file_scope_decl(decl, &mut symbols, &mut types))?;
+                .try_for_each(|decl| check_file_scope_decl(decl, &mut symbols))?;
         }
     }
-    Ok((symbols, types))
+    Ok(symbols)
 }
 
-fn check_file_scope_decl(
-    decl: &mut Decl<Plain>,
-    symbols: &mut Symbols,
-    types: &mut Types,
-) -> ValidationResult<()> {
+fn check_file_scope_decl(decl: &mut Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match decl {
-        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, false, types),
-        Decl::VarDecl(var_decl) => check_file_scope_var_decl(var_decl, symbols, types),
+        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, false),
+        Decl::VarDecl(var_decl) => check_file_scope_var_decl(var_decl, symbols),
     }
 }
 
-fn check_local_decl(
-    decl: &mut Decl<Plain>,
-    symbols: &mut Symbols,
-    types: &mut Types,
-) -> ValidationResult<()> {
+fn check_local_decl(decl: &mut Decl<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match decl {
-        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, true, types),
-        Decl::VarDecl(var_decl) => check_local_var_decl(var_decl, symbols, types),
+        Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, true),
+        Decl::VarDecl(var_decl) => check_local_var_decl(var_decl, symbols),
     }
 }
 
@@ -45,7 +34,6 @@ fn check_func_decl(
     func_decl: &mut FuncDecl<Plain>,
     symbols: &mut Symbols,
     block_scope: bool,
-    types: &mut Types,
 ) -> ValidationResult<()> {
     match func_decl {
         FuncDecl::FuncDecl(name, params, body, typ, storage_class) => {
@@ -93,7 +81,7 @@ fn check_func_decl(
                 for (param, param_type) in params.iter().zip(param_types) {
                     symbols.insert(param.clone(), Symbol::LocalVar { typ: param_type });
                 }
-                check_block(body, symbols, types)?;
+                check_block(body, symbols)?;
             }
         }
     }
@@ -103,7 +91,6 @@ fn check_func_decl(
 fn check_file_scope_var_decl(
     var_decl: &mut VarDecl,
     symbols: &mut Symbols,
-    types: &mut Types,
 ) -> ValidationResult<()> {
     match var_decl {
         VarDecl::VarDecl(name, init, typ, storage_class) => {
@@ -114,9 +101,10 @@ fn check_file_scope_var_decl(
                 },
                 None if *storage_class == StorageClass::Extern => InitialValue::NoInitializer,
                 None => InitialValue::Tentative,
-                _ => {
+                Some(exp) => {
                     return Err(ValidationError::StaticVarWithNonConstInitializer(
                         name.clone(),
+                        exp.clone(),
                     ));
                 }
             };
@@ -148,7 +136,13 @@ fn check_file_scope_var_decl(
                         }
                     }
                     Symbol::LocalVar { typ: old_typ } if old_typ == typ => {}
-                    _ => return Err(ValidationError::IncompatibleVarDecl(name.clone())),
+                    symbol => {
+                        return Err(ValidationError::IncompatibleVarDecl(
+                            name.clone(),
+                            symbol.typ().clone(),
+                            typ.clone(),
+                        ));
+                    }
                 }
             };
 
@@ -161,18 +155,14 @@ fn check_file_scope_var_decl(
             symbols.insert(name.clone(), symbol);
 
             if let Some(init) = init {
-                check_exp(init, symbols, types)?;
+                check_exp(init, symbols)?;
             }
             Ok(())
         }
     }
 }
 
-fn check_local_var_decl(
-    var_decl: &mut VarDecl,
-    symbols: &mut Symbols,
-    types: &mut Types,
-) -> ValidationResult<()> {
+fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> ValidationResult<()> {
     match var_decl {
         VarDecl::VarDecl(name, init, typ, storage_class) => {
             match storage_class {
@@ -182,14 +172,26 @@ fn check_local_var_decl(
                     }
                     println!("{:?}", symbols.get(name));
                     match symbols.get(name) {
-                        Some(Symbol::Func { .. }) => {
-                            return Err(ValidationError::IncompatibleVarDecl(name.clone()));
+                        Some(Symbol::Func { typ: old_typ, .. }) => {
+                            return Err(ValidationError::IncompatibleVarDecl(
+                                name.clone(),
+                                old_typ.clone(),
+                                typ.clone(),
+                            ));
                         }
                         Some(Symbol::StaticVar { typ: old_typ, .. }) if old_typ != typ => {
-                            return Err(ValidationError::IncompatibleVarDecl(name.clone()));
+                            return Err(ValidationError::IncompatibleVarDecl(
+                                name.clone(),
+                                old_typ.clone(),
+                                typ.clone(),
+                            ));
                         }
                         Some(Symbol::LocalVar { typ: old_typ, .. }) if old_typ != typ => {
-                            return Err(ValidationError::IncompatibleVarDecl(name.clone()));
+                            return Err(ValidationError::IncompatibleVarDecl(
+                                name.clone(),
+                                old_typ.clone(),
+                                typ.clone(),
+                            ));
                         }
                         None => {
                             symbols.insert(
@@ -211,9 +213,10 @@ fn check_local_var_decl(
                             Const::Long(i) => InitialValue::Initial(StaticInit::LongInit(*i)),
                         },
                         None => InitialValue::Initial(StaticInit::IntInit(0)),
-                        _ => {
+                        Some(exp) => {
                             return Err(ValidationError::StaticVarWithNonConstInitializer(
                                 name.clone(),
+                                exp.clone(),
                             ));
                         }
                     };
@@ -229,10 +232,8 @@ fn check_local_var_decl(
                 StorageClass::None => {
                     symbols.insert(name.clone(), Symbol::LocalVar { typ: typ.clone() });
                     if let Some(init) = init {
-                        check_exp(init, symbols, types)?;
-                        let converted_init = convert_to(init.clone(), typ, types);
-                        types.insert(converted_init.clone(), typ.clone());
-                        *init = converted_init;
+                        check_exp(init, symbols)?;
+                        convert_to(init, typ);
                     }
                 }
             }
@@ -241,75 +242,66 @@ fn check_local_var_decl(
     }
 }
 
-fn check_block(
-    block: &mut Block<Plain>,
-    symbols: &mut Symbols,
-    types: &mut Types,
-) -> ValidationResult<()> {
+fn check_block(block: &mut Block<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     block
         .iter_mut()
-        .try_for_each(|block_item| check_block_item(block_item, symbols, types))
+        .try_for_each(|block_item| check_block_item(block_item, symbols))
 }
 
 fn check_block_item(
     block_item: &mut BlockItem<Plain>,
     symbols: &mut Symbols,
-    types: &mut Types,
 ) -> ValidationResult<()> {
     match block_item {
-        BlockItem::S(stmt) => check_stmt(stmt, symbols, types),
-        BlockItem::D(decl) => check_local_decl(decl, symbols, types),
+        BlockItem::S(stmt) => check_stmt(stmt, symbols),
+        BlockItem::D(decl) => check_local_decl(decl, symbols),
     }
 }
 
-fn check_stmt(
-    stmt: &mut Stmt<Plain>,
-    symbols: &mut Symbols,
-    types: &mut Types,
-) -> ValidationResult<()> {
+fn check_stmt(stmt: &mut Stmt<Plain>, symbols: &mut Symbols) -> ValidationResult<()> {
     match stmt {
         Stmt::Return(exp) => {
-            check_exp(exp, symbols, types)?;
+            check_exp(exp, symbols)?;
         }
         Stmt::Expression(exp) => {
-            check_exp(exp, symbols, types)?;
+            check_exp(exp, symbols)?;
         }
         Stmt::If(cond, then, Some(else_)) => {
-            check_exp(cond, symbols, types)?;
-            check_stmt(then, symbols, types)?;
-            check_stmt(else_, symbols, types)?;
+            check_exp(cond, symbols)?;
+            check_stmt(then, symbols)?;
+            check_stmt(else_, symbols)?;
         }
         Stmt::If(cond, then, None) => {
-            check_exp(cond, symbols, types)?;
-            check_stmt(then, symbols, types)?;
+            check_exp(cond, symbols)?;
+            check_stmt(then, symbols)?;
         }
         Stmt::Labelled(_, stmt) => {
-            check_stmt(stmt, symbols, types)?;
+            check_stmt(stmt, symbols)?;
         }
         Stmt::Compound(block) => {
-            check_block(block, symbols, types)?;
+            check_block(block, symbols)?;
         }
         Stmt::While(cond, body, _) => {
-            check_exp(cond, symbols, types)?;
-            check_stmt(body, symbols, types)?;
+            check_exp(cond, symbols)?;
+            check_stmt(body, symbols)?;
         }
         Stmt::DoWhile(body, cond, _) => {
-            check_stmt(body, symbols, types)?;
-            check_exp(cond, symbols, types)?;
+            check_stmt(body, symbols)?;
+            check_exp(cond, symbols)?;
         }
         Stmt::For(init, cond, post, body, _) => {
-            check_for_init(init, symbols, types)?;
+            check_for_init(init, symbols)?;
             if let Some(cond) = cond {
-                check_exp(cond, symbols, types)?;
+                check_exp(cond, symbols)?;
             }
             if let Some(post) = post {
-                check_exp(post, symbols, types)?;
+                check_exp(post, symbols)?;
             }
-            check_stmt(body, symbols, types)?;
+            check_stmt(body, symbols)?;
         }
         Stmt::Switch(cond, body, _, _) => {
-            check_exp(cond, symbols, types)?;
-            check_stmt(body, symbols, types)?;
+            check_exp(cond, symbols)?;
+            check_stmt(body, symbols)?;
         }
         // Goto, Break, Continue, Null
         _ => {}
@@ -317,97 +309,77 @@ fn check_stmt(
     Ok(())
 }
 
-fn check_for_init(
-    for_init: &mut ForInit,
-    symbols: &mut Symbols,
-    types: &mut Types,
-) -> ValidationResult<()> {
+fn check_for_init(for_init: &mut ForInit, symbols: &mut Symbols) -> ValidationResult<()> {
     match for_init {
         ForInit::InitDecl(decl) => match decl {
-            VarDecl::VarDecl(_, _, _, StorageClass::None) => {
-                check_local_var_decl(decl, symbols, types)
-            }
+            VarDecl::VarDecl(_, _, _, StorageClass::None) => check_local_var_decl(decl, symbols),
             VarDecl::VarDecl(name, _, _, _) => {
                 Err(ValidationError::IncompatibleStorageClass(name.clone()))
             }
         },
-        ForInit::InitExp(exp) => check_exp(exp, symbols, types),
+        ForInit::InitExp(exp) => check_exp(exp, symbols),
         ForInit::Null => Ok(()),
     }
 }
 
-fn check_exp(exp: &mut Exp, symbols: &mut Symbols, types: &mut Types) -> ValidationResult<()> {
+fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
     match exp {
-        Exp::Const(c) => {
-            match c {
-                Const::Int(_) => types.insert(exp.clone(), Type::Int),
-                Const::Long(_) => types.insert(exp.clone(), Type::Long),
-            };
+        Exp::Const(_) => {}
+        Exp::Assignment(left, right, typ) => {
+            check_exp(left, symbols)?;
+            check_exp(right, symbols)?;
+            let left_typ = left.typ().clone();
+            convert_to(right, &left_typ);
+            *typ = Some(left_typ.clone());
         }
-        Exp::Assignment(left, right) => {
-            check_exp(left, symbols, types)?;
-            check_exp(right, symbols, types)?;
-            let left_typ = types.get(left).unwrap().clone();
-            let converted_right = convert_to(*right.clone(), &left_typ, types);
-            let new_exp = Exp::Assignment(left.clone(), Box::new(converted_right));
-            types.insert(new_exp.clone(), left_typ);
-            *exp = new_exp;
-        }
-        Exp::Var(name) => match symbols.get(name).unwrap() {
+        Exp::Var(name, typ) => match symbols.get(name).unwrap() {
             Symbol::Func { .. } => {
                 return Err(ValidationError::FunctionAsVariable(name.clone()));
             }
-            symbol => {
-                types.insert(exp.clone(), symbol.typ());
-            }
+            symbol => *typ = Some(symbol.typ().clone()),
         },
-        Exp::Cast(typ, inner) => {
-            check_exp(inner, symbols, types)?;
-            let typ = typ.clone();
-            types.insert(exp.clone(), typ);
+        Exp::Cast(_, inner) => {
+            check_exp(inner, symbols)?;
         }
-        Exp::Unary(op, inner) => {
-            check_exp(inner, symbols, types)?;
+        Exp::Unary(op, inner, typ) => {
+            check_exp(inner, symbols)?;
             match op {
-                UnaryOp::Not => types.insert(exp.clone(), Type::Int),
+                UnaryOp::Not => *typ = Some(Type::Int),
                 _ => {
-                    let typ = types.get(inner).unwrap().clone();
-                    types.insert(exp.clone(), typ)
+                    let typ_inner = inner.typ().clone();
+                    *typ = Some(typ_inner)
                 }
             };
         }
-        Exp::Binary(op, e1, e2) => {
+        Exp::Binary(op, e1, e2, typ) => {
             use BinaryOp::*;
 
-            check_exp(e1, symbols, types)?;
-            check_exp(e2, symbols, types)?;
+            check_exp(e1, symbols)?;
+            check_exp(e2, symbols)?;
             if matches!(op, And | Or) {
-                types.insert(exp.clone(), Type::Int);
-                return Ok(());
+                *typ = Some(Type::Int);
             } else if matches!(op, LShift | RShift) {
-                let left_typ = types.get(e1).unwrap().clone();
-                types.insert(exp.clone(), left_typ);
-                return Ok(());
-            }
-            let common_type = get_common_type(types.get(e1).unwrap(), types.get(e2).unwrap());
+                let left_typ = e1.typ().clone();
+                *typ = Some(left_typ)
+            } else {
+                let common_type = get_common_type(e1.typ(), e2.typ());
 
-            let e1 = convert_to(*e1.clone(), &common_type, types);
-            let e2 = convert_to(*e2.clone(), &common_type, types);
-            let new_exp = Exp::Binary(op.clone(), Box::new(e1), Box::new(e2));
-            match op {
-                Add | Subtract | Multiply | Divide | Remainder | LShift | RShift | BitAnd
-                | BitOr => types.insert(new_exp.clone(), common_type),
-                _ => types.insert(new_exp.clone(), Type::Int),
-            };
-            *exp = new_exp;
+                convert_to(e1, &common_type);
+                convert_to(e2, &common_type);
+                match op {
+                    Add | Subtract | Multiply | Divide | Remainder | LShift | RShift | BitAnd
+                    | BitOr => *typ = Some(common_type),
+                    _ => *typ = Some(Type::Int),
+                };
+            }
         }
-        Exp::Conditional(cond, then, else_) => {
-            check_exp(cond, symbols, types)?;
-            check_exp(then, symbols, types)?;
-            check_exp(else_, symbols, types)?;
-            types.insert(exp.clone(), Type::Int);
+        Exp::Conditional(cond, then, else_, typ) => {
+            check_exp(cond, symbols)?;
+            check_exp(then, symbols)?;
+            check_exp(else_, symbols)?;
+            *typ = Some(Type::Int);
         }
-        Exp::FuncCall(name, args) => {
+        Exp::FuncCall(name, args, typ) => {
             let Symbol::Func {
                 typ: Type::Func(param_types, ret_type),
                 ..
@@ -426,15 +398,12 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols, types: &mut Types) -> Validat
                 ));
             }
 
-            let mut new_args = Vec::new();
             for (arg, param_type) in args.iter_mut().zip(param_types) {
-                check_exp(arg, symbols, types)?;
-                new_args.push(convert_to(arg.clone(), &param_type, types))
+                check_exp(arg, symbols)?;
+                convert_to(arg, &param_type)
             }
 
-            let new_exp = Exp::FuncCall(name.clone(), new_args);
-            types.insert(new_exp.clone(), *ret_type);
-            *exp = new_exp;
+            *typ = Some(*ret_type.clone())
         }
     };
     Ok(())
@@ -448,12 +417,8 @@ fn get_common_type(typ1: &Type, typ2: &Type) -> Type {
     }
 }
 
-fn convert_to(exp: Exp, typ: &Type, types: &mut Types) -> Exp {
-    if types.get(&exp).unwrap() == typ {
-        exp
-    } else {
-        let new_exp = Exp::Cast(typ.clone(), Box::new(exp));
-        types.insert(new_exp.clone(), typ.clone());
-        new_exp
+fn convert_to(exp: &mut Exp, typ: &Type) {
+    if exp.typ() != typ {
+        *exp = Exp::Cast(typ.clone(), Box::new(exp.clone()))
     }
 }
