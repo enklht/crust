@@ -1,54 +1,39 @@
 use derive_more::Display;
 
-pub trait AsmExtra {
-    type TopLevel: std::fmt::Debug;
+use crate::models::symbol::StaticInit;
+
+#[derive(Debug)]
+pub enum Program {
+    Program(Vec<TopLevel>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AssemblyType {
+    Longword,
+    Quadword,
 }
 
 #[derive(Debug)]
-pub struct Plain;
-impl AsmExtra for Plain {
-    type TopLevel = ();
-}
-
-#[derive(Debug)]
-pub struct LastOffset;
-impl AsmExtra for LastOffset {
-    type TopLevel = usize;
-}
-
-#[derive(Debug)]
-pub enum Program<Extra>
-where
-    Extra: AsmExtra + std::fmt::Debug,
-{
-    Program(Vec<TopLevel<Extra>>),
-}
-
-#[derive(Debug)]
-pub enum TopLevel<Extra>
-where
-    Extra: AsmExtra + std::fmt::Debug,
-{
-    Function(String, bool, Vec<Instruction>, Extra::TopLevel),
-    StaticVar(String, bool, i32),
+pub enum TopLevel {
+    Function(String, bool, Vec<Instruction>, Option<usize>),
+    StaticVar(String, bool, usize, StaticInit),
 }
 
 #[derive(Debug)]
 pub enum Instruction {
-    Mov(Operand, Operand),
-    Unary(UnaryOp, Operand),
-    Binary(BinaryOp, Operand, Operand),
-    Cmp(Operand, Operand),
-    Idiv(Operand),
-    Cdq,
-    Shl(Operand),
-    Shr(Operand),
+    Mov(Operand, Operand, AssemblyType),
+    Movsx(Operand, Operand),
+    Unary(UnaryOp, Operand, AssemblyType),
+    Binary(BinaryOp, Operand, Operand, AssemblyType),
+    Cmp(Operand, Operand, AssemblyType),
+    Idiv(Operand, AssemblyType),
+    Cdq(AssemblyType),
+    Shl(Operand, AssemblyType),
+    Shr(Operand, AssemblyType),
     Jmp(String),
     JmpCC(CondCode, String),
     SetCC(CondCode, Operand),
     Label(String),
-    AllocateStack(usize),
-    DeallocateStack(usize),
     Push(Operand),
     Call(String),
     Ret,
@@ -81,7 +66,7 @@ pub enum BinaryOp {
 #[derive(Debug, Display, Clone)]
 pub enum Operand {
     #[display("${_0}")]
-    Imm(i32),
+    Imm(i64),
     #[display("{}", _0.four_byte())]
     Reg(Reg),
     #[display("<pseudo register will never be emit>")]
@@ -135,6 +120,7 @@ pub enum Reg {
     R9,
     R10,
     R11,
+    SP,
 }
 
 impl Reg {
@@ -149,6 +135,7 @@ impl Reg {
             Reg::R9 => "%r9",
             Reg::R10 => "%r10",
             Reg::R11 => "%r11",
+            Reg::SP => "%rsp",
         }
         .to_string()
     }
@@ -164,6 +151,7 @@ impl Reg {
             Reg::R9 => "%r9d",
             Reg::R10 => "%r10d",
             Reg::R11 => "%r11d",
+            _ => panic!(),
         }
         .to_string()
     }
@@ -179,6 +167,7 @@ impl Reg {
             Reg::R9 => "%r9b",
             Reg::R10 => "%r10b",
             Reg::R11 => "%r11b",
+            _ => panic!(),
         }
         .to_string()
     }

@@ -2,12 +2,29 @@ mod fixup;
 mod replace_pseudos;
 mod tacky_to_asm;
 
-use crate::models::assembly as asm;
+use crate::models::asm_symbol::from_symbols;
+use crate::models::assembly::{self as asm};
 use crate::models::symbol::Symbols;
 use crate::models::tacky;
+use fixup::fixup;
+use replace_pseudos::replace_pseudos;
+use tacky_to_asm::gen_program;
 
-pub fn codegen(program: tacky::Program, symbols: &Symbols) -> asm::Program<asm::Plain> {
-    let program = tacky_to_asm::gen_program(program);
-    let program = replace_pseudos::replace_pseudos(program, symbols);
-    fixup::fixup(program)
+macro_rules! reg {
+    ($reg: ident) => {
+        Operand::Reg(Reg::$reg)
+    };
+}
+
+use reg;
+
+pub fn codegen(program: tacky::Program, symbols: Symbols) -> asm::Program {
+    let mut program = gen_program(program, &symbols);
+
+    let backend_symbols = from_symbols(symbols);
+
+    replace_pseudos(&mut program, &backend_symbols);
+    fixup(&mut program);
+
+    program
 }

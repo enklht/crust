@@ -1,4 +1,4 @@
-// mod asm_generation;
+mod asm_generation;
 // mod code_emission;
 mod error_reporting;
 mod lexer;
@@ -79,7 +79,7 @@ fn main() -> Result<(), CrustError> {
     };
 
     if opts.mode == CompilerMode::Parse {
-        println!("{:#?}", ast);
+        println!("{ast:#?}");
         return Ok(());
     }
 
@@ -92,29 +92,28 @@ fn main() -> Result<(), CrustError> {
     };
 
     if opts.mode == CompilerMode::Validate {
-        println!("{:#?}", validated_ast);
-        println!("{:?}", symbols);
+        println!("{validated_ast:#?}");
         return Ok(());
     }
 
     let tacky = tacky_generation::convert_program(validated_ast, &mut symbols);
 
     if opts.mode == CompilerMode::Tacky {
-        println!("{:?}", tacky);
+        println!("{tacky:?}");
         return Ok(());
     }
 
-    // let asm_ast = asm_generation::codegen(tacky, &symbols);
-    //
-    // if opts.mode == CompilerMode::Codegen {
-    //     println!("{:#?}", asm_ast);
-    //     return Ok(());
-    // }
-    //
+    let asm_ast = asm_generation::codegen(tacky, symbols);
+
+    if opts.mode == CompilerMode::Codegen {
+        println!("{asm_ast:#?}");
+        return Ok(());
+    }
+
     // let asm_text = code_emission::emit(asm_ast, &symbols);
     //
     // let output = opts.output.unwrap_or(opts.input.with_extension("s"));
     // fs::write(&output, asm_text)?;
-    //
+
     Ok(())
 }

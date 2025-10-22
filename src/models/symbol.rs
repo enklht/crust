@@ -42,3 +42,12 @@ pub enum StaticInit {
     IntInit(i32),
     LongInit(i64),
 }
+
+impl StaticInit {
+    pub fn alignment(&self) -> usize {
+        match self {
+            StaticInit::IntInit(_) => 4,
+            StaticInit::LongInit(_) => 8,
+        }
+    }
+}

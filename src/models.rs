@@ -1,3 +1,4 @@
+pub mod asm_symbol;
 pub mod assembly;
 pub mod ast;
 pub mod symbol;
