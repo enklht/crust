@@ -1,3 +1,4 @@
+pub use super::operator::*;
 use crate::models::symbol::StaticInit;
 use derive_more::Display;
 
@@ -7,7 +8,7 @@ pub enum Program {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Display)]
-pub enum AssemblyType {
+pub enum AsmType {
     #[display("b")]
     Byte,
     #[display("l")]
@@ -23,13 +24,13 @@ pub enum TopLevel {
 
 #[derive(Debug)]
 pub enum Instruction {
-    Mov(Operand, Operand, AssemblyType),
+    Mov(Operand, Operand, AsmType),
     Movsx(Operand, Operand),
-    Unary(UnaryOp, Operand, AssemblyType),
-    Binary(BinaryOp, Operand, Operand, AssemblyType),
-    Cmp(Operand, Operand, AssemblyType),
-    Idiv(Operand, AssemblyType),
-    Cdq(AssemblyType),
+    Unary(UnaryOp, Operand, AsmType),
+    Binary(BinaryOp, Operand, Operand, AsmType),
+    Cmp(Operand, Operand, AsmType),
+    Idiv(Operand, AsmType),
+    Cdq(AsmType),
     Jmp(String),
     JmpCC(CondCode, String),
     SetCC(CondCode, Operand),
@@ -37,34 +38,6 @@ pub enum Instruction {
     Push(Operand),
     Call(String),
     Ret,
-}
-
-#[derive(Debug, Display)]
-pub enum UnaryOp {
-    #[display("neg")]
-    Neg,
-    #[display("not")]
-    Not,
-}
-
-#[derive(Debug, Display)]
-pub enum BinaryOp {
-    #[display("add")]
-    Add,
-    #[display("sub")]
-    Subtract,
-    #[display("imul")]
-    Multiply,
-    #[display("and")]
-    BitAnd,
-    #[display("or")]
-    BitOr,
-    #[display("xor")]
-    BitXor,
-    #[display("sal")]
-    LShift,
-    #[display("sar")]
-    RShift,
 }
 
 #[derive(Debug, Clone)]
@@ -106,21 +79,21 @@ pub enum Reg {
     SP,
 }
 
-pub fn fmt<'a>(op: &'a Operand, typ: AssemblyType) -> OperandFmt<'a> {
+pub fn fmt<'a>(op: &'a Operand, typ: AsmType) -> OperandFmt<'a> {
     OperandFmt { op, typ }
 }
 
 pub struct OperandFmt<'a> {
     op: &'a Operand,
-    typ: AssemblyType,
+    typ: AsmType,
 }
 
 impl<'a> std::fmt::Display for OperandFmt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.typ {
-            AssemblyType::Byte => self.op.one_byte(f),
-            AssemblyType::Longword => self.op.four_byte(f),
-            AssemblyType::Quadword => self.op.eight_byte(f),
+            AsmType::Byte => self.op.one_byte(f),
+            AsmType::Longword => self.op.four_byte(f),
+            AsmType::Quadword => self.op.eight_byte(f),
         }
     }
 }

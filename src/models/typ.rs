@@ -1,7 +1,7 @@
-use super::assembly::AssemblyType;
+use super::assembly::AsmType;
 use derive_more::Display;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
+#[derive(Debug, Clone, PartialEq, Display)]
 pub enum Type {
     #[display("Int")]
     Int,
@@ -12,10 +12,10 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn to_asm_type(&self) -> AssemblyType {
+    pub fn to_asm_type(&self) -> AsmType {
         match self {
-            Type::Int => AssemblyType::Longword,
-            Type::Long => AssemblyType::Quadword,
+            Type::Int => AsmType::Longword,
+            Type::Long => AsmType::Quadword,
             _ => unreachable!(),
         }
     }

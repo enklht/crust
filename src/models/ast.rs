@@ -1,3 +1,5 @@
+pub use super::constant::Const;
+pub use super::operator::*;
 use super::typ::Type;
 use rustc_hash::FxHashMap;
 
@@ -71,7 +73,7 @@ pub enum Stmt {
     Null,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Exp {
     Const(Const),
     Var(String, Option<Type>),
@@ -99,41 +101,6 @@ impl Exp {
             _ => panic!("the type is not assigned"),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum UnaryOp {
-    Negate,
-    BitNot,
-    Not,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum BinaryOp {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Remainder,
-    BitAnd,
-    BitOr,
-    BitXor,
-    LShift,
-    RShift,
-    And,
-    Or,
-    Equal,
-    NotEqual,
-    LessThan,
-    LessOrEqual,
-    GreaterThan,
-    GreaterOrEqual,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Const {
-    Int(i32),
-    Long(i64),
 }
 
 impl std::fmt::Debug for FuncDecl {

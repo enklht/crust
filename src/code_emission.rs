@@ -60,7 +60,7 @@ fn emit_instructions(
     acc: &mut impl Write,
     symbols: &AsmSymbols,
 ) -> std::fmt::Result {
-    use AssemblyType::*;
+    use AsmType::*;
     for instruction in instructions {
         match instruction {
             Instruction::Mov(src, dst, typ) => {
@@ -88,9 +88,9 @@ fn emit_instructions(
                 writeln!(acc, "    cmp{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
             }
             Instruction::Idiv(op, typ) => writeln!(acc, "    idiv{typ} {}", fmt(&op, typ),)?,
-            Instruction::Cdq(AssemblyType::Byte) => panic!(),
-            Instruction::Cdq(AssemblyType::Longword) => writeln!(acc, "    cdq")?,
-            Instruction::Cdq(AssemblyType::Quadword) => writeln!(acc, "    cqo")?,
+            Instruction::Cdq(AsmType::Byte) => panic!(),
+            Instruction::Cdq(AsmType::Longword) => writeln!(acc, "    cdq")?,
+            Instruction::Cdq(AsmType::Quadword) => writeln!(acc, "    cqo")?,
             Instruction::Jmp(label) => writeln!(acc, "    jmp .L{label}")?,
             Instruction::JmpCC(code, label) => writeln!(acc, "    j{code} .L{label}")?,
             Instruction::SetCC(code, op) => writeln!(acc, "    set{code} {}", fmt(&op, Byte))?,

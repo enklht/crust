@@ -1,28 +1,18 @@
 use super::reg;
 use crate::models::assembly::*;
-use crate::models::ast::Const;
-use crate::models::symbol::{Symbol, Symbols};
+use crate::models::operator::BinaryOp as BinOp;
+use crate::models::symbol::Symbols;
 use crate::models::tacky;
-use crate::models::tacky::BinaryOp as BinOp;
-use crate::models::typ::Type;
 
 const ARG_REGISTERS: [Reg; 6] = [Reg::DI, Reg::SI, Reg::DX, Reg::CX, Reg::R8, Reg::R9];
 
-fn type_of_var(name: &str, symbols: &Symbols) -> AssemblyType {
-    match symbols.get(name).unwrap() {
-        Symbol::StaticVar { typ, .. } | Symbol::LocalVar { typ } => match typ {
-            Type::Int => AssemblyType::Longword,
-            Type::Long => AssemblyType::Quadword,
-            _ => unreachable!(),
-        },
-        _ => unreachable!(),
-    }
+fn type_of_var(name: &str, symbols: &Symbols) -> AsmType {
+    symbols.get(name).unwrap().asm_typ()
 }
 
-fn type_of_val(val: &tacky::Val, symbols: &Symbols) -> AssemblyType {
+fn type_of_val(val: &tacky::Val, symbols: &Symbols) -> AsmType {
     match val {
-        tacky::Val::Const(Const::Int(_)) => AssemblyType::Longword,
-        tacky::Val::Const(Const::Long(_)) => AssemblyType::Quadword,
+        tacky::Val::Const(c) => c.asm_typ(),
         tacky::Val::Var(name) => type_of_var(name, symbols),
     }
 }
@@ -97,7 +87,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                 let dst = gen_val(dst);
                 asm_instructions.extend([
                     Instruction::Mov(gen_val(src), dst.clone(), asm_type),
-                    Instruction::Unary(gen_unop(op), dst, asm_type),
+                    Instruction::Unary(op, dst, asm_type),
                 ]);
             }
             Binary(op, src1, src2, dst) => {
@@ -113,7 +103,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                     | BinOp::BitXor => {
                         asm_instructions.extend([
                             Instruction::Mov(gen_val(src1), dst.clone(), src1_type),
-                            Instruction::Binary(gen_binop(op), gen_val(src2), dst, src1_type),
+                            Instruction::Binary(op, gen_val(src2), dst, src1_type),
                         ]);
                     }
                     BinOp::Divide => {
@@ -158,6 +148,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                             Instruction::SetCC(gen_rel(op), dst),
                         ]);
                     }
+                    _ => unreachable!(),
                 }
             }
             Jump(target) => {
@@ -192,7 +183,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                         BinaryOp::Subtract,
                         Operand::Imm(8),
                         reg!(SP),
-                        AssemblyType::Quadword,
+                        AsmType::Quadword,
                     ));
                     8
                 } else {
@@ -211,12 +202,12 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                     let asm_type = type_of_val(arg, symbols);
                     let arg = gen_val(arg.clone());
                     if matches!(arg, Operand::Imm(_) | Operand::Reg(_))
-                        || asm_type == AssemblyType::Quadword
+                        || asm_type == AsmType::Quadword
                     {
                         asm_instructions.push(Instruction::Push(arg))
                     } else {
                         asm_instructions.extend([
-                            Instruction::Mov(arg.clone(), reg!(AX), AssemblyType::Longword),
+                            Instruction::Mov(arg.clone(), reg!(AX), AsmType::Longword),
                             Instruction::Push(reg!(AX)),
                         ])
                     }
@@ -230,7 +221,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                         BinaryOp::Add,
                         Operand::Imm(bytes_to_remove as i64),
                         reg!(SP),
-                        AssemblyType::Quadword,
+                        AsmType::Quadword,
                     ));
                 }
 
@@ -243,7 +234,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
             Truncate(src, dst) => asm_instructions.push(Instruction::Mov(
                 gen_val(src),
                 gen_val(dst),
-                AssemblyType::Longword,
+                AsmType::Longword,
             )),
         }
     }
@@ -252,29 +243,9 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
 
 fn gen_val(val: tacky::Val) -> Operand {
     match val {
-        tacky::Val::Const(Const::Int(i)) => Operand::Imm(i as i64),
-        tacky::Val::Const(Const::Long(i)) => Operand::Imm(i),
+        tacky::Val::Const(tacky::Const::Int(i)) => Operand::Imm(i as i64),
+        tacky::Val::Const(tacky::Const::Long(i)) => Operand::Imm(i),
         tacky::Val::Var(ident) => Operand::Pseudo(ident),
-    }
-}
-
-fn gen_unop(op: tacky::UnaryOp) -> UnaryOp {
-    match op {
-        tacky::UnaryOp::Complement => UnaryOp::Not,
-        tacky::UnaryOp::Negate => UnaryOp::Neg,
-        _ => todo!(),
-    }
-}
-
-fn gen_binop(op: BinOp) -> BinaryOp {
-    match op {
-        BinOp::Add => BinaryOp::Add,
-        BinOp::Subtract => BinaryOp::Subtract,
-        BinOp::Multiply => BinaryOp::Multiply,
-        BinOp::BitAnd => BinaryOp::BitAnd,
-        BinOp::BitOr => BinaryOp::BitOr,
-        BinOp::BitXor => BinaryOp::BitXor,
-        _ => unreachable!(),
     }
 }
 

@@ -1,6 +1,8 @@
 pub mod asm_symbol;
 pub mod assembly;
 pub mod ast;
+pub mod constant;
+pub mod operator;
 pub mod symbol;
 pub mod tacky;
 pub mod token;

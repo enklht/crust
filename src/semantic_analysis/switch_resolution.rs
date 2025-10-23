@@ -65,13 +65,7 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
                 let Exp::Const(c) = exp else {
                     return Err(ValidationError::NonConstCase(exp.clone()));
                 };
-                let c = match (&context.typ, c) {
-                    (Type::Int, Const::Int(i)) => Const::Int(i),
-                    (Type::Int, Const::Long(i)) => Const::Int(i as i32),
-                    (Type::Long, Const::Int(i)) => Const::Long(i as i64),
-                    (Type::Long, Const::Long(i)) => Const::Long(i),
-                    _ => unreachable!(),
-                };
+                let c = c.convert_to(&context.typ);
                 if context.cases.contains_key(&c) {
                     return Err(ValidationError::DuplicateCaseValue(c));
                 }

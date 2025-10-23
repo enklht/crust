@@ -1,6 +1,7 @@
 use super::typ::Type;
-use crate::models::ast::Const;
+use crate::models::assembly::AsmType;
 use crate::models::ast::Exp;
+use crate::models::constant::Const;
 use rustc_hash::FxHashMap;
 
 pub type Symbols = FxHashMap<String, Symbol>;
@@ -28,6 +29,14 @@ impl Symbol {
             Symbol::Func { typ, .. } => typ,
             Symbol::StaticVar { typ, .. } => typ,
             Symbol::LocalVar { typ, .. } => typ,
+        }
+    }
+
+    pub fn asm_typ(&self) -> AsmType {
+        match self {
+            Symbol::Func { typ, .. } => typ.to_asm_type(),
+            Symbol::StaticVar { typ, .. } => typ.to_asm_type(),
+            Symbol::LocalVar { typ, .. } => typ.to_asm_type(),
         }
     }
 }

@@ -1,4 +1,5 @@
-use super::ast::Const;
+pub use super::constant::Const;
+pub use super::operator::*;
 use super::symbol::StaticInit;
 
 #[derive(Debug)]
@@ -30,33 +31,6 @@ pub enum Instruction {
 pub enum Val {
     Const(Const),
     Var(String),
-}
-
-#[derive(Debug)]
-pub enum UnaryOp {
-    Complement,
-    Negate,
-    Not,
-}
-
-#[derive(Debug)]
-pub enum BinaryOp {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Remainder,
-    BitAnd,
-    BitOr,
-    BitXor,
-    LShift,
-    RShift,
-    Equal,
-    NotEqual,
-    LessThan,
-    LessOrEqual,
-    GreaterThan,
-    GreaterOrEqual,
 }
 
 impl std::fmt::Debug for TopLevel {

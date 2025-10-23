@@ -93,10 +93,10 @@ fn replace_operand(operand: &mut Operand, state: &mut State, symbols: &AsmSymbol
     if let Operand::Pseudo(ident) = operand {
         match symbols.get(ident).unwrap() {
             AsmSymbol::ObjEntry(_, true) => *operand = Operand::Data(ident.clone()),
-            AsmSymbol::ObjEntry(AssemblyType::Longword, false) => {
+            AsmSymbol::ObjEntry(AsmType::Longword, false) => {
                 *operand = Operand::Stack(-(state.longword(ident) as isize))
             }
-            AsmSymbol::ObjEntry(AssemblyType::Quadword, false) => {
+            AsmSymbol::ObjEntry(AsmType::Quadword, false) => {
                 *operand = Operand::Stack(-(state.quadword(ident) as isize))
             }
             _ => unreachable!(),

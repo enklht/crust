@@ -1,11 +1,12 @@
-use super::assembly::AssemblyType;
-use super::symbol::{Symbol, Symbols};
+use super::assembly::AsmType;
+use super::symbol::Symbol;
+use super::symbol::Symbols;
 use rustc_hash::FxHashMap;
 
 pub type AsmSymbols = FxHashMap<String, AsmSymbol>;
 
 pub enum AsmSymbol {
-    ObjEntry(AssemblyType, bool),
+    ObjEntry(AsmType, bool),
     FunEntry(bool),
 }
 

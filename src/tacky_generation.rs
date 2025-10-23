@@ -246,8 +246,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
         Exp::Unary(op, inner, typ) => {
             let src = emit_exp(*inner, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
-            let tacky_op = convert_unop(op);
-            instructions.push(Instruction::Unary(tacky_op, src, dst.clone()));
+            instructions.push(Instruction::Unary(op, src, dst.clone()));
             dst
         }
         Exp::Binary(BinaryOp::And, v1, v2, typ) => {
@@ -290,8 +289,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             let v1 = emit_exp(*e1, instructions, symbols);
             let v2 = emit_exp(*e2, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
-            let tacky_op = convert_binop(op);
-            instructions.push(Instruction::Binary(tacky_op, v1, v2, dst.clone()));
+            instructions.push(Instruction::Binary(op, v1, v2, dst.clone()));
             dst
         }
         Exp::Var(name, _) => tacky::Val::Var(name),
@@ -350,35 +348,5 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
 
             dst
         }
-    }
-}
-
-fn convert_unop(op: UnaryOp) -> tacky::UnaryOp {
-    match op {
-        UnaryOp::BitNot => tacky::UnaryOp::Complement,
-        UnaryOp::Negate => tacky::UnaryOp::Negate,
-        UnaryOp::Not => tacky::UnaryOp::Not,
-    }
-}
-
-fn convert_binop(op: BinaryOp) -> tacky::BinaryOp {
-    match op {
-        BinaryOp::Add => tacky::BinaryOp::Add,
-        BinaryOp::Subtract => tacky::BinaryOp::Subtract,
-        BinaryOp::Multiply => tacky::BinaryOp::Multiply,
-        BinaryOp::Divide => tacky::BinaryOp::Divide,
-        BinaryOp::Remainder => tacky::BinaryOp::Remainder,
-        BinaryOp::BitAnd => tacky::BinaryOp::BitAnd,
-        BinaryOp::BitOr => tacky::BinaryOp::BitOr,
-        BinaryOp::BitXor => tacky::BinaryOp::BitXor,
-        BinaryOp::LShift => tacky::BinaryOp::LShift,
-        BinaryOp::RShift => tacky::BinaryOp::RShift,
-        BinaryOp::Equal => tacky::BinaryOp::Equal,
-        BinaryOp::NotEqual => tacky::BinaryOp::NotEqual,
-        BinaryOp::LessThan => tacky::BinaryOp::LessThan,
-        BinaryOp::LessOrEqual => tacky::BinaryOp::LessOrEqual,
-        BinaryOp::GreaterThan => tacky::BinaryOp::GreaterThan,
-        BinaryOp::GreaterOrEqual => tacky::BinaryOp::GreaterOrEqual,
-        _ => unreachable!(),
     }
 }

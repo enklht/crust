@@ -25,7 +25,7 @@ fn fixup_top_level(top_level: &mut TopLevel) {
             BinaryOp::Subtract,
             Operand::Imm(last_offset.unwrap().next_multiple_of(16) as i64),
             reg!(SP),
-            AssemblyType::Quadword,
+            AsmType::Quadword,
         )]);
 
         for instruction in old_instructions {
@@ -35,7 +35,7 @@ fn fixup_top_level(top_level: &mut TopLevel) {
 }
 
 fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
-    use AssemblyType::*;
+    use AsmType::*;
     match instruction {
         Instruction::Mov(src @ memory!(), dst @ memory!(), asm_type) => {
             acc.extend([
