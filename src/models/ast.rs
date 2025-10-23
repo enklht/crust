@@ -89,8 +89,7 @@ impl Exp {
     pub fn typ(&self) -> &Type {
         use Exp as E;
         match self {
-            E::Const(Const::Int(_)) => &Type::Int,
-            E::Const(Const::Long(_)) => &Type::Long,
+            E::Const(c) => c.typ(),
             E::Var(_, Some(typ)) => typ,
             E::Cast(typ, _) => typ,
             E::Unary(_, _, Some(typ)) => typ,
@@ -99,6 +98,12 @@ impl Exp {
             E::Conditional(_, _, _, Some(typ)) => typ,
             E::FuncCall(_, _, Some(typ)) => typ,
             _ => panic!("the type is not assigned"),
+        }
+    }
+
+    pub fn convert_to(&mut self, typ: &Type) {
+        if self.typ() != typ {
+            *self = Exp::Cast(typ.clone(), Box::new(self.clone()))
         }
     }
 }

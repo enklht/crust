@@ -54,6 +54,8 @@ impl InitialValue {
             Exp::Const(c) => match c {
                 Const::Int(i) => *i as i64,
                 Const::Long(i) => *i,
+                Const::UInt(i) => *i as i64,
+                Const::ULong(i) => *i as i64,
             },
             _ => return None,
         };
@@ -61,6 +63,8 @@ impl InitialValue {
         match typ {
             Type::Int => Some(InitialValue::Initial(StaticInit::Int(i as i32))),
             Type::Long => Some(InitialValue::Initial(StaticInit::Long(i))),
+            Type::UInt => Some(InitialValue::Initial(StaticInit::UInt(i as u32))),
+            Type::ULong => Some(InitialValue::Initial(StaticInit::ULong(i as u64))),
             _ => unreachable!(),
         }
     }
@@ -70,13 +74,16 @@ impl InitialValue {
 pub enum StaticInit {
     Int(i32),
     Long(i64),
+    UInt(u32),
+    ULong(u64),
 }
 
 impl StaticInit {
     pub fn alignment(&self) -> usize {
+        use StaticInit::*;
         match self {
-            StaticInit::Int(_) => 4,
-            StaticInit::Long(_) => 8,
+            Int(_) | UInt(_) => 4,
+            Long(_) | ULong(_) => 8,
         }
     }
 }

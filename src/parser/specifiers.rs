@@ -5,9 +5,12 @@ use crate::models::typ::Type;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
+#[derive(Debug, PartialEq, PartialOrd)]
 pub enum Specifier {
     Int,
     Long,
+    Unsigned,
+    Signed,
     Static,
     Extern,
 }
@@ -17,8 +20,10 @@ where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
     select! {
-        Token::KwInt => Type::Int,
-        Token::KwLong => Type::Long,
+        Token::KwInt => Specifier::Int,
+        Token::KwLong => Specifier::Long,
+        Token::KwUnsigned => Specifier::Unsigned,
+        Token::KwSigned => Specifier::Signed,
     }
     .repeated()
     .at_least(1)
@@ -26,16 +31,47 @@ where
     .try_map(parse_type)
 }
 
-fn parse_type<'tokens>(specs: Vec<Type>, span: SimpleSpan) -> Result<Type, Rich<'tokens, Token>> {
-    if specs == vec![Type::Int] {
-        Ok(Type::Int)
-    } else if specs == vec![Type::Int, Type::Long]
-        || specs == vec![Type::Long, Type::Int]
-        || specs == vec![Type::Long]
-    {
+fn parse_type<'tokens>(
+    specs: Vec<Specifier>,
+    span: SimpleSpan,
+) -> Result<Type, Rich<'tokens, Token>> {
+    dbg!(&specs);
+    let mut flags = 0u32;
+    const INT: u32 = 1 << 0;
+    const LONG: u32 = 1 << 1;
+    const UNSIGNED: u32 = 1 << 2;
+    const SIGNED: u32 = 1 << 3;
+
+    for spec in specs {
+        use Specifier::*;
+        let mask = match spec {
+            Int => INT,
+            Long => LONG,
+            Unsigned => UNSIGNED,
+            Signed => SIGNED,
+            _ => unreachable!(),
+        };
+
+        if flags & mask != 0 {
+            return Err(Rich::custom(span, "duplicate type specifier"));
+        }
+        flags |= mask;
+
+        if (flags & UNSIGNED != 0) && (flags & SIGNED != 0) {
+            return Err(Rich::custom(span, "cannot combine unsigned with signed"));
+        }
+    }
+
+    if (flags & UNSIGNED != 0) && (flags & LONG != 0) {
+        Ok(Type::ULong)
+    } else if flags & UNSIGNED != 0 {
+        Ok(Type::UInt)
+    } else if flags & LONG != 0 {
         Ok(Type::Long)
+    } else if flags != 0 {
+        Ok(Type::Int)
     } else {
-        Err(Rich::custom(span, "Invalid type specifier"))
+        Err(Rich::custom(span, "invalid type specifier"))
     }
 }
 
@@ -47,6 +83,8 @@ where
     select! {
         Token::KwInt => Specifier::Int,
         Token::KwLong => Specifier::Long,
+        Token::KwUnsigned => Specifier::Unsigned,
+        Token::KwSigned => Specifier::Signed,
         Token::KwStatic => Specifier::Static,
         Token::KwExtern => Specifier::Extern,
     }
@@ -65,8 +103,10 @@ fn parse_specs<'tokens>(
 
     for spec in specs {
         match spec {
-            Specifier::Int => types.push(Type::Int),
-            Specifier::Long => types.push(Type::Long),
+            Specifier::Int => types.push(Specifier::Int),
+            Specifier::Long => types.push(Specifier::Long),
+            Specifier::Unsigned => types.push(Specifier::Unsigned),
+            Specifier::Signed => types.push(Specifier::Signed),
             Specifier::Static => storage_classes.push(StorageClass::Static),
             Specifier::Extern => storage_classes.push(StorageClass::Extern),
         }

@@ -27,6 +27,8 @@ where
                 Token::Ident(ident) => Exp::Var(ident.clone(), None),
                 Token::ConstInt(i) => Exp::Const(Const::Int(i)),
                 Token::ConstLong(i) => Exp::Const(Const::Long(i)),
+                Token::ConstUInt(i) => Exp::Const(Const::UInt(i)),
+                Token::ConstULong(i) => Exp::Const(Const::ULong(i)),
             },
             exp.clone()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),

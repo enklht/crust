@@ -243,8 +243,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
 
 fn gen_val(val: tacky::Val) -> Operand {
     match val {
-        tacky::Val::Const(tacky::Const::Int(i)) => Operand::Imm(i as i64),
-        tacky::Val::Const(tacky::Const::Long(i)) => Operand::Imm(i),
+        tacky::Val::Const(c) => Operand::Imm(c.to_i64()),
         tacky::Val::Var(ident) => Operand::Pseudo(ident),
     }
 }

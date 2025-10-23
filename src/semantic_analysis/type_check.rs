@@ -4,20 +4,6 @@ use crate::models::ast::*;
 use crate::models::symbol::*;
 use crate::models::typ::Type;
 
-fn get_common_type(typ1: &Type, typ2: &Type) -> Type {
-    if typ1 == typ2 {
-        typ1.clone()
-    } else {
-        Type::Long
-    }
-}
-
-fn convert_to(exp: &mut Exp, typ: &Type) {
-    if exp.typ() != typ {
-        *exp = Exp::Cast(typ.clone(), Box::new(exp.clone()))
-    }
-}
-
 pub fn check_program(program: &mut Program) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
     match program {
@@ -243,7 +229,7 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                     symbols.insert(name.clone(), Symbol::LocalVar { typ: typ.clone() });
                     if let Some(init) = init {
                         check_exp(init, symbols)?;
-                        convert_to(init, typ);
+                        init.convert_to(typ);
                     }
                 }
             }
@@ -273,7 +259,7 @@ fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols, ret_type: &Type) -> Valida
     match stmt {
         Stmt::Return(exp) => {
             check_exp(exp, symbols)?;
-            convert_to(exp, ret_type);
+            exp.convert_to(ret_type);
         }
         Stmt::Expression(exp) => {
             check_exp(exp, symbols)?;
@@ -341,7 +327,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(left, symbols)?;
             check_exp(right, symbols)?;
             let left_typ = left.typ().clone();
-            convert_to(right, &left_typ);
+            right.convert_to(&left_typ);
             *typ = Some(left_typ.clone());
         }
         Exp::Var(name, typ) => match symbols.get(name).unwrap() {
@@ -374,10 +360,10 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 let left_typ = e1.typ().clone();
                 *typ = Some(left_typ)
             } else {
-                let common_type = get_common_type(e1.typ(), e2.typ());
+                let common_type = e1.typ().common_type_with(e2.typ());
 
-                convert_to(e1, &common_type);
-                convert_to(e2, &common_type);
+                e1.convert_to(&common_type);
+                e2.convert_to(&common_type);
                 match op {
                     Add | Subtract | Multiply | Divide | Remainder | LShift | RShift | BitAnd
                     | BitOr | BitXor => *typ = Some(common_type),
@@ -389,9 +375,9 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(cond, symbols)?;
             check_exp(then, symbols)?;
             check_exp(else_, symbols)?;
-            let common_type = get_common_type(then.typ(), else_.typ());
-            convert_to(then, &common_type);
-            convert_to(else_, &common_type);
+            let common_type = then.typ().common_type_with(else_.typ());
+            then.convert_to(&common_type);
+            else_.convert_to(&common_type);
             *typ = Some(common_type);
         }
         Exp::FuncCall(name, args, typ) => {
@@ -415,7 +401,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
 
             for (arg, param_type) in args.iter_mut().zip(param_types) {
                 check_exp(arg, symbols)?;
-                convert_to(arg, &param_type)
+                arg.convert_to(&param_type);
             }
 
             *typ = Some(*ret_type.clone())

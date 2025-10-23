@@ -9,8 +9,8 @@ pub fn lexer<'src>()
     let ident = text::ident().map(|s| match s {
         "int" => Token::KwInt,
         "long" => Token::KwLong,
-        "signed" => Token::KwSigned,
         "unsigned" => Token::KwUnsigned,
+        "signed" => Token::KwSigned,
         "return" => Token::KwReturn,
         "void" => Token::KwVoid,
         "if" => Token::KwIf,
@@ -35,12 +35,12 @@ pub fn lexer<'src>()
             one_of("lL").then(one_of("uU")),
         )))
         .then_ignore(any().filter(char::is_ascii_alphanumeric).not().rewind())
-        .try_map_with(|s: &str, e| {
+        .try_map(|s: &str, span| {
             if let Ok(i) = s.parse::<u64>() {
                 Ok(Token::ConstULong(i))
             } else {
                 Err(Rich::custom(
-                    e.span(),
+                    span,
                     "Constant is too large to represent as ulong",
                 ))
             }
@@ -49,14 +49,14 @@ pub fn lexer<'src>()
     let const_uint = text::int(10)
         .then_ignore(one_of("uU"))
         .then_ignore(any().filter(char::is_ascii_alphanumeric).not().rewind())
-        .try_map_with(|s: &str, e| {
+        .try_map(|s: &str, span| {
             if let Ok(i) = s.parse::<u32>() {
                 Ok(Token::ConstUInt(i))
             } else if let Ok(i) = s.parse::<u64>() {
                 Ok(Token::ConstULong(i))
             } else {
                 Err(Rich::custom(
-                    e.span(),
+                    span,
                     "Constant is too large to represent as uint or ulong",
                 ))
             }
@@ -65,12 +65,12 @@ pub fn lexer<'src>()
     let const_long = text::int(10)
         .then_ignore(one_of("lL"))
         .then_ignore(any().filter(char::is_ascii_alphanumeric).not().rewind())
-        .try_map_with(|s: &str, e| {
+        .try_map(|s: &str, span| {
             if let Ok(i) = s.parse::<i64>() {
                 Ok(Token::ConstLong(i))
             } else {
                 Err(Rich::custom(
-                    e.span(),
+                    span,
                     "Constant is too large to represent as long",
                 ))
             }
@@ -78,14 +78,14 @@ pub fn lexer<'src>()
 
     let const_int = text::int(10)
         .then_ignore(any().filter(char::is_ascii_alphanumeric).not().rewind())
-        .try_map_with(|s: &str, e| {
+        .try_map(|s: &str, span| {
             if let Ok(i) = s.parse::<i32>() {
                 Ok(Token::ConstInt(i))
             } else if let Ok(i) = s.parse::<i64>() {
                 Ok(Token::ConstLong(i))
             } else {
                 Err(Rich::custom(
-                    e.span(),
+                    span,
                     "Constant is too large to represent as int or long",
                 ))
             }
@@ -146,13 +146,13 @@ pub fn lexer<'src>()
         three_chars_long,
         two_chars_long,
         one_char_long,
-        const_ulong,
-        const_uint,
-        const_long,
         const_int,
+        const_long,
+        const_uint,
+        const_ulong,
     ))
-    .padded()
     .map_with(|t, e| (t, e.span()))
+    .padded()
     .repeated()
     .collect()
     .then_ignore(end())

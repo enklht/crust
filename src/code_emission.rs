@@ -42,6 +42,7 @@ fn emit_top_level(
                 StaticInit::Long(0) => writeln!(acc, "    .bss")?,
                 StaticInit::Int(_) => writeln!(acc, "    .data")?,
                 StaticInit::Long(_) => writeln!(acc, "    .data")?,
+                _ => todo!(),
             }
             writeln!(acc, "    .balign {alignment}")?;
             writeln!(acc, "{name}:")?;
@@ -50,6 +51,7 @@ fn emit_top_level(
                 StaticInit::Int(i) => writeln!(acc, "    .long {i}"),
                 StaticInit::Long(0) => writeln!(acc, "    .zero 8"),
                 StaticInit::Long(i) => writeln!(acc, "    .quad {i}"),
+                _ => todo!(),
             }
         }
     }

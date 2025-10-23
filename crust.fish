@@ -66,13 +66,6 @@ set dir (path dirname -- $input)
 set name (path basename -E -- $input)
 set out "$dir/$name"
 
-# Cleanup function (always remove intermediate files)
-function __cleanup --on-event EXIT
-    # Remove intermediates if they exist
-    test -n "$out.i" && rm -f -- "$out.i"
-    test -n "$out.s" && rm -f -- "$out.s"
-end
-
 # Step 1: Preprocess
 gcc -E -P "$input" -o "$out.i"
 if test $status -ne 0
