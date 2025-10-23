@@ -9,6 +9,8 @@ pub fn lexer<'src>()
     let ident = text::ident().map(|s| match s {
         "int" => Token::KwInt,
         "long" => Token::KwLong,
+        "signed" => Token::KwSigned,
+        "unsigned" => Token::KwUnsigned,
         "return" => Token::KwReturn,
         "void" => Token::KwVoid,
         "if" => Token::KwIf,
@@ -26,6 +28,39 @@ pub fn lexer<'src>()
         "extern" => Token::KwExtern,
         s => Token::Ident(s.to_string()),
     });
+
+    let const_ulong = text::int(10)
+        .then_ignore(choice((
+            one_of("uU").then(one_of("lL")),
+            one_of("lL").then(one_of("uU")),
+        )))
+        .then_ignore(any().filter(char::is_ascii_alphanumeric).not().rewind())
+        .try_map_with(|s: &str, e| {
+            if let Ok(i) = s.parse::<u64>() {
+                Ok(Token::ConstULong(i))
+            } else {
+                Err(Rich::custom(
+                    e.span(),
+                    "Constant is too large to represent as ulong",
+                ))
+            }
+        });
+
+    let const_uint = text::int(10)
+        .then_ignore(one_of("uU"))
+        .then_ignore(any().filter(char::is_ascii_alphanumeric).not().rewind())
+        .try_map_with(|s: &str, e| {
+            if let Ok(i) = s.parse::<u32>() {
+                Ok(Token::ConstUInt(i))
+            } else if let Ok(i) = s.parse::<u64>() {
+                Ok(Token::ConstULong(i))
+            } else {
+                Err(Rich::custom(
+                    e.span(),
+                    "Constant is too large to represent as uint or ulong",
+                ))
+            }
+        });
 
     let const_long = text::int(10)
         .then_ignore(one_of("lL"))
@@ -111,6 +146,8 @@ pub fn lexer<'src>()
         three_chars_long,
         two_chars_long,
         one_char_long,
+        const_ulong,
+        const_uint,
         const_long,
         const_int,
     ))

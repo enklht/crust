@@ -6,12 +6,20 @@ pub enum Token {
     Ident(String),
     #[display("{_0}")]
     ConstInt(i32),
-    #[display("{_0}")]
+    #[display("{_0}l")]
     ConstLong(i64),
+    #[display("{_0}u")]
+    ConstUInt(u32),
+    #[display("{_0}ul")]
+    ConstULong(u64),
     #[display("int")]
     KwInt,
     #[display("long")]
     KwLong,
+    #[display("signed")]
+    KwSigned,
+    #[display("unsigned")]
+    KwUnsigned,
     #[display("void")]
     KwVoid,
     #[display("return")]
