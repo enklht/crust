@@ -1,4 +1,4 @@
-use crate::models::typ::Type;
+use super::typ::Type;
 use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]

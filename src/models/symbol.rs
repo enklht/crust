@@ -1,9 +1,6 @@
-use crate::{
-    models::ast::{Const, Exp},
-    semantic_analysis::ValidationError,
-};
-
 use super::typ::Type;
+use crate::models::ast::Const;
+use crate::models::ast::Exp;
 use rustc_hash::FxHashMap;
 
 pub type Symbols = FxHashMap<String, Symbol>;

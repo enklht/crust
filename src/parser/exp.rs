@@ -1,12 +1,10 @@
+use super::ParserError;
+use super::specifiers::type_specifiers;
 use crate::models::ast::*;
 use crate::models::token::Token;
 use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
-
-use super::specifiers::type_specifiers;
-
-type ParserError<'tokens> = extra::Err<Rich<'tokens, Token>>;
 
 fn binary(op: BinaryOp, left: Exp, right: Exp) -> Exp {
     Exp::Binary(op, Box::new(left), Box::new(right), None)

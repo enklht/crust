@@ -1,6 +1,5 @@
-use derive_more::Display;
-
 use crate::models::symbol::StaticInit;
+use derive_more::Display;
 
 #[derive(Debug)]
 pub enum Program {

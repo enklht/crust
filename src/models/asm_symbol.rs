@@ -1,5 +1,5 @@
-use crate::models::assembly::AssemblyType;
-use crate::models::symbol::{Symbol, Symbols};
+use super::assembly::AssemblyType;
+use super::symbol::{Symbol, Symbols};
 use rustc_hash::FxHashMap;
 
 pub type AsmSymbols = FxHashMap<String, AsmSymbol>;

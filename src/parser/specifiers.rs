@@ -1,10 +1,9 @@
+use super::ParserError;
 use crate::models::ast::StorageClass;
 use crate::models::token::Token;
 use crate::models::typ::Type;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
-
-type ParserError<'tokens> = extra::Err<Rich<'tokens, Token>>;
 
 pub enum Specifier {
     Int,

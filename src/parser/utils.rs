@@ -1,20 +1,20 @@
+use super::ParserError;
 use crate::models::token::Token;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
-pub trait SemicolonExt<'token, I, T>:
-    Parser<'token, I, T, extra::Err<Rich<'token, Token>>> + Clone
+pub trait SemicolonExt<'tokens, I, T>: Parser<'tokens, I, T, ParserError<'tokens>> + Clone
 where
-    I: ValueInput<'token, Token = Token, Span = SimpleSpan>,
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
-    fn semicolon(self) -> impl Parser<'token, I, T, extra::Err<Rich<'token, Token>>> + Clone {
+    fn semicolon(self) -> impl Parser<'tokens, I, T, ParserError<'tokens>> + Clone {
         self.then_ignore(just(Token::Semicolon))
     }
 }
 
-impl<'token, I, T, P> SemicolonExt<'token, I, T> for P
+impl<'tokens, I, T, P> SemicolonExt<'tokens, I, T> for P
 where
-    I: ValueInput<'token, Token = Token, Span = SimpleSpan>,
-    P: Parser<'token, I, T, extra::Err<Rich<'token, Token>>> + Clone,
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+    P: Parser<'tokens, I, T, ParserError<'tokens>> + Clone,
 {
 }

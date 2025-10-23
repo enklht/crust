@@ -1,5 +1,5 @@
-use crate::models::ast::Const;
-use crate::models::symbol::StaticInit;
+use super::ast::Const;
+use super::symbol::StaticInit;
 
 #[derive(Debug)]
 pub enum Program {

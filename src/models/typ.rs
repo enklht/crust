@@ -1,4 +1,4 @@
-use crate::models::assembly::AssemblyType;
+use super::assembly::AssemblyType;
 use derive_more::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
