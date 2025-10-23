@@ -38,18 +38,18 @@ fn emit_top_level(
                 writeln!(acc, "    .globl {name}")?;
             }
             match init {
-                StaticInit::IntInit(0) => writeln!(acc, "    .bss")?,
-                StaticInit::LongInit(0) => writeln!(acc, "    .bss")?,
-                StaticInit::IntInit(_) => writeln!(acc, "    .data")?,
-                StaticInit::LongInit(_) => writeln!(acc, "    .data")?,
+                StaticInit::Int(0) => writeln!(acc, "    .bss")?,
+                StaticInit::Long(0) => writeln!(acc, "    .bss")?,
+                StaticInit::Int(_) => writeln!(acc, "    .data")?,
+                StaticInit::Long(_) => writeln!(acc, "    .data")?,
             }
             writeln!(acc, "    .balign {alignment}")?;
             writeln!(acc, "{name}:")?;
             match init {
-                StaticInit::IntInit(0) => writeln!(acc, "    .zero 4"),
-                StaticInit::IntInit(i) => writeln!(acc, "    .long {i}"),
-                StaticInit::LongInit(0) => writeln!(acc, "    .zero 8"),
-                StaticInit::LongInit(i) => writeln!(acc, "    .quad {i}"),
+                StaticInit::Int(0) => writeln!(acc, "    .zero 4"),
+                StaticInit::Int(i) => writeln!(acc, "    .long {i}"),
+                StaticInit::Long(0) => writeln!(acc, "    .zero 8"),
+                StaticInit::Long(i) => writeln!(acc, "    .quad {i}"),
             }
         }
     }

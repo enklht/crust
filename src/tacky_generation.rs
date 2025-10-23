@@ -43,8 +43,8 @@ fn convert_symbols(symbols: &Symbols) -> Vec<TopLevel> {
                         name.clone(),
                         *global,
                         match typ {
-                            Type::Int => StaticInit::IntInit(0),
-                            Type::Long => StaticInit::LongInit(0),
+                            Type::Int => StaticInit::Int(0),
+                            Type::Long => StaticInit::Long(0),
                             _ => unreachable!(),
                         },
                     )),

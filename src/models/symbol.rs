@@ -53,8 +53,8 @@ impl InitialValue {
         };
 
         match typ {
-            Type::Int => Some(InitialValue::Initial(StaticInit::IntInit(i as i32))),
-            Type::Long => Some(InitialValue::Initial(StaticInit::LongInit(i))),
+            Type::Int => Some(InitialValue::Initial(StaticInit::Int(i as i32))),
+            Type::Long => Some(InitialValue::Initial(StaticInit::Long(i))),
             _ => unreachable!(),
         }
     }
@@ -62,15 +62,15 @@ impl InitialValue {
 
 #[derive(Debug, Clone)]
 pub enum StaticInit {
-    IntInit(i32),
-    LongInit(i64),
+    Int(i32),
+    Long(i64),
 }
 
 impl StaticInit {
     pub fn alignment(&self) -> usize {
         match self {
-            StaticInit::IntInit(_) => 4,
-            StaticInit::LongInit(_) => 8,
+            StaticInit::Int(_) => 4,
+            StaticInit::Long(_) => 8,
         }
     }
 }

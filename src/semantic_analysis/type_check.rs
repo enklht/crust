@@ -225,8 +225,8 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                             ValidationError::NonConstInitializer(name.to_string(), init.clone()),
                         )?,
                         None => match typ {
-                            Type::Int => InitialValue::Initial(StaticInit::IntInit(0)),
-                            Type::Long => InitialValue::Initial(StaticInit::LongInit(0)),
+                            Type::Int => InitialValue::Initial(StaticInit::Int(0)),
+                            Type::Long => InitialValue::Initial(StaticInit::Long(0)),
                             _ => unreachable!(),
                         },
                     };
