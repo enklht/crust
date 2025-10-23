@@ -101,7 +101,7 @@ fn check_func_decl(
                 for (param, param_type) in params.iter().zip(param_types) {
                     symbols.insert(param.clone(), Symbol::LocalVar { typ: param_type });
                 }
-                check_block(body, symbols, &*ret_type)?;
+                check_block(body, symbols, &ret_type)?;
             }
         }
     }
@@ -115,19 +115,13 @@ fn check_file_scope_var_decl(
     match var_decl {
         VarDecl::VarDecl(name, init, typ, storage_class) => {
             let mut init_value = match init {
-                Some(Exp::Const(c)) => match c {
-                    Const::Int(i) => InitialValue::Initial(StaticInit::IntInit(*i)),
-                    Const::Long(i) => InitialValue::Initial(StaticInit::LongInit(*i)),
-                },
+                Some(init) => InitialValue::from_exp(init, typ).ok_or(
+                    ValidationError::NonConstInitializer(name.to_string(), init.clone()),
+                )?,
                 None if *storage_class == StorageClass::Extern => InitialValue::NoInitializer,
                 None => InitialValue::Tentative,
-                Some(exp) => {
-                    return Err(ValidationError::StaticVarWithNonConstInitializer(
-                        name.clone(),
-                        exp.clone(),
-                    ));
-                }
             };
+
             let mut global = *storage_class != StorageClass::Static;
 
             if let Some(old_symbol) = symbols.get(name) {
@@ -227,17 +221,14 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                 }
                 StorageClass::Static => {
                     let init_value = match init {
-                        Some(Exp::Const(c)) => match c {
-                            Const::Int(i) => InitialValue::Initial(StaticInit::IntInit(*i)),
-                            Const::Long(i) => InitialValue::Initial(StaticInit::LongInit(*i)),
+                        Some(init) => InitialValue::from_exp(init, typ).ok_or(
+                            ValidationError::NonConstInitializer(name.to_string(), init.clone()),
+                        )?,
+                        None => match typ {
+                            Type::Int => InitialValue::Initial(StaticInit::IntInit(0)),
+                            Type::Long => InitialValue::Initial(StaticInit::LongInit(0)),
+                            _ => unreachable!(),
                         },
-                        None => InitialValue::Initial(StaticInit::IntInit(0)),
-                        Some(exp) => {
-                            return Err(ValidationError::StaticVarWithNonConstInitializer(
-                                name.clone(),
-                                exp.clone(),
-                            ));
-                        }
                     };
                     symbols.insert(
                         name.clone(),

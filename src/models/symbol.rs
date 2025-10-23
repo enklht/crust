@@ -1,3 +1,8 @@
+use crate::{
+    models::ast::{Const, Exp},
+    semantic_analysis::ValidationError,
+};
+
 use super::typ::Type;
 use rustc_hash::FxHashMap;
 
@@ -35,6 +40,24 @@ pub enum InitialValue {
     Tentative,
     Initial(StaticInit),
     NoInitializer,
+}
+
+impl InitialValue {
+    pub fn from_exp(init: &Exp, typ: &Type) -> Option<InitialValue> {
+        let i = match init {
+            Exp::Const(c) => match c {
+                Const::Int(i) => *i as i64,
+                Const::Long(i) => *i,
+            },
+            _ => return None,
+        };
+
+        match typ {
+            Type::Int => Some(InitialValue::Initial(StaticInit::IntInit(i as i32))),
+            Type::Long => Some(InitialValue::Initial(StaticInit::LongInit(i))),
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

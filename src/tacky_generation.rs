@@ -236,7 +236,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             instructions.push(Instruction::Label(break_label));
         }
         Stmt::Null => {}
-        other => panic!(),
+        _ => panic!(),
     }
 }
 

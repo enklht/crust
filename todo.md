@@ -6,4 +6,6 @@
 - [x] use write! macro for code emission
 - [x] ~simplify parser types with a macro?~
 - [x] ~type table should have type HashMap<&Exp, &Symbol>?~
-- [ ] post ++ as ((A+=1)-1), and compound assignment as primitive binary operation tacky node?
+- [x] post ++ as ((A+=1)-1), and
+- [ ] compound assignment as primitive binary operation tacky node?
+- [ ] make preprocesser

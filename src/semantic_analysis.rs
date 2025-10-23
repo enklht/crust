@@ -17,7 +17,7 @@ pub enum ValidationError {
     #[error("Incompatible linkage for {0}")]
     IncompatibleLinkage(String),
     #[error("Static variable {0} has a non-constant initializer {1:?}")]
-    StaticVarWithNonConstInitializer(String, Exp),
+    NonConstInitializer(String, Exp),
     #[error("Extern variable {0} has an initializer")]
     ExternVarWithInitializer(String),
 
