@@ -65,6 +65,10 @@ fn replace_pseudos_in_instruction(
             replace_operand(src, state, symbols);
             replace_operand(dst, state, symbols);
         }
+        Instruction::MovZeroExtend(src, dst) => {
+            replace_operand(src, state, symbols);
+            replace_operand(dst, state, symbols);
+        }
         Instruction::Unary(_, dst, _) => {
             replace_operand(dst, state, symbols);
         }
@@ -72,7 +76,13 @@ fn replace_pseudos_in_instruction(
             replace_operand(src, state, symbols);
             replace_operand(dst, state, symbols);
         }
+        Instruction::Shift(_, dst, _) => {
+            replace_operand(dst, state, symbols);
+        }
         Instruction::Idiv(op, _) => {
+            replace_operand(op, state, symbols);
+        }
+        Instruction::Div(op, _) => {
             replace_operand(op, state, symbols);
         }
         Instruction::Cmp(src, dst, _) => {

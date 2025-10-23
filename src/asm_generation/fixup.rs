@@ -74,6 +74,15 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Mov(reg!(R11), dst, Quadword),
             ]);
         }
+        Instruction::MovZeroExtend(src, dst @ Operand::Reg(_)) => {
+            acc.push(Instruction::Mov(src, dst, Longword))
+        }
+        Instruction::MovZeroExtend(src, dst @ memory!()) => {
+            acc.extend([
+                Instruction::Mov(src, reg!(R11), Longword),
+                Instruction::Mov(reg!(R11), dst, Quadword),
+            ]);
+        }
         Instruction::Binary(
             op @ (BinaryOp::Add
             | BinaryOp::Subtract
@@ -130,6 +139,12 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Mov(dst.clone(), reg!(R11), asm_type),
                 Instruction::Binary(BinaryOp::Multiply, src, reg!(R11), asm_type),
                 Instruction::Mov(reg!(R11), dst, asm_type),
+            ]);
+        }
+        Instruction::Div(op @ Operand::Imm(_), asm_type) => {
+            acc.extend([
+                Instruction::Mov(op, reg!(R10), asm_type),
+                Instruction::Div(reg!(R10), asm_type),
             ]);
         }
         Instruction::Idiv(op @ Operand::Imm(_), asm_type) => {

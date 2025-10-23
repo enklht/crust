@@ -34,24 +34,23 @@ fn emit_top_level(
             emit_instructions(instructions, acc, symbols)
         }
         TopLevel::StaticVar(name, global, alignment, init) => {
+            use StaticInit::*;
             if global {
                 writeln!(acc, "    .globl {name}")?;
             }
             match init {
-                StaticInit::Int(0) => writeln!(acc, "    .bss")?,
-                StaticInit::Long(0) => writeln!(acc, "    .bss")?,
-                StaticInit::Int(_) => writeln!(acc, "    .data")?,
-                StaticInit::Long(_) => writeln!(acc, "    .data")?,
-                _ => todo!(),
+                Int(0) | Long(0) | UInt(0) | ULong(0) => writeln!(acc, "    .bss")?,
+                _ => writeln!(acc, "    .data")?,
             }
             writeln!(acc, "    .balign {alignment}")?;
             writeln!(acc, "{name}:")?;
             match init {
-                StaticInit::Int(0) => writeln!(acc, "    .zero 4"),
-                StaticInit::Int(i) => writeln!(acc, "    .long {i}"),
-                StaticInit::Long(0) => writeln!(acc, "    .zero 8"),
-                StaticInit::Long(i) => writeln!(acc, "    .quad {i}"),
-                _ => todo!(),
+                Int(0) | UInt(0) => writeln!(acc, "    .zero 4"),
+                Int(i) => writeln!(acc, "    .long {i}"),
+                UInt(i) => writeln!(acc, "    .long {i}"),
+                Long(0) | ULong(0) => writeln!(acc, "    .zero 8"),
+                Long(i) => writeln!(acc, "    .quad {i}"),
+                ULong(i) => writeln!(acc, "    .quad {i}"),
             }
         }
     }
@@ -77,19 +76,17 @@ fn emit_instructions(
             Instruction::Unary(op, operand, typ) => {
                 writeln!(acc, "    {op}{typ} {}", fmt(&operand, typ))?
             }
-            Instruction::Binary(BinaryOp::LShift, _, dst, typ) => {
-                writeln!(acc, "    sal{typ} %cl, {}", fmt(&dst, typ))?
-            }
-            Instruction::Binary(BinaryOp::RShift, _, dst, typ) => {
-                writeln!(acc, "    sar{typ} %cl, {}", fmt(&dst, typ))?
-            }
             Instruction::Binary(op, src, dst, typ) => {
                 writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
+            }
+            Instruction::Shift(op, dst, typ) => {
+                writeln!(acc, "    {op}{typ} %cl, {}", fmt(&dst, typ))?
             }
             Instruction::Cmp(src, dst, typ) => {
                 writeln!(acc, "    cmp{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
             }
-            Instruction::Idiv(op, typ) => writeln!(acc, "    idiv{typ} {}", fmt(&op, typ),)?,
+            Instruction::Idiv(op, typ) => writeln!(acc, "    idiv{typ} {}", fmt(&op, typ))?,
+            Instruction::Div(op, typ) => writeln!(acc, "    div{typ} {}", fmt(&op, typ))?,
             Instruction::Cdq(AsmType::Byte) => panic!(),
             Instruction::Cdq(AsmType::Longword) => writeln!(acc, "    cdq")?,
             Instruction::Cdq(AsmType::Quadword) => writeln!(acc, "    cqo")?,
@@ -110,6 +107,7 @@ fn emit_instructions(
                 writeln!(acc, "    popq %rbp")?;
                 writeln!(acc, "    ret")?;
             }
+            Instruction::MovZeroExtend(_, _) => unreachable!(),
         }
     }
     Ok(())

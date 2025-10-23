@@ -35,7 +35,6 @@ fn parse_type<'tokens>(
     specs: Vec<Specifier>,
     span: SimpleSpan,
 ) -> Result<Type, Rich<'tokens, Token>> {
-    dbg!(&specs);
     let mut flags = 0u32;
     const INT: u32 = 1 << 0;
     const LONG: u32 = 1 << 1;

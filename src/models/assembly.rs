@@ -26,10 +26,13 @@ pub enum TopLevel {
 pub enum Instruction {
     Mov(Operand, Operand, AsmType),
     Movsx(Operand, Operand),
+    MovZeroExtend(Operand, Operand),
     Unary(UnaryOp, Operand, AsmType),
     Binary(BinaryOp, Operand, Operand, AsmType),
+    Shift(ShiftOp, Operand, AsmType),
     Cmp(Operand, Operand, AsmType),
     Idiv(Operand, AsmType),
+    Div(Operand, AsmType),
     Cdq(AsmType),
     Jmp(String),
     JmpCC(CondCode, String),
@@ -63,6 +66,14 @@ pub enum CondCode {
     G,
     #[display("ge")]
     GE,
+    #[display("a")]
+    A,
+    #[display("ae")]
+    AE,
+    #[display("b")]
+    B,
+    #[display("be")]
+    BE,
 }
 
 #[derive(Debug, Clone)]

@@ -9,6 +9,7 @@ use crate::models::tacky::TopLevel;
 use crate::models::typ::Type;
 use crate::utils::make_label;
 use crate::utils::make_temporary;
+use std::cmp::Ordering;
 
 fn make_temp_var(typ: Type, symbols: &mut Symbols) -> tacky::Val {
     let name = make_temporary();
@@ -45,6 +46,8 @@ fn convert_symbols(symbols: &Symbols) -> Vec<TopLevel> {
                         match typ {
                             Type::Int => StaticInit::Int(0),
                             Type::Long => StaticInit::Long(0),
+                            Type::UInt => StaticInit::UInt(0),
+                            Type::ULong => StaticInit::ULong(0),
                             _ => unreachable!(),
                         },
                     )),
@@ -78,6 +81,12 @@ fn convert_func_decl(func_decl: FuncDecl, symbols: &mut Symbols) -> Option<TopLe
                 }
                 Type::Long => {
                     instructions.push(Instruction::Return(tacky::Val::Const(Const::Long(0))))
+                }
+                Type::UInt => {
+                    instructions.push(Instruction::Return(tacky::Val::Const(Const::UInt(0))))
+                }
+                Type::ULong => {
+                    instructions.push(Instruction::Return(tacky::Val::Const(Const::ULong(0))))
                 }
                 _ => unreachable!(),
             }
@@ -242,7 +251,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
 
 fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols) -> tacky::Val {
     match exp {
-        Exp::Const(i) => tacky::Val::Const(i),
+        Exp::Const(c) => tacky::Val::Const(c),
         Exp::Unary(op, inner, typ) => {
             let src = emit_exp(*inner, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
@@ -340,10 +349,15 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
 
             let dst = make_temp_var(typ.clone(), symbols);
 
-            match typ {
-                Type::Int => instructions.push(Instruction::Truncate(result, dst.clone())),
-                Type::Long => instructions.push(Instruction::SignExtend(result, dst.clone())),
-                _ => unreachable!(),
+            match typ.size().cmp(&inner_typ.size()) {
+                Ordering::Equal => instructions.push(Instruction::Copy(result, dst.clone())),
+                Ordering::Less => instructions.push(Instruction::Truncate(result, dst.clone())),
+                Ordering::Greater if inner_typ.is_signed() => {
+                    instructions.push(Instruction::SignExtend(result, dst.clone()))
+                }
+                Ordering::Greater => {
+                    instructions.push(Instruction::ZeroExtend(result, dst.clone()))
+                }
             }
 
             dst

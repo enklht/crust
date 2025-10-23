@@ -16,6 +16,7 @@ pub enum TopLevel {
 pub enum Instruction {
     Return(Val),
     SignExtend(Val, Val),
+    ZeroExtend(Val, Val),
     Truncate(Val, Val),
     Unary(UnaryOp, Val, Val),
     Binary(BinaryOp, Val, Val, Val),

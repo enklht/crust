@@ -50,9 +50,27 @@ impl fmt::Display for BinaryOp {
             BitAnd => write!(f, "and"),
             BitOr => write!(f, "or"),
             BitXor => write!(f, "xor"),
-            LShift => write!(f, "sal"),
-            RShift => write!(f, "sar"),
             _ => panic!("display is not implemented for this variant"),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ShiftOp {
+    Sal,
+    Sar,
+    Shl,
+    Shr,
+}
+
+impl fmt::Display for ShiftOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use ShiftOp::*;
+        match self {
+            Sal => write!(f, "sal"),
+            Sar => write!(f, "sar"),
+            Shl => write!(f, "shl"),
+            Shr => write!(f, "shr"),
         }
     }
 }

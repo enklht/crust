@@ -17,7 +17,7 @@ pub enum Type {
 }
 
 impl Type {
-    fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         use Type::*;
         match self {
             Int | UInt => 32,
@@ -26,7 +26,7 @@ impl Type {
         }
     }
 
-    fn signed(&self) -> bool {
+    pub fn is_signed(&self) -> bool {
         use Type::*;
         match self {
             Int | Long => true,
@@ -36,9 +36,10 @@ impl Type {
     }
 
     pub fn to_asm_type(&self) -> AsmType {
+        use Type::*;
         match self {
-            Type::Int => AsmType::Longword,
-            Type::Long => AsmType::Quadword,
+            Int | UInt => AsmType::Longword,
+            Long | ULong => AsmType::Quadword,
             _ => unreachable!(),
         }
     }
@@ -48,7 +49,7 @@ impl Type {
             self.clone()
         } else {
             match self.size().cmp(&other.size()) {
-                Ordering::Equal if self.signed() => other.clone(),
+                Ordering::Equal if self.is_signed() => other.clone(),
                 Ordering::Equal => self.clone(),
                 Ordering::Greater => self.clone(),
                 Ordering::Less => other.clone(),
