@@ -34,9 +34,7 @@ where
 
     let for_init = choice((
         var_decl.clone().map(ForInit::InitDecl),
-        exp()
-            .then_ignore(just(Token::Semicolon))
-            .map(ForInit::InitExp),
+        exp().semicolon().map(ForInit::InitExp),
         just(Token::Semicolon).to(ForInit::Null),
     ));
 
@@ -132,7 +130,9 @@ where
         block_item
             .repeated()
             .collect()
-            .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+            .delimited_by(just(Token::LBrace), just(Token::RBrace))
+            .labelled("block")
+            .as_context(),
     );
 
     let param_list = choice((
@@ -141,7 +141,9 @@ where
             .then(ident)
             .separated_by(just(Token::Comma))
             .collect(),
-    ));
+    ))
+    .labelled("parameter list")
+    .as_context();
 
     let func_decl = specifiers()
         .then(ident)
@@ -151,7 +153,9 @@ where
             let (param_types, params): (Vec<_>, Vec<_>) = params.into_iter().unzip();
             let typ = Type::Func(param_types, Box::new(typ));
             FuncDecl::FuncDecl(name, params, body, typ, storage_class)
-        });
+        })
+        .labelled("function declaration")
+        .as_context();
 
     decl.define(choice((
         func_decl.clone().map(Decl::FuncDecl),

@@ -258,7 +258,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             instructions.push(Instruction::Unary(op, src, dst.clone()));
             dst
         }
-        Exp::Binary(BinaryOp::And, v1, v2, typ) => {
+        Exp::Binary(BinaryOp::LogicalAnd, v1, v2, typ) => {
             let false_label = make_label("and_false");
             let end_label = make_label("and_end");
 
@@ -276,7 +276,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             ]);
             dst
         }
-        Exp::Binary(BinaryOp::Or, v1, v2, typ) => {
+        Exp::Binary(BinaryOp::LogicalOr, v1, v2, typ) => {
             let true_label = make_label("or_true");
             let end_label = make_label("or_end");
 

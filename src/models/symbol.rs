@@ -43,19 +43,20 @@ impl InitialValue {
     pub fn from_exp(init: &Exp, typ: &Type) -> Option<InitialValue> {
         let i = match init {
             Exp::Const(c) => match c {
-                Const::Int(i) => *i as i64,
-                Const::Long(i) => *i,
-                Const::UInt(i) => *i as i64,
-                Const::ULong(i) => *i as i64,
+                Const::Int(i) => *i as u64,
+                Const::Long(i) => *i as u64,
+                Const::UInt(i) => *i as u64,
+                Const::ULong(i) => *i,
+                Const::Double(i) => i.to_bits(),
             },
             _ => return None,
         };
 
         match typ {
             Type::Int => Some(InitialValue::Initial(StaticInit::Int(i as i32))),
-            Type::Long => Some(InitialValue::Initial(StaticInit::Long(i))),
+            Type::Long => Some(InitialValue::Initial(StaticInit::Long(i as i64))),
             Type::UInt => Some(InitialValue::Initial(StaticInit::UInt(i as u32))),
-            Type::ULong => Some(InitialValue::Initial(StaticInit::ULong(i as u64))),
+            Type::ULong => Some(InitialValue::Initial(StaticInit::ULong(i))),
             _ => unreachable!(),
         }
     }
@@ -67,6 +68,7 @@ pub enum StaticInit {
     Long(i64),
     UInt(u32),
     ULong(u64),
+    Double(f64),
 }
 
 impl StaticInit {
@@ -74,7 +76,7 @@ impl StaticInit {
         use StaticInit::*;
         match self {
             Int(_) | UInt(_) => 4,
-            Long(_) | ULong(_) => 8,
+            Long(_) | ULong(_) | Double(_) => 8,
         }
     }
 }

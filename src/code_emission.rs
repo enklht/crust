@@ -51,6 +51,7 @@ fn emit_top_level(
                 Long(0) | ULong(0) => writeln!(acc, "    .zero 8"),
                 Long(i) => writeln!(acc, "    .quad {i}"),
                 ULong(i) => writeln!(acc, "    .quad {i}"),
+                _ => unimplemented!(),
             }
         }
     }

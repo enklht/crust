@@ -12,6 +12,8 @@ pub enum Token {
     ConstUInt(u32),
     #[display("{_0}ul")]
     ConstULong(u64),
+    #[display("{_0}")]
+    ConstDouble(f64),
     #[display("int")]
     KwInt,
     #[display("long")]
@@ -20,6 +22,8 @@ pub enum Token {
     KwSigned,
     #[display("unsigned")]
     KwUnsigned,
+    #[display("double")]
+    KwDouble,
     #[display("void")]
     KwVoid,
     #[display("return")]

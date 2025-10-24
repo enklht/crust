@@ -29,6 +29,7 @@ where
                 Token::ConstLong(i) => Exp::Const(Const::Long(i)),
                 Token::ConstUInt(i) => Exp::Const(Const::UInt(i)),
                 Token::ConstULong(i) => Exp::Const(Const::ULong(i)),
+                Token::ConstDouble(i) => Exp::Const(Const::Double(i)),
             },
             exp.clone()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
@@ -131,10 +132,10 @@ where
                 binary(BinaryOp::BitOr, left, right)
             }),
             infix(left(4), just(Token::LogicalAnd), |left, _, right, _| {
-                binary(BinaryOp::And, left, right)
+                binary(BinaryOp::LogicalAnd, left, right)
             }),
             infix(left(3), just(Token::LogicalOr), |left, _, right, _| {
-                binary(BinaryOp::Or, left, right)
+                binary(BinaryOp::LogicalOr, left, right)
             }),
             infix(
                 right(2),
@@ -187,8 +188,8 @@ fn convert_binop(token: Token) -> BinaryOp {
         Token::VerticalBar => BinaryOp::BitOr,
         Token::LShift => BinaryOp::LShift,
         Token::RShift => BinaryOp::RShift,
-        Token::LogicalAnd => BinaryOp::And,
-        Token::LogicalOr => BinaryOp::Or,
+        Token::LogicalAnd => BinaryOp::LogicalAnd,
+        Token::LogicalOr => BinaryOp::LogicalOr,
         Token::DoubleEqual => BinaryOp::Equal,
         Token::BangEqual => BinaryOp::NotEqual,
         Token::LessThan => BinaryOp::LessThan,
@@ -203,7 +204,7 @@ fn convert_unop(token: Token) -> UnaryOp {
     match token {
         Token::Hyphen => UnaryOp::Negate,
         Token::Tilde => UnaryOp::BitNot,
-        Token::Bang => UnaryOp::Not,
+        Token::Bang => UnaryOp::LogicalNot,
         _ => unreachable!(),
     }
 }

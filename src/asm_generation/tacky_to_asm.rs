@@ -73,7 +73,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                     Instruction::Ret,
                 ]);
             }
-            Unary(tacky::UnaryOp::Not, src, dst) => {
+            Unary(tacky::UnaryOp::LogicalNot, src, dst) => {
                 let src_type = type_of_val(&src, symbols).to_asm_type();
                 let dst = gen_val(dst);
                 asm_instructions.extend([
@@ -228,7 +228,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
                 if bytes_to_remove > 0 {
                     asm_instructions.push(Instruction::Binary(
                         BinaryOp::Add,
-                        Operand::Imm(bytes_to_remove as i64),
+                        Operand::Imm(bytes_to_remove as u64),
                         reg!(SP),
                         AsmType::Quadword,
                     ));
@@ -255,7 +255,7 @@ fn gen_instructions(instructions: Vec<tacky::Instruction>, symbols: &Symbols) ->
 
 fn gen_val(val: tacky::Val) -> Operand {
     match val {
-        tacky::Val::Const(c) => Operand::Imm(c.to_i64()),
+        tacky::Val::Const(c) => Operand::Imm(c.to_u64()),
         tacky::Val::Var(ident) => Operand::Pseudo(ident),
     }
 }

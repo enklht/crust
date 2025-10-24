@@ -55,7 +55,6 @@ fn main() -> Result<(), CrustError> {
     let tokens = match lexer.parse(source).into_result() {
         Ok(tokens) => tokens,
         Err(errs) => {
-            println!("{:?}", errs);
             report_errors(fname, &errs, source);
         }
     };

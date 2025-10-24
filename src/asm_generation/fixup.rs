@@ -7,8 +7,8 @@ macro_rules! memory {
     };
 }
 
-fn fits_in_i32(i: &i64) -> bool {
-    (i32::MIN as i64..i32::MAX as i64).contains(i)
+fn fits_in_i32(i: u64) -> bool {
+    (i32::MIN as i64..i32::MAX as i64).contains(&(i as i64))
 }
 
 pub fn fixup(program: &mut Program) {
@@ -23,7 +23,7 @@ fn fixup_top_level(top_level: &mut TopLevel) {
 
         instructions.extend([Instruction::Binary(
             BinaryOp::Subtract,
-            Operand::Imm(last_offset.unwrap().next_multiple_of(16) as i64),
+            Operand::Imm(last_offset.unwrap().next_multiple_of(16) as u64),
             reg!(SP),
             AsmType::Quadword,
         )]);
@@ -49,7 +49,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Mov(reg!(AX), dst, Quadword),
             ]);
         }
-        Instruction::Mov(Operand::Imm(i), dst, Longword) if !fits_in_i32(&i) => {
+        Instruction::Mov(Operand::Imm(i), dst, Longword) if !fits_in_i32(i) => {
             acc.extend([
                 Instruction::Mov(Operand::Imm(i & 0xffffffff), reg!(AX), Longword),
                 Instruction::Mov(reg!(AX), dst, Longword),
@@ -107,7 +107,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             src @ Operand::Imm(i),
             dst,
             asm_type,
-        ) if !fits_in_i32(&i) => {
+        ) if !fits_in_i32(i) => {
             acc.extend([
                 Instruction::Mov(src, reg!(R10), asm_type),
                 Instruction::Binary(op, reg!(R10), dst, asm_type),
@@ -118,7 +118,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             src @ Operand::Imm(i),
             dst @ memory!(),
             Quadword,
-        ) if !fits_in_i32(&i) => {
+        ) if !fits_in_i32(i) => {
             acc.extend([
                 Instruction::Mov(src, reg!(R10), Quadword),
                 Instruction::Mov(dst.clone(), reg!(R11), Quadword),
@@ -127,7 +127,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             ]);
         }
         Instruction::Binary(BinaryOp::Multiply, src @ Operand::Imm(i), dst, Quadword)
-            if !fits_in_i32(&i) =>
+            if !fits_in_i32(i) =>
         {
             acc.extend([
                 Instruction::Mov(src, reg!(R10), Quadword),
@@ -160,7 +160,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             ]);
         }
         Instruction::Cmp(src @ Operand::Imm(i), dst @ Operand::Imm(_), asm_type)
-            if !fits_in_i32(&i) =>
+            if !fits_in_i32(i) =>
         {
             acc.extend([
                 Instruction::Mov(src, reg!(R10), asm_type),
@@ -168,7 +168,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Cmp(reg!(R10), reg!(R11), asm_type),
             ]);
         }
-        Instruction::Cmp(src @ Operand::Imm(i), dst, asm_type) if !fits_in_i32(&i) => {
+        Instruction::Cmp(src @ Operand::Imm(i), dst, asm_type) if !fits_in_i32(i) => {
             acc.extend([
                 Instruction::Mov(src, reg!(R10), asm_type),
                 Instruction::Cmp(reg!(R10), dst, asm_type),
@@ -186,7 +186,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Push(reg!(AX)),
             ]);
         }
-        Instruction::Push(op @ Operand::Imm(i)) if !fits_in_i32(&i) => {
+        Instruction::Push(op @ Operand::Imm(i)) if !fits_in_i32(i) => {
             acc.extend([
                 Instruction::Mov(op, reg!(R10), Quadword),
                 Instruction::Push(reg!(R10)),

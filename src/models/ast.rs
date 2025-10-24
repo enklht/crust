@@ -97,7 +97,7 @@ impl Exp {
             E::Assignment(_, _, Some(typ)) => typ,
             E::Conditional(_, _, _, Some(typ)) => typ,
             E::FuncCall(_, _, Some(typ)) => typ,
-            _ => panic!("the type is not assigned"),
+            _ => unreachable!("the type is not assigned"),
         }
     }
 

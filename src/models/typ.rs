@@ -12,6 +12,8 @@ pub enum Type {
     UInt,
     #[display("ulong")]
     ULong,
+    #[display("double")]
+    Double,
     #[display("fn{_0:?} -> {_1}")]
     Func(Vec<Type>, Box<Type>),
 }
@@ -47,6 +49,8 @@ impl Type {
     pub fn common_type_with(&self, other: &Type) -> Type {
         if self == other {
             self.clone()
+        } else if self == &Type::Double || other == &Type::Double {
+            Type::Double
         } else {
             match self.size().cmp(&other.size()) {
                 Ordering::Equal if self.is_signed() => other.clone(),

@@ -95,7 +95,7 @@ fn resolve_local_var_decl(
     let VarDecl::VarDecl(name, init, _, storage_class) = var_decl;
 
     if let Some(&(_, has_linkage)) = scope_manager.get_from_current_scope(name)
-        && !(has_linkage && *storage_class == StorageClass::Extern)
+        && !(has_linkage && storage_class == &StorageClass::Extern)
     {
         return Err(ValidationError::DuplicateVarDecl(name.clone()));
     }

@@ -4,7 +4,7 @@ use std::fmt;
 pub enum UnaryOp {
     Negate,
     BitNot,
-    Not,
+    LogicalNot,
 }
 
 impl fmt::Display for UnaryOp {
@@ -13,7 +13,7 @@ impl fmt::Display for UnaryOp {
         match self {
             Negate => write!(f, "neg"),
             BitNot => write!(f, "not"),
-            _ => panic!("display is not implemented for this variant"),
+            _ => unreachable!("display is not implemented for this variant"),
         }
     }
 }
@@ -30,8 +30,8 @@ pub enum BinaryOp {
     RShift,
     Divide,
     Remainder,
-    And,
-    Or,
+    LogicalAnd,
+    LogicalOr,
     Equal,
     NotEqual,
     LessThan,
@@ -50,7 +50,7 @@ impl fmt::Display for BinaryOp {
             BitAnd => write!(f, "and"),
             BitOr => write!(f, "or"),
             BitXor => write!(f, "xor"),
-            _ => panic!("display is not implemented for this variant"),
+            _ => unreachable!("display is not implemented for this variant"),
         }
     }
 }

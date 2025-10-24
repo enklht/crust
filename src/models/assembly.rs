@@ -45,7 +45,7 @@ pub enum Instruction {
 
 #[derive(Debug, Clone)]
 pub enum Operand {
-    Imm(i64),
+    Imm(u64),
     Reg(Reg),
     Pseudo(String),
     Stack(isize),
@@ -116,7 +116,7 @@ impl Operand {
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
             Operand::Data(label) => write!(f, "{}(%rip)", label),
-            Operand::Pseudo(_) => panic!("pseudo register will never be emit"),
+            Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
         }
     }
 
@@ -126,7 +126,7 @@ impl Operand {
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
             Operand::Data(label) => write!(f, "{}(%rip)", label),
-            Operand::Pseudo(_) => panic!("pseudo register will never be emit"),
+            Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
         }
     }
 
@@ -136,7 +136,7 @@ impl Operand {
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
             Operand::Data(label) => write!(f, "{}(%rip)", label),
-            Operand::Pseudo(_) => panic!("pseudo register will never be emit"),
+            Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
         }
     }
 }
