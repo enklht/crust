@@ -70,7 +70,9 @@ fn resolve_local_decl(decl: &mut Decl, scope_manager: &mut ScopeManager) -> Vali
         Decl::VarDecl(var_decl) => resolve_local_var_decl(var_decl, scope_manager)?,
         Decl::FuncDecl(func_decl) => {
             if let FuncDecl::FuncDecl(name, _, Some(_), _, _) = func_decl {
-                return Err(ValidationError::NestedFuncDef(name));
+                return Err(ValidationError::FuncDecl(format!(
+                    "Function '{name}' cannot be defined inside another function"
+                )));
             }
             resolve_func_decl(func_decl, scope_manager)?
         }
@@ -99,7 +101,9 @@ fn resolve_local_var_decl(
     if let Some(&(_, has_linkage)) = scope_manager.get_from_current_scope(name)
         && !(has_linkage && storage_class == &StorageClass::Extern)
     {
-        return Err(ValidationError::DuplicateVarDecl(name));
+        return Err(ValidationError::VarDecl(format!(
+            "Variable '{name}' has already been declared in this scope"
+        )));
     }
 
     let (new_name, has_linkage) = match storage_class {
@@ -124,7 +128,9 @@ fn resolve_func_decl(
     let FuncDecl::FuncDecl(name, params, body, _, _) = func_decl;
 
     if let Some(&(_, false)) = scope_manager.get_from_current_scope(name) {
-        return Err(ValidationError::DuplicateFuncDecl(name));
+        return Err(ValidationError::FuncDecl(format!(
+            "Function '{name}' has already been declared"
+        )));
     }
 
     scope_manager.insert(name, (name, true));
@@ -144,7 +150,9 @@ fn resolve_func_decl(
 
 fn resolve_param(name: &mut Ident, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
     if scope_manager.is_in_current_scope(name) {
-        return Err(ValidationError::DuplicateVarDecl(name));
+        return Err(ValidationError::VarDecl(format!(
+            "Variable '{name}' has already been declared in this scope"
+        )));
     }
 
     let unique_name = make_label(name);
@@ -237,11 +245,19 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
                 resolve_exp(left, scope_manager)?;
                 resolve_exp(right, scope_manager)?;
             }
-            other => return Err(ValidationError::InvalidLvalue(other.clone())),
+            other => {
+                return Err(ValidationError::VarDecl(format!(
+                    "Expression '{other:?}' cannot be used as an lvalue"
+                )));
+            }
         },
         Exp::Var(name, _) => match scope_manager.get(name) {
             Some((unique_name, _)) => *name = unique_name,
-            None => return Err(ValidationError::UndefinedVariable(name)),
+            None => {
+                return Err(ValidationError::VarDecl(format!(
+                    "Cannot find variable '{name}' in this scope"
+                )));
+            }
         },
         Exp::Cast(_, exp) => resolve_exp(exp, scope_manager)?,
         Exp::Unary(_, exp, _) => resolve_exp(exp, scope_manager)?,
@@ -256,7 +272,9 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
         }
         Exp::FuncCall(name, args, _) => {
             let Some((new_name, _)) = scope_manager.get(name) else {
-                return Err(ValidationError::UndefinedFunction(name));
+                return Err(ValidationError::FuncDecl(format!(
+                    "Cannot find function '{name}' in this scope"
+                )));
             };
 
             *name = new_name;

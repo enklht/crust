@@ -65,7 +65,9 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
 
             if let Some(context) = context.as_mut() {
                 let Exp::Const(c) = exp else {
-                    return Err(ValidationError::NonConstCase(exp.clone()));
+                    return Err(ValidationError::Switch(format!(
+                        "Case value must be a constant expression, found: {exp:?}"
+                    )));
                 };
                 if c.typ() == &Type::Double {
                     panic!()
@@ -73,11 +75,15 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
 
                 let c = c.convert_to(&context.typ);
                 if context.cases.contains_key(&c) {
-                    return Err(ValidationError::DuplicateCaseValue(c));
+                    return Err(ValidationError::Switch(format!(
+                        "Duplicate case value {c:?} in switch statement"
+                    )));
                 }
                 context.cases.insert(c, new_label);
             } else {
-                return Err(ValidationError::CaseOutsideSwitch);
+                return Err(ValidationError::Switch(
+                    "'case' statement can only appear inside a switch".to_string(),
+                ));
             }
 
             resolve_stmt(stmt, context)?;
@@ -88,11 +94,17 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
 
             if let Some(context) = context.as_mut() {
                 match context.default {
-                    Some(_) => return Err(ValidationError::DuplicateDefault),
+                    Some(_) => {
+                        return Err(ValidationError::Switch(
+                            "Switch statement cannot have multiple 'default' cases".to_string(),
+                        ));
+                    }
                     None => context.default = Some(new_label),
                 }
             } else {
-                return Err(ValidationError::DefaultOutsideSwitch);
+                return Err(ValidationError::Switch(
+                    "'default' statement can only appear inside a switch".to_string(),
+                ));
             }
 
             resolve_stmt(stmt, context)?;

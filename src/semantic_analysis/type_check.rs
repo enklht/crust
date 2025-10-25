@@ -38,7 +38,9 @@ fn check_func_decl(
     match func_decl {
         FuncDecl::FuncDecl(name, params, body, typ, storage_class) => {
             if block_scope && storage_class == &StorageClass::Static {
-                return Err(Error::IncompatibleStorageClass(name));
+                return Err(Error::FuncDecl(format!(
+                    "Incompatible storage class for function '{name}'"
+                )));
             }
 
             let mut defined = false;
@@ -52,21 +54,25 @@ fn check_func_decl(
                         global: old_global,
                     } if old_typ == typ => {
                         if *old_defined && body.is_some() {
-                            return Err(Error::DuplicateFuncDecl(name));
+                            return Err(Error::FuncDecl(format!(
+                                "Function '{name}' has already been declared",
+                            )));
                         }
                         if *old_global && storage_class == &StorageClass::Static {
-                            return Err(Error::IncompatibleLinkage(name));
+                            return Err(Error::FuncDecl(format!(
+                                "Incompatible linkage for function '{name}'"
+                            )));
                         }
 
                         defined = *old_defined;
                         global = *old_global;
                     }
                     symbol => {
-                        return Err(Error::IncompatibleFuncDecl(
-                            name,
-                            symbol.typ().clone(),
-                            typ.clone(),
-                        ));
+                        return Err(Error::FuncDecl(format!(
+                            "Function '{name}' is previously defined as {}, now defined as {}",
+                            symbol.typ(),
+                            typ
+                        )));
                     }
                 }
             };
@@ -101,8 +107,9 @@ fn check_file_scope_var_decl(
     match var_decl {
         VarDecl::VarDecl(name, init, typ, storage_class) => {
             let mut init_value = match init {
-                Some(init) => InitialValue::from_exp(init, typ)
-                    .ok_or(Error::NonConstInitializer(name, init.clone()))?,
+                Some(init) => InitialValue::from_exp(init, typ).ok_or(Error::VarDecl(format!(
+                    "Static variable '{name}' has a non-constant initializer {init:?}"
+                )))?,
                 None if storage_class == &StorageClass::Extern => InitialValue::NoInitializer,
                 None => InitialValue::Tentative,
             };
@@ -119,12 +126,16 @@ fn check_file_scope_var_decl(
                         if storage_class == &StorageClass::Extern {
                             global = *old_global;
                         } else if old_global != &global {
-                            return Err(Error::IncompatibleLinkage(name));
+                            return Err(Error::VarDecl(format!(
+                                "Incompatible linkage for variable '{name}'"
+                            )));
                         }
 
                         match (old_init, &mut init_value) {
                             (InitialValue::Initial(_), InitialValue::Initial(_)) => {
-                                return Err(Error::DuplicateVarDecl(name));
+                                return Err(Error::VarDecl(format!(
+                                    "Variable '{name}' has already been declared in this scope"
+                                )));
                             }
                             (old_init @ InitialValue::Initial(_), _) => {
                                 init_value = old_init.clone();
@@ -136,11 +147,11 @@ fn check_file_scope_var_decl(
                     }
                     Symbol::LocalVar { typ: old_typ } if old_typ == typ => {}
                     symbol => {
-                        return Err(Error::IncompatibleVarDecl(
-                            name,
-                            symbol.typ().clone(),
-                            typ.clone(),
-                        ));
+                        return Err(Error::VarDecl(format!(
+                            "Variable '{name}' is previously defined as {}, now defined as {}",
+                            symbol.typ(),
+                            typ,
+                        )));
                     }
                 }
             };
@@ -167,29 +178,28 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
             match storage_class {
                 StorageClass::Extern => {
                     if init.is_some() {
-                        return Err(Error::ExternVarWithInitializer(name));
+                        return Err(Error::VarDecl(format!(
+                            "Extern variable '{name}' has an initializer"
+                        )));
                     }
                     match symbols.get(name) {
                         Some(Symbol::Func { typ: old_typ, .. }) => {
-                            return Err(Error::IncompatibleVarDecl(
-                                name,
-                                old_typ.clone(),
-                                typ.clone(),
-                            ));
+                            return Err(Error::VarDecl(format!(
+                                "Variable '{name}' is previously defined as {}, now defined as {}",
+                                old_typ, typ
+                            )));
                         }
                         Some(Symbol::StaticVar { typ: old_typ, .. }) if old_typ != typ => {
-                            return Err(Error::IncompatibleVarDecl(
-                                name,
-                                old_typ.clone(),
-                                typ.clone(),
-                            ));
+                            return Err(Error::VarDecl(format!(
+                                "Variable '{name}' is previously defined as {}, now defined as {}",
+                                old_typ, typ
+                            )));
                         }
                         Some(Symbol::LocalVar { typ: old_typ, .. }) if old_typ != typ => {
-                            return Err(Error::IncompatibleVarDecl(
-                                name,
-                                old_typ.clone(),
-                                typ.clone(),
-                            ));
+                            return Err(Error::VarDecl(format!(
+                                "Variable '{name}' is previously defined as {}, now defined as {}",
+                                old_typ, typ
+                            )));
                         }
                         None => {
                             symbols.insert(
@@ -206,8 +216,11 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                 }
                 StorageClass::Static => {
                     let init_value = match init {
-                        Some(init) => InitialValue::from_exp(init, typ)
-                            .ok_or(Error::NonConstInitializer(name, init.clone()))?,
+                        Some(init) => {
+                            InitialValue::from_exp(init, typ).ok_or(Error::VarDecl(format!(
+                                "Static variable '{name}' has a non-constant initializer {init:?}"
+                            )))?
+                        }
                         None => match typ {
                             Type::Int => InitialValue::Initial(StaticInit::Int(0)),
                             Type::Long => InitialValue::Initial(StaticInit::Long(0)),
@@ -309,7 +322,9 @@ fn check_for_init(for_init: &mut ForInit, symbols: &mut Symbols) -> ValidationRe
     match for_init {
         ForInit::InitDecl(decl) => match decl {
             VarDecl::VarDecl(_, _, _, StorageClass::None) => check_local_var_decl(decl, symbols),
-            VarDecl::VarDecl(name, _, _, _) => Err(Error::IncompatibleStorageClass(name)),
+            VarDecl::VarDecl(name, _, _, _) => Err(Error::VarDecl(format!(
+                "Incompatible storage class for variable '{name}'"
+            ))),
         },
         ForInit::InitExp(exp) => check_exp(exp, symbols),
         ForInit::Null => Ok(()),
@@ -328,7 +343,9 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
         }
         Exp::Var(name, typ) => match symbols.get(name).unwrap() {
             Symbol::Func { .. } => {
-                return Err(Error::FunctionAsVariable(name));
+                return Err(Error::Type(format!(
+                    "'{name}' is a function and cannot be used as a variable"
+                )));
             }
             symbol => *typ = Some(symbol.typ().clone()),
         },
@@ -397,13 +414,19 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 ..
             } = symbols.get(name).unwrap()
             else {
-                return Err(Error::VariableAsFunction(name));
+                return Err(Error::Type(format!(
+                    "'{name}' is a variable and cannot be called as a function"
+                )));
             };
             let param_types = param_types.clone();
             let ret_type = ret_type.clone();
 
             if param_types.len() != args.len() {
-                return Err(Error::WrongArity(name, param_types.len(), args.len()));
+                return Err(Error::Type(format!(
+                    "Function '{name}' expects {} arguments but was called with {} arguments",
+                    param_types.len(),
+                    args.len()
+                )));
             }
 
             for (arg, param_type) in args.iter_mut().zip(param_types) {

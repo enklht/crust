@@ -58,11 +58,19 @@ fn label_stmt(
             .try_for_each(|block_item| label_block_item(block_item, break_label, continue_label))?,
         Stmt::Break(label) => match break_label {
             Some(_) => *label = break_label,
-            None => return Err(ValidationError::BreakOutsideLoop),
+            None => {
+                return Err(ValidationError::LoopLabel(
+                    "'break' statement can only be used within a loop".to_string(),
+                ));
+            }
         },
         Stmt::Continue(label) => match continue_label {
             Some(_) => *label = continue_label,
-            None => return Err(ValidationError::ContinueOutsideLoop),
+            None => {
+                return Err(ValidationError::LoopLabel(
+                    "'continue' statement can only be used within a loop".to_string(),
+                ));
+            }
         },
         Stmt::While(_, body, label)
         | Stmt::DoWhile(body, _, label)

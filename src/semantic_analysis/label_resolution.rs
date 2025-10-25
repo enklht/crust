@@ -66,7 +66,11 @@ fn collect_labels(stmt: &Stmt, labels: &mut Labels) -> ValidationResult<()> {
         Stmt::If(_, then, None) => collect_labels(then, labels)?,
         Stmt::Labelled(Label::Ident(label), stmt) => {
             match labels.get(label) {
-                Some(_) => return Err(ValidationError::DuplicateLabel(label)),
+                Some(_) => {
+                    return Err(ValidationError::Label(format!(
+                        "Label '{label}' has already been defined",
+                    )));
+                }
                 None => {
                     let new_label = make_label(label);
                     labels.insert(label, new_label)
@@ -107,14 +111,22 @@ fn resolve_stmt(stmt: Stmt, labels: &Labels) -> ValidationResult<Stmt> {
             Some(label) => {
                 Stmt::Labelled(Label::Ident(label), Box::new(resolve_stmt(*stmt, labels)?))
             }
-            None => return Err(ValidationError::UndefinedLabel(label)),
+            None => {
+                return Err(ValidationError::Label(format!(
+                    "Cannot find label '{label}' in this scope",
+                )));
+            }
         },
         Stmt::Labelled(label, stmt) => {
             Stmt::Labelled(label, Box::new(resolve_stmt(*stmt, labels)?))
         }
         Stmt::Goto(label) => match labels.get(&label) {
             Some(label) => Stmt::Goto(label),
-            None => return Err(ValidationError::UndefinedLabel(label)),
+            None => {
+                return Err(ValidationError::Label(format!(
+                    "Cannot find label '{label}' in this scope",
+                )));
+            }
         },
         Stmt::Compound(block) => {
             let block = block
