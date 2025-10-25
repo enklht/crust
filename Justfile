@@ -1,6 +1,6 @@
-test chapter stage:
+test chapter stage *flags:
   cargo build
-  ./writing-a-c-compiler-tests/test_compiler ./crust.fish --latest-only --chapter {{chapter}} --stage {{stage}}
+  ./writing-a-c-compiler-tests/test_compiler ./crust.fish --latest-only --chapter {{chapter}} --stage {{stage}} {{flags}}
 
 test-all *flags:
   cargo build

@@ -16,8 +16,12 @@ pub enum TopLevel {
 pub enum Instruction {
     Return(Val),
     SignExtend(Val, Val),
-    ZeroExtend(Val, Val),
     Truncate(Val, Val),
+    ZeroExtend(Val, Val),
+    DoubleToInt(Val, Val),
+    DoubleToUInt(Val, Val),
+    IntToDouble(Val, Val),
+    UIntToDouble(Val, Val),
     Unary(UnaryOp, Val, Val),
     Binary(BinaryOp, Val, Val, Val),
     Copy(Val, Val),

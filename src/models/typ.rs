@@ -31,7 +31,7 @@ impl Type {
     pub fn is_signed(&self) -> bool {
         use Type::*;
         match self {
-            Int | Long => true,
+            Int | Long | Double => true,
             UInt | ULong => false,
             _ => unreachable!(),
         }
@@ -42,6 +42,7 @@ impl Type {
         match self {
             Int | UInt => AsmType::Longword,
             Long | ULong => AsmType::Quadword,
+            Double => AsmType::Double,
             _ => unreachable!(),
         }
     }

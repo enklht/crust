@@ -2,8 +2,9 @@ mod fixup;
 mod replace_pseudos;
 mod tacky_to_asm;
 
-use crate::models::asm_symbol::{AsmSymbols, from_symbols};
-use crate::models::assembly::{self as asm};
+use crate::models::asm_symbol::AsmSymbols;
+use crate::models::asm_symbol::from_symbols;
+use crate::models::assembly as asm;
 use crate::models::symbol::Symbols;
 use crate::models::tacky;
 use fixup::fixup;
@@ -16,6 +17,13 @@ macro_rules! reg {
     };
 }
 
+macro_rules! imm {
+    ($imm: expr) => {
+        Operand::Imm($imm)
+    };
+}
+
+use imm;
 use reg;
 
 pub fn codegen(program: tacky::Program, symbols: Symbols) -> (asm::Program, AsmSymbols) {

@@ -25,8 +25,7 @@ impl State {
 
     fn quadword(&mut self, ident: &str) -> usize {
         *self.offset_map.entry(ident.to_string()).or_insert_with(|| {
-            self.current_offset += 8;
-            self.current_offset = self.current_offset.next_multiple_of(8);
+            self.current_offset = (self.current_offset + 8).next_multiple_of(8);
             self.current_offset
         })
     }
@@ -69,6 +68,14 @@ fn replace_pseudos_in_instruction(
             replace_operand(src, state, symbols);
             replace_operand(dst, state, symbols);
         }
+        Instruction::Cvttsd2si(src, dst, _) => {
+            replace_operand(src, state, symbols);
+            replace_operand(dst, state, symbols);
+        }
+        Instruction::Cvtsi2sd(src, dst, _) => {
+            replace_operand(src, state, symbols);
+            replace_operand(dst, state, symbols);
+        }
         Instruction::Unary(_, dst, _) => {
             replace_operand(dst, state, symbols);
         }
@@ -106,7 +113,7 @@ fn replace_operand(operand: &mut Operand, state: &mut State, symbols: &AsmSymbol
             AsmSymbol::ObjEntry(AsmType::Longword, false) => {
                 *operand = Operand::Stack(-(state.longword(ident) as isize))
             }
-            AsmSymbol::ObjEntry(AsmType::Quadword, false) => {
+            AsmSymbol::ObjEntry(AsmType::Quadword | AsmType::Double, false) => {
                 *operand = Operand::Stack(-(state.quadword(ident) as isize))
             }
             _ => unreachable!(),

@@ -113,7 +113,10 @@ fn main() -> Result<(), CrustError> {
     let asm_text = code_emission::emit(asm_ast, &asm_symbols);
 
     if opts.mode == CompilerMode::Emit {
-        println!("{asm_text}");
+        asm_text
+            .lines()
+            .enumerate()
+            .for_each(|(i, line)| println!("{}\t{}", i + 1, line));
         return Ok(());
     }
 

@@ -3,7 +3,7 @@ use crate::models::assembly::*;
 
 macro_rules! memory {
     () => {
-        (Operand::Stack(_) | Operand::Data(_))
+        Operand::Stack(_) | Operand::Data(_)
     };
 }
 
@@ -38,21 +38,27 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
     use AsmType::*;
     match instruction {
         Instruction::Mov(src @ memory!(), dst @ memory!(), asm_type) => {
+            let tmp = match asm_type {
+                Double => reg!(XMM14),
+                _ => reg!(R10),
+            };
+
             acc.extend([
-                Instruction::Mov(src, reg!(R10), asm_type),
-                Instruction::Mov(reg!(R10), dst, asm_type),
+                Instruction::Mov(src, tmp.clone(), asm_type),
+                Instruction::Mov(tmp, dst, asm_type),
             ]);
         }
-        Instruction::Mov(src @ Operand::Imm(_), dst @ memory!(), Quadword) => {
+        Instruction::Mov(src @ Operand::Imm(_), dst, Quadword) => {
             acc.extend([
-                Instruction::Mov(src, reg!(AX), Quadword),
-                Instruction::Mov(reg!(AX), dst, Quadword),
+                Instruction::Mov(src, reg!(R10), Quadword),
+                Instruction::Mov(reg!(R10), dst, Quadword),
             ]);
         }
+        // TODO: is this fits_in_i32 necessary?
         Instruction::Mov(Operand::Imm(i), dst, Longword) if !fits_in_i32(i) => {
             acc.extend([
-                Instruction::Mov(Operand::Imm(i & 0xffffffff), reg!(AX), Longword),
-                Instruction::Mov(reg!(AX), dst, Longword),
+                Instruction::Mov(Operand::Imm(i & 0xffffffff), reg!(R10), Longword),
+                Instruction::Mov(reg!(R10), dst, Longword),
             ]);
         }
         Instruction::Movsx(src @ Operand::Imm(_), dst @ memory!()) => {
@@ -81,6 +87,62 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             acc.extend([
                 Instruction::Mov(src, reg!(R11), Longword),
                 Instruction::Mov(reg!(R11), dst, Quadword),
+            ]);
+        }
+        // Instruction::Cvttsd2si(src @ Operand::Imm(_), dst @ memory!(), asm_type) => {
+        //     acc.extend([
+        //         Instruction::Mov(src, reg!(XMM14), Double),
+        //         Instruction::Cvttsd2si(reg!(XMM14), reg!(R11), asm_type),
+        //         Instruction::Mov(reg!(R11), dst, asm_type),
+        //     ]);
+        // }
+        // Instruction::Cvttsd2si(src @ Operand::Imm(_), dst, asm_type) => {
+        //     acc.extend([
+        //         Instruction::Mov(src, reg!(XMM14), Double),
+        //         Instruction::Cvttsd2si(reg!(XMM14), dst, asm_type),
+        //     ]);
+        // }
+        Instruction::Cvttsd2si(src, dst @ memory!(), asm_type) => {
+            acc.extend([
+                Instruction::Cvttsd2si(src, reg!(R11), asm_type),
+                Instruction::Mov(reg!(R11), dst, asm_type),
+            ]);
+        }
+        Instruction::Cvtsi2sd(src @ Operand::Imm(_), dst @ memory!(), asm_type) => {
+            acc.extend([
+                Instruction::Mov(src, reg!(R10), asm_type),
+                Instruction::Cvtsi2sd(reg!(R10), reg!(XMM15), asm_type),
+                Instruction::Mov(reg!(XMM15), dst, Double),
+            ]);
+        }
+        Instruction::Cvtsi2sd(src @ Operand::Imm(_), dst, asm_type) => {
+            acc.extend([
+                Instruction::Mov(src, reg!(R10), asm_type),
+                Instruction::Cvtsi2sd(reg!(R10), dst, asm_type),
+            ]);
+        }
+        Instruction::Cvtsi2sd(src, dst @ memory!(), asm_type) => {
+            acc.extend([
+                Instruction::Cvtsi2sd(src, reg!(XMM15), asm_type),
+                Instruction::Mov(reg!(XMM15), dst, Double),
+            ]);
+        }
+        Instruction::Binary(
+            op @ (BinaryOp::Add
+            | BinaryOp::Subtract
+            | BinaryOp::Multiply
+            | BinaryOp::Divide
+            | BinaryOp::BitAnd
+            | BinaryOp::BitOr
+            | BinaryOp::BitXor),
+            src,
+            dst @ (memory!() | Operand::Imm(_)),
+            Double,
+        ) => {
+            acc.extend([
+                Instruction::Mov(dst.clone(), reg!(XMM15), Double),
+                Instruction::Binary(op, src, reg!(XMM15), Double),
+                Instruction::Mov(reg!(XMM15), dst, Double),
             ]);
         }
         Instruction::Binary(
@@ -141,16 +203,22 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Mov(reg!(R11), dst, asm_type),
             ]);
         }
+        Instruction::Idiv(op @ Operand::Imm(_), asm_type) => {
+            acc.extend([
+                Instruction::Mov(op, reg!(R10), asm_type),
+                Instruction::Idiv(reg!(R10), asm_type),
+            ]);
+        }
         Instruction::Div(op @ Operand::Imm(_), asm_type) => {
             acc.extend([
                 Instruction::Mov(op, reg!(R10), asm_type),
                 Instruction::Div(reg!(R10), asm_type),
             ]);
         }
-        Instruction::Idiv(op @ Operand::Imm(_), asm_type) => {
+        Instruction::Cmp(src, dst @ (memory!() | Operand::Imm(_)), Double) => {
             acc.extend([
-                Instruction::Mov(op, reg!(R10), asm_type),
-                Instruction::Idiv(reg!(R10), asm_type),
+                Instruction::Mov(dst, reg!(XMM15), Double),
+                Instruction::Cmp(src, reg!(XMM15), Double),
             ]);
         }
         Instruction::Cmp(src @ memory!(), dst @ memory!(), asm_type) => {

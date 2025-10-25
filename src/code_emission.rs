@@ -46,12 +46,27 @@ fn emit_top_level(
             writeln!(acc, "{name}:")?;
             match init {
                 Int(0) | UInt(0) => writeln!(acc, "    .zero 4"),
+                Long(0) | ULong(0) => writeln!(acc, "    .zero 8"),
                 Int(i) => writeln!(acc, "    .long {i}"),
                 UInt(i) => writeln!(acc, "    .long {i}"),
-                Long(0) | ULong(0) => writeln!(acc, "    .zero 8"),
                 Long(i) => writeln!(acc, "    .quad {i}"),
                 ULong(i) => writeln!(acc, "    .quad {i}"),
-                _ => unimplemented!(),
+                Double(i) => writeln!(acc, "    .quad {}", i.to_bits()),
+            }
+        }
+        TopLevel::StaticConst(name, alignment, init) => {
+            use StaticInit::*;
+            writeln!(acc, "    .section .rodata")?;
+            writeln!(acc, "    .balign {alignment}")?;
+            writeln!(acc, "{name}:")?;
+            match init {
+                Int(0) | UInt(0) => writeln!(acc, "    .zero 4"),
+                Long(0) | ULong(0) => writeln!(acc, "    .zero 8"),
+                Int(i) => writeln!(acc, "    .long {i}"),
+                UInt(i) => writeln!(acc, "    .long {i}"),
+                Long(i) => writeln!(acc, "    .quad {i}"),
+                ULong(i) => writeln!(acc, "    .quad {i}"),
+                Double(i) => writeln!(acc, "    .quad {}", i.to_bits()),
             }
         }
     }
@@ -68,27 +83,58 @@ fn emit_instructions(
             Instruction::Mov(src, dst, typ) => {
                 writeln!(acc, "    mov{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
             }
-            Instruction::Movsx(src, dst) => writeln!(
-                acc,
-                "    movslq {}, {}",
-                fmt(&src, Longword),
-                fmt(&dst, Quadword)
-            )?,
+            Instruction::Movsx(src, dst) => {
+                writeln!(
+                    acc,
+                    "    movslq {}, {}",
+                    fmt(&src, Longword),
+                    fmt(&dst, Quadword)
+                )?;
+            }
+            Instruction::Cvtsi2sd(src, dst, typ) => {
+                writeln!(
+                    acc,
+                    "    cvtsi2sd{typ} {}, {}",
+                    fmt(&src, typ),
+                    fmt(&dst, typ)
+                )?;
+            }
+            Instruction::Cvttsd2si(src, dst, typ) => {
+                writeln!(
+                    acc,
+                    "    cvttsd2si{typ} {}, {}",
+                    fmt(&src, typ),
+                    fmt(&dst, typ)
+                )?;
+            }
             Instruction::Unary(op, operand, typ) => {
                 writeln!(acc, "    {op}{typ} {}", fmt(&operand, typ))?
             }
             Instruction::Binary(op, src, dst, typ) => {
-                writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
+                use BinaryOp::*;
+                match (op, typ) {
+                    (Multiply, Double) => {
+                        writeln!(acc, "    mulsd {}, {}", fmt(&src, typ), fmt(&dst, typ))?;
+                    }
+                    (BitAnd | BitOr | BitXor, Double) => {
+                        writeln!(acc, "    {op}pd {}, {}", fmt(&src, typ), fmt(&dst, typ))?;
+                    }
+                    _ => {
+                        writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?;
+                    }
+                }
             }
             Instruction::Shift(op, dst, typ) => {
                 writeln!(acc, "    {op}{typ} %cl, {}", fmt(&dst, typ))?
             }
             Instruction::Cmp(src, dst, typ) => {
-                writeln!(acc, "    cmp{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
+                match typ {
+                    Double => writeln!(acc, "    comisd {}, {}", fmt(&src, typ), fmt(&dst, typ))?,
+                    _ => writeln!(acc, "    cmp{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?,
+                };
             }
             Instruction::Idiv(op, typ) => writeln!(acc, "    idiv{typ} {}", fmt(&op, typ))?,
             Instruction::Div(op, typ) => writeln!(acc, "    div{typ} {}", fmt(&op, typ))?,
-            Instruction::Cdq(AsmType::Byte) => panic!(),
             Instruction::Cdq(AsmType::Longword) => writeln!(acc, "    cdq")?,
             Instruction::Cdq(AsmType::Quadword) => writeln!(acc, "    cqo")?,
             Instruction::Jmp(label) => writeln!(acc, "    jmp .L{label}")?,
@@ -97,7 +143,12 @@ fn emit_instructions(
             Instruction::Label(label) => writeln!(acc, ".L{label}:")?,
             Instruction::Push(op) => writeln!(acc, "    pushq {}", fmt(&op, Quadword))?,
             Instruction::Call(name) => {
-                if symbols.contains_key(&name) {
+                let defined = match symbols.get(&name) {
+                    Some(crate::models::asm_symbol::AsmSymbol::FunEntry(defined)) => *defined,
+                    _ => false,
+                };
+
+                if defined {
                     writeln!(acc, "    call {name}")?;
                 } else {
                     writeln!(acc, "    call {name}@PLT")?;
@@ -109,6 +160,7 @@ fn emit_instructions(
                 writeln!(acc, "    ret")?;
             }
             Instruction::MovZeroExtend(_, _) => unreachable!(),
+            _ => todo!(),
         }
     }
     Ok(())

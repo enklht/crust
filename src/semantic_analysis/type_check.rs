@@ -360,9 +360,17 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             if matches!(op, LogicalAnd | LogicalOr) {
                 *typ = Some(Type::Int);
             } else if matches!(op, LShift | RShift) {
-                let left_typ = e1.typ().clone();
-                *typ = Some(left_typ)
+                if e1.typ() == &Type::Double || e2.typ() == &Type::Double {
+                    panic!()
+                }
+                *typ = Some(e1.typ().clone())
             } else {
+                if matches!(op, Remainder | BitAnd | BitOr | BitXor)
+                    && (e1.typ() == &Type::Double || e2.typ() == &Type::Double)
+                {
+                    panic!()
+                }
+
                 let common_type = e1.typ().common_type_with(e2.typ());
 
                 e1.convert_to(&common_type);

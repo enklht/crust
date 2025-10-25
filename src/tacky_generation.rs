@@ -48,6 +48,7 @@ fn convert_symbols(symbols: &Symbols) -> Vec<TopLevel> {
                             Type::Long => StaticInit::Long(0),
                             Type::UInt => StaticInit::UInt(0),
                             Type::ULong => StaticInit::ULong(0),
+                            Type::Double => StaticInit::Double(0.),
                             _ => unreachable!(),
                         },
                     )),
@@ -87,6 +88,9 @@ fn convert_func_decl(func_decl: FuncDecl, symbols: &mut Symbols) -> Option<TopLe
                 }
                 Type::ULong => {
                     instructions.push(Instruction::Return(tacky::Val::Const(Const::ULong(0))))
+                }
+                Type::Double => {
+                    instructions.push(Instruction::Return(tacky::Val::Const(Const::Double(0.))))
                 }
                 _ => unreachable!(),
             }
@@ -245,7 +249,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             instructions.push(Instruction::Label(break_label));
         }
         Stmt::Null => {}
-        _ => panic!(),
+        _ => unreachable!(),
     }
 }
 
@@ -349,14 +353,28 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
 
             let dst = make_temp_var(typ.clone(), symbols);
 
-            match typ.size().cmp(&inner_typ.size()) {
-                Ordering::Equal => instructions.push(Instruction::Copy(result, dst.clone())),
-                Ordering::Less => instructions.push(Instruction::Truncate(result, dst.clone())),
-                Ordering::Greater if inner_typ.is_signed() => {
-                    instructions.push(Instruction::SignExtend(result, dst.clone()))
+            if inner_typ == Type::Double {
+                if typ.is_signed() {
+                    instructions.push(Instruction::DoubleToInt(result, dst.clone()));
+                } else {
+                    instructions.push(Instruction::DoubleToUInt(result, dst.clone()));
                 }
-                Ordering::Greater => {
-                    instructions.push(Instruction::ZeroExtend(result, dst.clone()))
+            } else if typ == Type::Double {
+                if inner_typ.is_signed() {
+                    instructions.push(Instruction::IntToDouble(result, dst.clone()));
+                } else {
+                    instructions.push(Instruction::UIntToDouble(result, dst.clone()));
+                }
+            } else {
+                match typ.size().cmp(&inner_typ.size()) {
+                    Ordering::Equal => instructions.push(Instruction::Copy(result, dst.clone())),
+                    Ordering::Less => instructions.push(Instruction::Truncate(result, dst.clone())),
+                    Ordering::Greater if inner_typ.is_signed() => {
+                        instructions.push(Instruction::SignExtend(result, dst.clone()))
+                    }
+                    Ordering::Greater => {
+                        instructions.push(Instruction::ZeroExtend(result, dst.clone()))
+                    }
                 }
             }
 

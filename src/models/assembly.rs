@@ -15,11 +15,14 @@ pub enum AsmType {
     Longword,
     #[display("q")]
     Quadword,
+    #[display("sd")]
+    Double,
 }
 
 pub enum TopLevel {
     Function(String, bool, Vec<Instruction>, Option<usize>),
     StaticVar(String, bool, usize, StaticInit),
+    StaticConst(String, usize, StaticInit),
 }
 
 #[derive(Debug)]
@@ -27,6 +30,8 @@ pub enum Instruction {
     Mov(Operand, Operand, AsmType),
     Movsx(Operand, Operand),
     MovZeroExtend(Operand, Operand),
+    Cvttsd2si(Operand, Operand, AsmType),
+    Cvtsi2sd(Operand, Operand, AsmType),
     Unary(UnaryOp, Operand, AsmType),
     Binary(BinaryOp, Operand, Operand, AsmType),
     Shift(ShiftOp, Operand, AsmType),
@@ -76,7 +81,7 @@ pub enum CondCode {
     BE,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Reg {
     AX,
     CX,
@@ -88,6 +93,16 @@ pub enum Reg {
     R10,
     R11,
     SP,
+    XMM0,
+    XMM1,
+    XMM2,
+    XMM3,
+    XMM4,
+    XMM5,
+    XMM6,
+    XMM7,
+    XMM14,
+    XMM15,
 }
 
 pub fn fmt<'a>(op: &'a Operand, typ: AsmType) -> OperandFmt<'a> {
@@ -105,6 +120,7 @@ impl<'a> std::fmt::Display for OperandFmt<'a> {
             AsmType::Byte => self.op.one_byte(f),
             AsmType::Longword => self.op.four_byte(f),
             AsmType::Quadword => self.op.eight_byte(f),
+            AsmType::Double => self.op.eight_byte(f),
         }
     }
 }
@@ -154,6 +170,7 @@ impl Reg {
             Reg::R10 => write!(f, "%r10b"),
             Reg::R11 => write!(f, "%r11b"),
             Reg::SP => write!(f, "%spl"),
+            _ => unreachable!(),
         }
     }
 
@@ -169,6 +186,16 @@ impl Reg {
             Reg::R10 => write!(f, "%r10d"),
             Reg::R11 => write!(f, "%r11d"),
             Reg::SP => write!(f, "%esp"),
+            Reg::XMM0 => write!(f, "%xmm0"),
+            Reg::XMM1 => write!(f, "%xmm1"),
+            Reg::XMM2 => write!(f, "%xmm2"),
+            Reg::XMM3 => write!(f, "%xmm3"),
+            Reg::XMM4 => write!(f, "%xmm4"),
+            Reg::XMM5 => write!(f, "%xmm5"),
+            Reg::XMM6 => write!(f, "%xmm6"),
+            Reg::XMM7 => write!(f, "%xmm7"),
+            Reg::XMM14 => write!(f, "%xmm14"),
+            Reg::XMM15 => write!(f, "%xmm15"),
         }
     }
 
@@ -184,6 +211,16 @@ impl Reg {
             Reg::R10 => write!(f, "%r10"),
             Reg::R11 => write!(f, "%r11"),
             Reg::SP => write!(f, "%rsp"),
+            Reg::XMM0 => write!(f, "%xmm0"),
+            Reg::XMM1 => write!(f, "%xmm1"),
+            Reg::XMM2 => write!(f, "%xmm2"),
+            Reg::XMM3 => write!(f, "%xmm3"),
+            Reg::XMM4 => write!(f, "%xmm4"),
+            Reg::XMM5 => write!(f, "%xmm5"),
+            Reg::XMM6 => write!(f, "%xmm6"),
+            Reg::XMM7 => write!(f, "%xmm7"),
+            Reg::XMM14 => write!(f, "%xmm14"),
+            Reg::XMM15 => write!(f, "%xmm15"),
         }
     }
 }
@@ -201,8 +238,12 @@ impl std::fmt::Debug for TopLevel {
                 )
             }
             TopLevel::StaticVar(name, global, _, init) => {
-                writeln!(f, "\nstatic {name} := {init:?}")?;
+                writeln!(f, "\nstatic var {name} := {init:?}")?;
                 write!(f, "global: {global}")
+            }
+            TopLevel::StaticConst(name, alignment, init) => {
+                writeln!(f, "\nstatic const {name} := {init:?}")?;
+                write!(f, "alignment: {alignment}")
             }
         }
     }

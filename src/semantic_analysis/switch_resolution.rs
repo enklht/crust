@@ -65,6 +65,10 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
                 let Exp::Const(c) = exp else {
                     return Err(ValidationError::NonConstCase(exp.clone()));
                 };
+                if c.typ() == &Type::Double {
+                    panic!()
+                }
+
                 let c = c.convert_to(&context.typ);
                 if context.cases.contains_key(&c) {
                     return Err(ValidationError::DuplicateCaseValue(c));
@@ -101,10 +105,15 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
         | Stmt::DoWhile(body, _, _)
         | Stmt::For(_, _, _, body, _) => resolve_stmt(body, context)?,
         Stmt::Switch(cond, body, _, info) => {
+            let cond_type = cond.typ();
+            if cond_type == &Type::Double {
+                panic!()
+            }
+
             let mut new_context = Context {
                 cases: FxHashMap::default(),
                 default: None,
-                typ: cond.typ().clone(),
+                typ: cond_type.clone(),
             };
             resolve_stmt(body, &mut Some(&mut new_context))?;
             *info = Some((new_context.cases, new_context.default));

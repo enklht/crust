@@ -1,10 +1,11 @@
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOp {
     Negate,
     BitNot,
     LogicalNot,
+    Shr,
 }
 
 impl fmt::Display for UnaryOp {
@@ -13,12 +14,13 @@ impl fmt::Display for UnaryOp {
         match self {
             Negate => write!(f, "neg"),
             BitNot => write!(f, "not"),
+            Shr => write!(f, "shr"),
             _ => unreachable!("display is not implemented for this variant"),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -47,6 +49,7 @@ impl fmt::Display for BinaryOp {
             Add => write!(f, "add"),
             Subtract => write!(f, "sub"),
             Multiply => write!(f, "imul"),
+            Divide => write!(f, "div"),
             BitAnd => write!(f, "and"),
             BitOr => write!(f, "or"),
             BitXor => write!(f, "xor"),
@@ -55,7 +58,7 @@ impl fmt::Display for BinaryOp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ShiftOp {
     Sal,
     Sar,

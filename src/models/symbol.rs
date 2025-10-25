@@ -57,6 +57,7 @@ impl InitialValue {
             Type::Long => Some(InitialValue::Initial(StaticInit::Long(i as i64))),
             Type::UInt => Some(InitialValue::Initial(StaticInit::UInt(i as u32))),
             Type::ULong => Some(InitialValue::Initial(StaticInit::ULong(i))),
+            Type::Double => Some(InitialValue::Initial(StaticInit::Double(f64::from_bits(i)))),
             _ => unreachable!(),
         }
     }

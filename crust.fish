@@ -3,40 +3,50 @@
 # Parse arguments
 argparse \
     c/compile-only \
-    l/lex \
-    p/parse \
-    v/validate \
-    t/tacky \
-    g/codegen \
-    e/emit \
-    h/help \
+    /lex \
+    /parse \
+    /validate \
+    /tacky \
+    /codegen \
+    /emit \
+    /help \
+    /lm \
     -- $argv
 or exit
 
 if set -q _flag_help
     printf "Usage: crust.fish [OPTIONS] /path/to/source.c\n\n"
     printf "Options:\n"
+    printf "  --lex                  Stop after lexing stage\n"
+    printf "  --parse                Stop after parsing stage\n"
+    printf "  --validate             Stop after validation stage\n"
+    printf "  --tacky                Stop after tacky generation stage\n"
+    printf "  --codegen              Stop after code generation stage\n"
+    printf "  --emit                 Stop after code emission stage\n"
     printf "  -c, --compile-only     Compile only, do not link\n"
-    printf "  -l, --lex              Stop after lexing stage\n"
-    printf "  -p, --parse            Stop after parsing stage\n"
-    printf "  -v, --validate         Stop after validation stage\n"
-    printf "  -t, --tacky            Stop after tacky generation stage\n"
-    printf "  -g, --codegen          Stop after code generation stage\n"
-    printf "  -e, --emit             Stop after code emission stage\n"
+    printf "  --lm                   Link with math library (-lm)\n"
     printf "  -h, --help             Show this help message\n"
     exit 0
 end
 
-# Check input file
-if test (count $argv) -ne 1
-    printf "Error: exactly one input file must be specified\n" >&2
-    exit 2
+# Check input file and extract gcc arguments
+set gcc_args
+for arg in $argv
+    if string match -r -- '.+\.c$' "$arg"
+        if not set -q input
+            set input "$arg"
+        else
+            printf "Error: more than one .c file specified\n" >&2
+            exit 2
+        end
+    else
+        set -a gcc_args "$arg"
+    end
 end
 
-set input $argv[1]
-if not test -f $input -a -r $input
-    printf "Error: input file '%s' not found or not readable\n" $input >&2
-    exit 3
+if not set -q input
+    printf "Error: no .c input file specified\n" >&2
+    exit 2
 end
 
 # Set compilation stage flag
@@ -55,16 +65,17 @@ else if set -q _flag_emit
     set flag --emit
 end
 
-# Set compile-only flag
-set compile_only 0
-if set -q _flag_compile_only
-    set compile_only 1
+# Set math flag
+if set -q _flag_lm
+    set math_flag -lm
 end
 
 # Derive paths
 set dir (path dirname -- $input)
 set name (path basename -E -- $input)
 set out "$dir/$name"
+
+trap "rm -f $out.i $out.s" EXIT
 
 # Step 1: Preprocess
 gcc -E -P "$input" -o "$out.i"
@@ -80,20 +91,17 @@ if test $status -ne 0
     exit 5
 end
 
-# We can remove the preprocessed file now
-rm -f -- "$out.i"
-
 # Step 3: Assemble & link
 if test -z "$flag"
-    if test $compile_only -eq 1
-        gcc -c "$out.s" -o "$out.o"
+    if set -q _flag_compile_only
+        gcc -c "$out.s" -o "$out.o" $math_flag
         if test $status -ne 0
             rm -f -- "$out.o"
             printf "Error: assembly failed\n" >&2
             exit 6
         end
     else
-        gcc "$out.s" -o "$out"
+        gcc "$out.s" -o "$out" $math_flag
         if test $status -ne 0
             # avoid leaving partial executable
             rm -f -- "$out"
@@ -103,6 +111,4 @@ if test -z "$flag"
     end
 end
 
-# If we reach here, success. Remove assembly file and exit 0.
-rm -f -- "$out.s"
 exit 0
