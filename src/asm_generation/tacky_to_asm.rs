@@ -204,7 +204,7 @@ fn gen_instructions(
                         let dst = gen_val(dst, consts);
 
                         asm_instructions.extend([
-                            Instruction::Cmp(src.clone(), upper_bound.clone(), Quadword),
+                            Instruction::Cmp(upper_bound.clone(), src.clone(), Double),
                             Instruction::JmpCC(CondCode::AE, out_of_range_label.clone()),
                             Instruction::Cvttsd2si(src.clone(), dst.clone(), Quadword),
                             Instruction::Jmp(end_label.clone()),
