@@ -122,13 +122,13 @@ fn emit_instructions(
                     (BitAnd | BitOr | BitXor, Double) => {
                         writeln!(acc, "    {op}pd {}, {}", fmt(&src, typ), fmt(&dst, typ))?;
                     }
+                    (Sal | Sar | Shl | Shr, _) => {
+                        writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, Byte), fmt(&dst, typ))?;
+                    }
                     _ => {
                         writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?;
                     }
                 }
-            }
-            Instruction::Shift(op, dst, typ) => {
-                writeln!(acc, "    {op}{typ} %cl, {}", fmt(&dst, typ))?;
             }
             Instruction::Cmp(src, dst, typ) => {
                 match typ {

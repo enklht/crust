@@ -171,7 +171,7 @@ fn gen_instructions(
                             Instruction::Label(out_of_range_label),
                             Instruction::Mov(src, reg!(R8), Quadword),
                             Instruction::Mov(reg!(R8), reg!(R9), Quadword),
-                            Instruction::Unary(UnaryOp::Shr, reg!(R9), Quadword),
+                            Instruction::Binary(BinaryOp::Shr, imm!(1), reg!(R9), Quadword),
                             Instruction::Binary(BinaryOp::BitAnd, imm!(1), reg!(R8), Quadword),
                             Instruction::Binary(BinaryOp::BitAnd, imm!(1), reg!(R8), Quadword),
                             Instruction::Binary(BinaryOp::BitOr, reg!(R8), reg!(R9), Quadword),
@@ -233,7 +233,7 @@ fn gen_instructions(
                 let dst = gen_val(dst, consts);
 
                 match op {
-                    UnaryOp::LogicalNot if src_type == Double => {
+                    tacky::UnaryOp::LogicalNot if src_type == Double => {
                         asm_instructions.extend([
                             Instruction::Binary(BinaryOp::BitXor, reg!(XMM0), reg!(XMM0), Double),
                             Instruction::Cmp(src, reg!(XMM0), Double),
@@ -243,14 +243,14 @@ fn gen_instructions(
                             Instruction::Binary(BinaryOp::BitAnd, reg!(AX), dst, Byte),
                         ]);
                     }
-                    UnaryOp::LogicalNot => {
+                    tacky::UnaryOp::LogicalNot => {
                         asm_instructions.extend([
                             Instruction::Cmp(imm!(0), src, src_type),
                             Instruction::Mov(imm!(0), dst, Longword),
                             Instruction::SetCC(CondCode::E, dst),
                         ]);
                     }
-                    UnaryOp::Negate if src_type == Double => {
+                    tacky::UnaryOp::Negate if src_type == Double => {
                         let (_, neg_zero) = consts
                             .entry((-0.0f64).to_bits())
                             .or_insert((16, make_label("negative_zero")));
@@ -263,7 +263,7 @@ fn gen_instructions(
                     _ => {
                         asm_instructions.extend([
                             Instruction::Mov(src, dst, src_type),
-                            Instruction::Unary(op, dst, src_type),
+                            Instruction::Unary(gen_unop(op), dst, src_type),
                         ]);
                     }
                 }
@@ -276,23 +276,25 @@ fn gen_instructions(
                 let src2 = gen_val(src2, consts);
                 let dst = gen_val(dst, consts);
 
+                use tacky::BinaryOp as TBinOp;
+
                 match op {
-                    BinaryOp::Add
-                    | BinaryOp::Subtract
-                    | BinaryOp::Multiply
-                    | BinaryOp::BitAnd
-                    | BinaryOp::BitOr
-                    | BinaryOp::BitXor => {
+                    TBinOp::Add
+                    | TBinOp::Subtract
+                    | TBinOp::Multiply
+                    | TBinOp::BitAnd
+                    | TBinOp::BitOr
+                    | TBinOp::BitXor => {
                         asm_instructions.extend([
                             Instruction::Mov(src1, dst, src1_type),
-                            Instruction::Binary(op, src2, dst, src1_type),
+                            Instruction::Binary(gen_binop(op), src2, dst, src1_type),
                         ]);
                     }
-                    BinaryOp::Divide => {
+                    TBinOp::Divide => {
                         if src1_type == Double {
                             asm_instructions.extend([
                                 Instruction::Mov(src1, dst, src1_type),
-                                Instruction::Binary(BinaryOp::Divide, src2, dst, src1_type),
+                                Instruction::Binary(BinaryOp::DivideDouble, src2, dst, src1_type),
                             ]);
                         } else if signed {
                             asm_instructions.extend([
@@ -310,7 +312,7 @@ fn gen_instructions(
                             ]);
                         }
                     }
-                    BinaryOp::Remainder => {
+                    TBinOp::Remainder => {
                         if signed {
                             asm_instructions.extend([
                                 Instruction::Mov(src1, reg!(AX), src1_type),
@@ -327,18 +329,18 @@ fn gen_instructions(
                             ]);
                         }
                     }
-                    BinaryOp::LShift | BinaryOp::RShift => {
+                    TBinOp::LShift | TBinOp::RShift => {
                         asm_instructions.extend([
                             Instruction::Mov(src1, dst, src1_type),
                             Instruction::Mov(src2, reg!(CX), src1_type),
-                            Instruction::Shift(gen_shift_op(op, signed), dst, src1_type),
+                            Instruction::Binary(gen_shiftop(op, signed), reg!(CX), dst, src1_type),
                         ]);
                     }
-                    BinaryOp::Equal
-                    | BinaryOp::LessThan
-                    | BinaryOp::LessOrEqual
-                    | BinaryOp::GreaterThan
-                    | BinaryOp::GreaterOrEqual
+                    TBinOp::Equal
+                    | TBinOp::LessThan
+                    | TBinOp::LessOrEqual
+                    | TBinOp::GreaterThan
+                    | TBinOp::GreaterOrEqual
                         if src1_type == Double =>
                     {
                         asm_instructions.extend([
@@ -349,7 +351,7 @@ fn gen_instructions(
                             Instruction::Binary(BinaryOp::BitAnd, reg!(AX), dst, Byte),
                         ]);
                     }
-                    BinaryOp::NotEqual if src1_type == Double => {
+                    TBinOp::NotEqual if src1_type == Double => {
                         asm_instructions.extend([
                             Instruction::Cmp(src2, src1, src1_type),
                             Instruction::Mov(imm!(0), dst, Longword),
@@ -358,12 +360,12 @@ fn gen_instructions(
                             Instruction::Binary(BinaryOp::BitOr, reg!(AX), dst, Byte),
                         ]);
                     }
-                    BinaryOp::Equal
-                    | BinaryOp::NotEqual
-                    | BinaryOp::LessThan
-                    | BinaryOp::LessOrEqual
-                    | BinaryOp::GreaterThan
-                    | BinaryOp::GreaterOrEqual => {
+                    TBinOp::Equal
+                    | TBinOp::NotEqual
+                    | TBinOp::LessThan
+                    | TBinOp::LessOrEqual
+                    | TBinOp::GreaterThan
+                    | TBinOp::GreaterOrEqual => {
                         asm_instructions.extend([
                             Instruction::Cmp(src2, src1, src1_type),
                             Instruction::Mov(imm!(0), dst, Longword),
@@ -540,18 +542,39 @@ fn gen_val(val: tacky::Val, consts: &mut Consts) -> Operand {
     }
 }
 
-fn gen_shift_op(op: BinaryOp, signed: bool) -> ShiftOp {
+fn gen_unop(op: tacky::UnaryOp) -> UnaryOp {
     match op {
-        BinaryOp::LShift if signed => ShiftOp::Sal,
-        BinaryOp::LShift if !signed => ShiftOp::Shl,
-        BinaryOp::RShift if signed => ShiftOp::Sar,
-        BinaryOp::RShift if !signed => ShiftOp::Shr,
+        tacky::UnaryOp::Negate => UnaryOp::Negate,
+        tacky::UnaryOp::BitNot => UnaryOp::BitNot,
         _ => unreachable!(),
     }
 }
 
-fn gen_rel(op: BinaryOp, unsigned_or_double: bool) -> CondCode {
-    use BinaryOp::*;
+fn gen_binop(op: tacky::BinaryOp) -> BinaryOp {
+    match op {
+        tacky::BinaryOp::Add => BinaryOp::Add,
+        tacky::BinaryOp::Subtract => BinaryOp::Subtract,
+        tacky::BinaryOp::Multiply => BinaryOp::Multiply,
+        tacky::BinaryOp::Divide => BinaryOp::DivideDouble,
+        tacky::BinaryOp::BitAnd => BinaryOp::BitAnd,
+        tacky::BinaryOp::BitOr => BinaryOp::BitOr,
+        tacky::BinaryOp::BitXor => BinaryOp::BitXor,
+        _ => todo!(),
+    }
+}
+
+fn gen_shiftop(op: tacky::BinaryOp, signed: bool) -> BinaryOp {
+    match (op, signed) {
+        (tacky::BinaryOp::LShift, true) => BinaryOp::Sal,
+        (tacky::BinaryOp::RShift, true) => BinaryOp::Sar,
+        (tacky::BinaryOp::LShift, false) => BinaryOp::Shl,
+        (tacky::BinaryOp::RShift, false) => BinaryOp::Shr,
+        _ => unreachable!(),
+    }
+}
+
+fn gen_rel(op: tacky::BinaryOp, unsigned_or_double: bool) -> CondCode {
+    use tacky::BinaryOp::*;
     match (op, unsigned_or_double) {
         (Equal, _) => CondCode::E,
         (NotEqual, _) => CondCode::NE,

@@ -1,23 +1,8 @@
-use std::fmt;
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOp {
     Negate,
     BitNot,
     LogicalNot,
-    Shr,
-}
-
-impl fmt::Display for UnaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use UnaryOp::*;
-        match self {
-            Negate => write!(f, "neg"),
-            BitNot => write!(f, "not"),
-            Shr => write!(f, "shr"),
-            _ => unreachable!("display is not implemented for this variant"),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -40,40 +25,4 @@ pub enum BinaryOp {
     LessOrEqual,
     GreaterThan,
     GreaterOrEqual,
-}
-
-impl fmt::Display for BinaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use BinaryOp::*;
-        match self {
-            Add => write!(f, "add"),
-            Subtract => write!(f, "sub"),
-            Multiply => write!(f, "imul"),
-            Divide => write!(f, "div"),
-            BitAnd => write!(f, "and"),
-            BitOr => write!(f, "or"),
-            BitXor => write!(f, "xor"),
-            _ => unreachable!("display is not implemented for this variant"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum ShiftOp {
-    Sal,
-    Sar,
-    Shl,
-    Shr,
-}
-
-impl fmt::Display for ShiftOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use ShiftOp::*;
-        match self {
-            Sal => write!(f, "sal"),
-            Sar => write!(f, "sar"),
-            Shl => write!(f, "shl"),
-            Shr => write!(f, "shr"),
-        }
-    }
 }

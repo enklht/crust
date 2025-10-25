@@ -54,8 +54,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Mov(reg!(R10), dst, Quadword),
             ]);
         }
-        // TODO: is this fits_in_i32 necessary?
-        Instruction::Mov(Operand::Imm(i), dst, Longword) if !fits_in_i32(i) => {
+        Instruction::Mov(Operand::Imm(i), dst, Longword) => {
             acc.extend([
                 Instruction::Mov(Operand::Imm(i & 0xffffffff), reg!(R10), Longword),
                 Instruction::Mov(reg!(R10), dst, Longword),
@@ -118,7 +117,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             op @ (BinaryOp::Add
             | BinaryOp::Subtract
             | BinaryOp::Multiply
-            | BinaryOp::Divide
+            | BinaryOp::DivideDouble
             | BinaryOp::BitAnd
             | BinaryOp::BitOr
             | BinaryOp::BitXor),

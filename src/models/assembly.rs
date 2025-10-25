@@ -1,6 +1,6 @@
-pub use super::operator::*;
 use crate::models::symbol::StaticInit;
 use derive_more::Display;
+use std::fmt;
 
 type Ident = &'static str;
 
@@ -36,7 +36,6 @@ pub enum Instruction {
     Cvtsi2sd(Operand, Operand, AsmType),
     Unary(UnaryOp, Operand, AsmType),
     Binary(BinaryOp, Operand, Operand, AsmType),
-    Shift(ShiftOp, Operand, AsmType),
     Cmp(Operand, Operand, AsmType),
     Idiv(Operand, AsmType),
     Div(Operand, AsmType),
@@ -111,6 +110,40 @@ pub enum Reg {
     XMM15,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Display)]
+pub enum UnaryOp {
+    #[display("neg")]
+    Negate,
+    #[display("not")]
+    BitNot,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Display)]
+pub enum BinaryOp {
+    #[display("add")]
+    Add,
+    #[display("sub")]
+    Subtract,
+    #[display("imul")]
+    Multiply,
+    #[display("div")]
+    DivideDouble,
+    #[display("and")]
+    BitAnd,
+    #[display("or")]
+    BitOr,
+    #[display("xor")]
+    BitXor,
+    #[display("sal")]
+    Sal,
+    #[display("sar")]
+    Sar,
+    #[display("shl")]
+    Shl,
+    #[display("shr")]
+    Shr,
+}
+
 pub fn fmt<'a>(op: &'a Operand, typ: AsmType) -> OperandFmt<'a> {
     OperandFmt { op, typ }
 }
@@ -120,8 +153,8 @@ pub struct OperandFmt<'a> {
     typ: AsmType,
 }
 
-impl<'a> std::fmt::Display for OperandFmt<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'a> fmt::Display for OperandFmt<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.typ {
             AsmType::Byte => self.op.one_byte(f),
             AsmType::Longword => self.op.four_byte(f),
@@ -132,7 +165,7 @@ impl<'a> std::fmt::Display for OperandFmt<'a> {
 }
 
 impl Operand {
-    pub fn one_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn one_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Operand::Reg(reg) => reg.one_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
@@ -142,7 +175,7 @@ impl Operand {
         }
     }
 
-    pub fn four_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn four_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Operand::Reg(reg) => reg.four_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
@@ -152,7 +185,7 @@ impl Operand {
         }
     }
 
-    pub fn eight_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn eight_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Operand::Reg(reg) => reg.eight_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
@@ -164,7 +197,7 @@ impl Operand {
 }
 
 impl Reg {
-    pub fn one_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn one_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Reg::AX => write!(f, "%al"),
             Reg::CX => write!(f, "%cl"),
@@ -180,7 +213,7 @@ impl Reg {
         }
     }
 
-    fn four_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn four_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Reg::AX => write!(f, "%eax"),
             Reg::CX => write!(f, "%ecx"),
@@ -196,7 +229,7 @@ impl Reg {
         }
     }
 
-    fn eight_byte(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn eight_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Reg::AX => write!(f, "%rax"),
             Reg::CX => write!(f, "%rcx"),
@@ -222,8 +255,8 @@ impl Reg {
     }
 }
 
-impl std::fmt::Debug for TopLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for TopLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
             TopLevel::Function(name, global, instructions, _) => {
                 writeln!(f, "\nname: {name}")?;
