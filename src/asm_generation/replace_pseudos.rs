@@ -106,11 +106,11 @@ fn replace_pseudos_in_instruction(
 fn replace_operand(operand: &mut Operand, state: &mut State, symbols: &AsmSymbols) {
     if let Operand::Pseudo(ident) = operand {
         match symbols.get(ident).unwrap() {
-            AsmSymbol::ObjEntry(_, true) => *operand = Operand::Data(ident),
-            AsmSymbol::ObjEntry(AsmType::Longword, false) => {
+            AsmSymbol::ObjEntry(_, true, _) => *operand = Operand::Data(ident),
+            AsmSymbol::ObjEntry(AsmType::Longword, false, _) => {
                 *operand = Operand::Stack(-(state.longword(ident) as isize))
             }
-            AsmSymbol::ObjEntry(AsmType::Quadword | AsmType::Double, false) => {
+            AsmSymbol::ObjEntry(AsmType::Quadword | AsmType::Double, false, _) => {
                 *operand = Operand::Stack(-(state.quadword(ident) as isize))
             }
             _ => unreachable!(),

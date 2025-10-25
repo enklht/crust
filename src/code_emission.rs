@@ -58,7 +58,7 @@ fn emit_top_level(
             use StaticInit::*;
             writeln!(acc, "    .section .rodata")?;
             writeln!(acc, "    .balign {alignment}")?;
-            writeln!(acc, "{name}:")?;
+            writeln!(acc, ".L{name}:")?;
             match init {
                 Int(0) | UInt(0) => writeln!(acc, "    .zero 4"),
                 Long(0) | ULong(0) => writeln!(acc, "    .zero 8"),
@@ -83,68 +83,105 @@ fn emit_instructions(
     use AsmType::*;
     for instruction in instructions {
         match instruction {
-            Instruction::Mov(src, dst, typ) => {
-                writeln!(acc, "    mov{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?
-            }
+            Instruction::Mov(src, dst, typ) => writeln!(
+                acc,
+                "    mov{typ} {}, {}",
+                fmt(&src, typ, symbols),
+                fmt(&dst, typ, symbols)
+            )?,
             Instruction::Movsx(src, dst) => {
                 writeln!(
                     acc,
                     "    movslq {}, {}",
-                    fmt(&src, Longword),
-                    fmt(&dst, Quadword)
+                    fmt(&src, Longword, symbols),
+                    fmt(&dst, Quadword, symbols)
                 )?;
             }
             Instruction::Cvtsi2sd(src, dst, typ) => {
                 writeln!(
                     acc,
                     "    cvtsi2sd{typ} {}, {}",
-                    fmt(&src, typ),
-                    fmt(&dst, Double)
+                    fmt(&src, typ, symbols),
+                    fmt(&dst, Double, symbols)
                 )?;
             }
             Instruction::Cvttsd2si(src, dst, typ) => {
                 writeln!(
                     acc,
                     "    cvttsd2si{typ} {}, {}",
-                    fmt(&src, Double),
-                    fmt(&dst, typ)
+                    fmt(&src, Double, symbols),
+                    fmt(&dst, typ, symbols)
                 )?;
             }
             Instruction::Unary(op, operand, typ) => {
-                writeln!(acc, "    {op}{typ} {}", fmt(&operand, typ))?
+                writeln!(acc, "    {op}{typ} {}", fmt(&operand, typ, symbols))?
             }
             Instruction::Binary(op, src, dst, typ) => {
                 use BinaryOp::*;
                 match (op, typ) {
                     (Multiply, Double) => {
-                        writeln!(acc, "    mulsd {}, {}", fmt(&src, typ), fmt(&dst, typ))?;
+                        writeln!(
+                            acc,
+                            "    mulsd {}, {}",
+                            fmt(&src, typ, symbols),
+                            fmt(&dst, typ, symbols)
+                        )?;
                     }
                     (BitAnd | BitOr | BitXor, Double) => {
-                        writeln!(acc, "    {op}pd {}, {}", fmt(&src, typ), fmt(&dst, typ))?;
+                        writeln!(
+                            acc,
+                            "    {op}pd {}, {}",
+                            fmt(&src, typ, symbols),
+                            fmt(&dst, typ, symbols)
+                        )?;
                     }
                     (Sal | Sar | Shl | Shr, _) => {
-                        writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, Byte), fmt(&dst, typ))?;
+                        writeln!(
+                            acc,
+                            "    {op}{typ} {}, {}",
+                            fmt(&src, Byte, symbols),
+                            fmt(&dst, typ, symbols)
+                        )?;
                     }
                     _ => {
-                        writeln!(acc, "    {op}{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?;
+                        writeln!(
+                            acc,
+                            "    {op}{typ} {}, {}",
+                            fmt(&src, typ, symbols),
+                            fmt(&dst, typ, symbols)
+                        )?;
                     }
                 }
             }
             Instruction::Cmp(src, dst, typ) => {
                 match typ {
-                    Double => writeln!(acc, "    ucomisd {}, {}", fmt(&src, typ), fmt(&dst, typ))?,
-                    _ => writeln!(acc, "    cmp{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?,
+                    Double => writeln!(
+                        acc,
+                        "    ucomisd {}, {}",
+                        fmt(&src, typ, symbols),
+                        fmt(&dst, typ, symbols)
+                    )?,
+                    _ => writeln!(
+                        acc,
+                        "    cmp{typ} {}, {}",
+                        fmt(&src, typ, symbols),
+                        fmt(&dst, typ, symbols),
+                    )?,
                 };
             }
-            Instruction::Idiv(op, typ) => writeln!(acc, "    idiv{typ} {}", fmt(&op, typ))?,
-            Instruction::Div(op, typ) => writeln!(acc, "    div{typ} {}", fmt(&op, typ))?,
+            Instruction::Idiv(op, typ) => {
+                writeln!(acc, "    idiv{typ} {}", fmt(&op, typ, symbols))?
+            }
+            Instruction::Div(op, typ) => writeln!(acc, "    div{typ} {}", fmt(&op, typ, symbols))?,
             Instruction::Cdq(AsmType::Longword) => writeln!(acc, "    cdq")?,
             Instruction::Cdq(AsmType::Quadword) => writeln!(acc, "    cqo")?,
             Instruction::Jmp(label) => writeln!(acc, "    jmp .L{label}")?,
             Instruction::JmpCC(code, label) => writeln!(acc, "    j{code} .L{label}")?,
-            Instruction::SetCC(code, op) => writeln!(acc, "    set{code} {}", fmt(&op, Byte))?,
+            Instruction::SetCC(code, op) => {
+                writeln!(acc, "    set{code} {}", fmt(&op, Byte, symbols))?
+            }
             Instruction::Label(label) => writeln!(acc, ".L{label}:")?,
-            Instruction::Push(op) => writeln!(acc, "    pushq {}", fmt(&op, Quadword))?,
+            Instruction::Push(op) => writeln!(acc, "    pushq {}", fmt(&op, Quadword, symbols))?,
             Instruction::Call(name) => {
                 let defined = match symbols.get(&name) {
                     Some(crate::models::asm_symbol::AsmSymbol::FunEntry(defined)) => *defined,

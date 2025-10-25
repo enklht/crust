@@ -20,13 +20,14 @@ fn make_temp_var(typ: Type, symbols: &mut Symbols) -> tacky::Val {
 pub fn convert_program(program: Program, symbols: &mut Symbols) -> tacky::Program {
     match program {
         Program::Program(decls) => {
-            let mut decls = decls
+            let decls = decls
                 .into_iter()
                 .filter_map(|decl| convert_decl(decl, symbols))
                 .collect::<Vec<_>>();
-            decls.extend(convert_symbols(symbols));
 
-            tacky::Program::Program(decls)
+            let top_levels = convert_symbols(symbols).into_iter().chain(decls).collect();
+
+            tacky::Program::Program(top_levels)
         }
     }
 }

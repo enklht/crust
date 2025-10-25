@@ -1,4 +1,7 @@
-use crate::models::symbol::StaticInit;
+use crate::models::{
+    asm_symbol::{AsmSymbol, AsmSymbols},
+    symbol::StaticInit,
+};
 use derive_more::Display;
 use std::fmt;
 
@@ -144,53 +147,75 @@ pub enum BinaryOp {
     Shr,
 }
 
-pub fn fmt<'a>(op: &'a Operand, typ: AsmType) -> OperandFmt<'a> {
-    OperandFmt { op, typ }
+pub fn fmt<'a>(op: &'a Operand, typ: AsmType, symbols: &'a AsmSymbols) -> OperandFmt<'a> {
+    OperandFmt { op, typ, symbols }
 }
 
 pub struct OperandFmt<'a> {
     op: &'a Operand,
     typ: AsmType,
+    symbols: &'a AsmSymbols,
 }
 
 impl<'a> fmt::Display for OperandFmt<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.typ {
-            AsmType::Byte => self.op.one_byte(f),
-            AsmType::Longword => self.op.four_byte(f),
-            AsmType::Quadword => self.op.eight_byte(f),
-            AsmType::Double => self.op.eight_byte(f),
+            AsmType::Byte => self.op.one_byte(f, self.symbols),
+            AsmType::Longword => self.op.four_byte(f, self.symbols),
+            AsmType::Quadword => self.op.eight_byte(f, self.symbols),
+            AsmType::Double => self.op.eight_byte(f, self.symbols),
         }
     }
 }
 
 impl Operand {
-    pub fn one_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub fn one_byte(&self, f: &mut fmt::Formatter<'_>, symbols: &AsmSymbols) -> fmt::Result {
         match self {
             Operand::Reg(reg) => reg.one_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
-            Operand::Data(label) => write!(f, "{}(%rip)", label),
+            Operand::Data(label) => match symbols.get(label).unwrap() {
+                AsmSymbol::ObjEntry(_, _, true) => {
+                    write!(f, ".L{}(%rip)", label)
+                }
+                _ => {
+                    write!(f, "{}(%rip)", label)
+                }
+            },
             Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
         }
     }
 
-    pub fn four_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub fn four_byte(&self, f: &mut fmt::Formatter<'_>, symbols: &AsmSymbols) -> fmt::Result {
         match self {
             Operand::Reg(reg) => reg.four_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
-            Operand::Data(label) => write!(f, "{}(%rip)", label),
+            Operand::Data(label) => match symbols.get(label).unwrap() {
+                AsmSymbol::ObjEntry(_, _, true) => {
+                    write!(f, ".L{}(%rip)", label)
+                }
+                _ => {
+                    write!(f, "{}(%rip)", label)
+                }
+            },
             Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
         }
     }
 
-    pub fn eight_byte(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub fn eight_byte(&self, f: &mut fmt::Formatter<'_>, symbols: &AsmSymbols) -> fmt::Result {
         match self {
             Operand::Reg(reg) => reg.eight_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
-            Operand::Data(label) => write!(f, "{}(%rip)", label),
+            Operand::Data(label) => match symbols.get(label).unwrap() {
+                AsmSymbol::ObjEntry(_, _, true) => {
+                    write!(f, ".L{}(%rip)", label)
+                }
+                _ => {
+                    write!(f, "{}(%rip)", label)
+                }
+            },
             Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
         }
     }

@@ -1,5 +1,7 @@
 use super::imm;
 use super::reg;
+use crate::models::asm_symbol::AsmSymbol;
+use crate::models::asm_symbol::AsmSymbols;
 use crate::models::assembly::*;
 use crate::models::constant::Const;
 use crate::models::symbol::*;
@@ -34,20 +36,41 @@ fn type_of_val(val: &tacky::Val, symbols: &Symbols) -> Type {
     }
 }
 
-pub fn gen_program(program: tacky::Program, symbols: &Symbols) -> Program {
+pub fn gen_program(program: tacky::Program, symbols: Symbols) -> (Program, AsmSymbols) {
     match program {
         tacky::Program::Program(top_levels) => {
             let mut consts = FxHashMap::default();
-            let mut top_levels: Vec<_> = top_levels
+            let top_levels: Vec<_> = top_levels
                 .into_iter()
-                .map(|top_level| gen_top_level(top_level, symbols, &mut consts))
+                .map(|top_level| gen_top_level(top_level, &symbols, &mut consts))
                 .collect();
 
-            top_levels.extend(consts.into_iter().map(|(val, (alignment, label))| {
-                TopLevel::StaticConst(label, alignment, StaticInit::Double(f64::from_bits(val)))
-            }));
+            let asm_symbols =
+                symbols
+                    .into_iter()
+                    .map(|(name, symbol)| match symbol {
+                        Symbol::Func { defined, .. } => (name, AsmSymbol::FunEntry(defined)),
+                        Symbol::StaticVar { typ, .. } => {
+                            (name, AsmSymbol::ObjEntry(typ.to_asm_type(), true, false))
+                        }
+                        Symbol::LocalVar { typ } => {
+                            (name, AsmSymbol::ObjEntry(typ.to_asm_type(), false, false))
+                        }
+                    })
+                    .chain(consts.values().map(|(_, name)| {
+                        (*name, AsmSymbol::ObjEntry(AsmType::Double, false, true))
+                    }))
+                    .collect();
 
-            Program::Program(top_levels)
+            let top_levels = consts
+                .into_iter()
+                .map(|(val, (alignment, label))| {
+                    TopLevel::StaticConst(label, alignment, StaticInit::Double(f64::from_bits(val)))
+                })
+                .chain(top_levels)
+                .collect();
+
+            (Program::Program(top_levels), asm_symbols)
         }
     }
 }

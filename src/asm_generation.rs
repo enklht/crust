@@ -3,7 +3,6 @@ mod replace_pseudos;
 mod tacky_to_asm;
 
 use crate::models::asm_symbol::AsmSymbols;
-use crate::models::asm_symbol::from_symbols;
 use crate::models::assembly as asm;
 use crate::models::symbol::Symbols;
 use crate::models::tacky;
@@ -27,11 +26,10 @@ use imm;
 use reg;
 
 pub fn codegen(program: tacky::Program, symbols: Symbols) -> (asm::Program, AsmSymbols) {
-    let mut program = gen_program(program, &symbols);
-
-    let asm_symbols = from_symbols(symbols);
+    let (mut program, asm_symbols) = gen_program(program, symbols);
 
     replace_pseudos(&mut program, &asm_symbols);
+
     fixup(&mut program);
 
     (program, asm_symbols)
