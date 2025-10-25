@@ -3,7 +3,8 @@ use super::symbol::Symbol;
 use super::symbol::Symbols;
 use rustc_hash::FxHashMap;
 
-pub type AsmSymbols = FxHashMap<String, AsmSymbol>;
+type Ident = &'static str;
+pub type AsmSymbols = FxHashMap<Ident, AsmSymbol>;
 
 pub enum AsmSymbol {
     ObjEntry(AsmType, bool),
@@ -12,15 +13,11 @@ pub enum AsmSymbol {
 
 pub fn from_symbols(symbols: Symbols) -> AsmSymbols {
     symbols
-        .iter()
+        .into_iter()
         .map(|(name, symbol)| match symbol {
-            Symbol::Func { defined, .. } => (name.clone(), AsmSymbol::FunEntry(*defined)),
-            Symbol::StaticVar { typ, .. } => {
-                (name.clone(), AsmSymbol::ObjEntry(typ.to_asm_type(), true))
-            }
-            Symbol::LocalVar { typ } => {
-                (name.clone(), AsmSymbol::ObjEntry(typ.to_asm_type(), false))
-            }
+            Symbol::Func { defined, .. } => (name, AsmSymbol::FunEntry(defined)),
+            Symbol::StaticVar { typ, .. } => (name, AsmSymbol::ObjEntry(typ.to_asm_type(), true)),
+            Symbol::LocalVar { typ } => (name, AsmSymbol::ObjEntry(typ.to_asm_type(), false)),
         })
         .collect()
 }

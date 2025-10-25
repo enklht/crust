@@ -1,9 +1,11 @@
 use derive_more::Display;
 
+type Ident = &'static str;
+
 #[derive(Debug, PartialEq, Clone, Display)]
 pub enum Token {
     #[display("{_0}")]
-    Ident(String),
+    Ident(Ident),
     #[display("{_0}")]
     ConstInt(i32),
     #[display("{_0}l")]

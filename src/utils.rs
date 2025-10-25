@@ -4,14 +4,14 @@ use std::sync::atomic::Ordering;
 
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-pub fn make_temporary() -> String {
+pub fn make_temporary() -> &'static str {
     let i = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("tmp.{}", i)
+    Box::new(format!("tmp.{}", i)).leak()
 }
 
-pub fn make_label(prefix: &str) -> String {
+pub fn make_label(prefix: &str) -> &'static str {
     let i = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("{}.{}", prefix, i)
+    Box::new(format!("{}.{}", prefix, i)).leak()
 }
 
 pub struct PrettyVec<'a, T>(pub &'a [T]);

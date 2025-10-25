@@ -3,7 +3,8 @@ use crate::models::ast::Exp;
 use crate::models::constant::Const;
 use rustc_hash::FxHashMap;
 
-pub type Symbols = FxHashMap<String, Symbol>;
+type Ident = &'static str;
+pub type Symbols = FxHashMap<Ident, Symbol>;
 
 #[derive(Debug)]
 pub enum Symbol {
@@ -72,7 +73,7 @@ impl InitialValue {
         };
 
         let i = match c {
-            _ if typ == &Type::Double => return Some(to_f64(c.clone())),
+            _ if typ == &Type::Double => return Some(to_f64(*c)),
             Const::Double(i) => return Some(from_f64(*i, typ)),
             Const::Int(i) => *i as u64,
             Const::Long(i) => *i as u64,

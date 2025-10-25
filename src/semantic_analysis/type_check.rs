@@ -38,7 +38,7 @@ fn check_func_decl(
     match func_decl {
         FuncDecl::FuncDecl(name, params, body, typ, storage_class) => {
             if block_scope && storage_class == &StorageClass::Static {
-                return Err(Error::IncompatibleStorageClass(name.clone()));
+                return Err(Error::IncompatibleStorageClass(name));
             }
 
             let mut defined = false;
@@ -52,10 +52,10 @@ fn check_func_decl(
                         global: old_global,
                     } if old_typ == typ => {
                         if *old_defined && body.is_some() {
-                            return Err(Error::DuplicateFuncDecl(name.clone()));
+                            return Err(Error::DuplicateFuncDecl(name));
                         }
                         if *old_global && storage_class == &StorageClass::Static {
-                            return Err(Error::IncompatibleLinkage(name.clone()));
+                            return Err(Error::IncompatibleLinkage(name));
                         }
 
                         defined = *old_defined;
@@ -63,7 +63,7 @@ fn check_func_decl(
                     }
                     symbol => {
                         return Err(Error::IncompatibleFuncDecl(
-                            name.clone(),
+                            name,
                             symbol.typ().clone(),
                             typ.clone(),
                         ));
@@ -81,11 +81,11 @@ fn check_func_decl(
                 global,
             };
 
-            symbols.insert(name.clone(), symbol);
+            symbols.insert(name, symbol);
 
             if let Some(body) = body {
                 for (param, param_type) in params.iter().zip(param_types) {
-                    symbols.insert(param.clone(), Symbol::LocalVar { typ: param_type });
+                    symbols.insert(param, Symbol::LocalVar { typ: param_type });
                 }
                 check_block(body, symbols, &ret_type)?;
             }
@@ -102,7 +102,7 @@ fn check_file_scope_var_decl(
         VarDecl::VarDecl(name, init, typ, storage_class) => {
             let mut init_value = match init {
                 Some(init) => InitialValue::from_exp(init, typ)
-                    .ok_or(Error::NonConstInitializer(name.to_string(), init.clone()))?,
+                    .ok_or(Error::NonConstInitializer(name, init.clone()))?,
                 None if storage_class == &StorageClass::Extern => InitialValue::NoInitializer,
                 None => InitialValue::Tentative,
             };
@@ -119,12 +119,12 @@ fn check_file_scope_var_decl(
                         if storage_class == &StorageClass::Extern {
                             global = *old_global;
                         } else if old_global != &global {
-                            return Err(Error::IncompatibleLinkage(name.clone()));
+                            return Err(Error::IncompatibleLinkage(name));
                         }
 
                         match (old_init, &mut init_value) {
                             (InitialValue::Initial(_), InitialValue::Initial(_)) => {
-                                return Err(Error::DuplicateVarDecl(name.clone()));
+                                return Err(Error::DuplicateVarDecl(name));
                             }
                             (old_init @ InitialValue::Initial(_), _) => {
                                 init_value = old_init.clone();
@@ -137,7 +137,7 @@ fn check_file_scope_var_decl(
                     Symbol::LocalVar { typ: old_typ } if old_typ == typ => {}
                     symbol => {
                         return Err(Error::IncompatibleVarDecl(
-                            name.clone(),
+                            name,
                             symbol.typ().clone(),
                             typ.clone(),
                         ));
@@ -151,7 +151,7 @@ fn check_file_scope_var_decl(
                 global,
             };
 
-            symbols.insert(name.clone(), symbol);
+            symbols.insert(name, symbol);
 
             if let Some(init) = init {
                 check_exp(init, symbols)?;
@@ -167,33 +167,33 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
             match storage_class {
                 StorageClass::Extern => {
                     if init.is_some() {
-                        return Err(Error::ExternVarWithInitializer(name.clone()));
+                        return Err(Error::ExternVarWithInitializer(name));
                     }
                     match symbols.get(name) {
                         Some(Symbol::Func { typ: old_typ, .. }) => {
                             return Err(Error::IncompatibleVarDecl(
-                                name.clone(),
+                                name,
                                 old_typ.clone(),
                                 typ.clone(),
                             ));
                         }
                         Some(Symbol::StaticVar { typ: old_typ, .. }) if old_typ != typ => {
                             return Err(Error::IncompatibleVarDecl(
-                                name.clone(),
+                                name,
                                 old_typ.clone(),
                                 typ.clone(),
                             ));
                         }
                         Some(Symbol::LocalVar { typ: old_typ, .. }) if old_typ != typ => {
                             return Err(Error::IncompatibleVarDecl(
-                                name.clone(),
+                                name,
                                 old_typ.clone(),
                                 typ.clone(),
                             ));
                         }
                         None => {
                             symbols.insert(
-                                name.clone(),
+                                name,
                                 Symbol::StaticVar {
                                     typ: Type::Int,
                                     init: InitialValue::NoInitializer,
@@ -207,7 +207,7 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                 StorageClass::Static => {
                     let init_value = match init {
                         Some(init) => InitialValue::from_exp(init, typ)
-                            .ok_or(Error::NonConstInitializer(name.to_string(), init.clone()))?,
+                            .ok_or(Error::NonConstInitializer(name, init.clone()))?,
                         None => match typ {
                             Type::Int => InitialValue::Initial(StaticInit::Int(0)),
                             Type::Long => InitialValue::Initial(StaticInit::Long(0)),
@@ -215,7 +215,7 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                         },
                     };
                     symbols.insert(
-                        name.clone(),
+                        name,
                         Symbol::StaticVar {
                             typ: typ.clone(),
                             init: init_value,
@@ -224,7 +224,7 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                     );
                 }
                 StorageClass::None => {
-                    symbols.insert(name.clone(), Symbol::LocalVar { typ: typ.clone() });
+                    symbols.insert(name, Symbol::LocalVar { typ: typ.clone() });
                     if let Some(init) = init {
                         check_exp(init, symbols)?;
                         init.convert_to(typ);
@@ -309,7 +309,7 @@ fn check_for_init(for_init: &mut ForInit, symbols: &mut Symbols) -> ValidationRe
     match for_init {
         ForInit::InitDecl(decl) => match decl {
             VarDecl::VarDecl(_, _, _, StorageClass::None) => check_local_var_decl(decl, symbols),
-            VarDecl::VarDecl(name, _, _, _) => Err(Error::IncompatibleStorageClass(name.clone())),
+            VarDecl::VarDecl(name, _, _, _) => Err(Error::IncompatibleStorageClass(name)),
         },
         ForInit::InitExp(exp) => check_exp(exp, symbols),
         ForInit::Null => Ok(()),
@@ -328,7 +328,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
         }
         Exp::Var(name, typ) => match symbols.get(name).unwrap() {
             Symbol::Func { .. } => {
-                return Err(Error::FunctionAsVariable(name.clone()));
+                return Err(Error::FunctionAsVariable(name));
             }
             symbol => *typ = Some(symbol.typ().clone()),
         },
@@ -397,17 +397,13 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 ..
             } = symbols.get(name).unwrap()
             else {
-                return Err(Error::VariableAsFunction(name.clone()));
+                return Err(Error::VariableAsFunction(name));
             };
             let param_types = param_types.clone();
             let ret_type = ret_type.clone();
 
             if param_types.len() != args.len() {
-                return Err(Error::WrongArity(
-                    name.clone(),
-                    param_types.len(),
-                    args.len(),
-                ));
+                return Err(Error::WrongArity(name, param_types.len(), args.len()));
             }
 
             for (arg, param_type) in args.iter_mut().zip(param_types) {

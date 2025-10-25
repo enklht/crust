@@ -71,7 +71,7 @@ pub fn lexer<'src>()
         "default" => Token::KwDefault,
         "static" => Token::KwStatic,
         "extern" => Token::KwExtern,
-        s => Token::Ident(s.to_string()),
+        s => Token::Ident(Box::new(s.to_string()).leak()),
     });
 
     let const_int = text::int(10)

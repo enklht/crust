@@ -9,53 +9,55 @@ use crate::models::symbol::*;
 use crate::models::typ::Type;
 use thiserror::Error;
 
+type Ident = &'static str;
+
 #[derive(Debug, Error)]
 pub enum ValidationError {
     // invalid declaration
     #[error("Incompatible storage class for {0}")]
-    IncompatibleStorageClass(String),
+    IncompatibleStorageClass(Ident),
     #[error("Incompatible linkage for {0}")]
-    IncompatibleLinkage(String),
+    IncompatibleLinkage(Ident),
     #[error("Static variable {0} has a non-constant initializer {1:?}")]
-    NonConstInitializer(String, Exp),
+    NonConstInitializer(Ident, Exp),
     #[error("Extern variable {0} has an initializer")]
-    ExternVarWithInitializer(String),
+    ExternVarWithInitializer(Ident),
 
     // invalid variable declaration
     #[error("Variable '{0}' has already been declared in this scope")]
-    DuplicateVarDecl(String),
+    DuplicateVarDecl(Ident),
     #[error("Variable '{0}' is previously defined as {1}, now defined as {2}")]
-    IncompatibleVarDecl(String, Type, Type),
+    IncompatibleVarDecl(Ident, Type, Type),
     #[error("Expression '{0:?}' cannot be used as an lvalue")]
     InvalidLvalue(Exp),
 
     // invalid function declaration
     #[error("Function '{0}' has already been declared")]
-    DuplicateFuncDecl(String),
+    DuplicateFuncDecl(Ident),
     #[error("Function '{0}' is previously defined as {1}, now defined as {2}")]
-    IncompatibleFuncDecl(String, Type, Type),
+    IncompatibleFuncDecl(Ident, Type, Type),
     #[error("Function '{0}' cannot be defined inside another function")]
-    NestedFuncDef(String),
+    NestedFuncDef(Ident),
 
     /// invalid variable use
     #[error("Cannot find variable '{0}' in this scope")]
-    UndefinedVariable(String),
+    UndefinedVariable(Ident),
     #[error("'{0}' is a function and cannot be used as a variable")]
-    FunctionAsVariable(String),
+    FunctionAsVariable(Ident),
 
     // invalid function call
     #[error("Cannot find function '{0}' in this scope")]
-    UndefinedFunction(String),
+    UndefinedFunction(Ident),
     #[error("'{0}' is a variable and cannot be called as a function")]
-    VariableAsFunction(String),
+    VariableAsFunction(Ident),
     #[error("Function '{0}' expects {1} arguments but was called with {2} arguments")]
-    WrongArity(String, usize, usize),
+    WrongArity(Ident, usize, usize),
 
     // invalid label
     #[error("Cannot find label '{0}' in this scope")]
-    UndefinedLabel(String),
+    UndefinedLabel(Ident),
     #[error("Label '{0}' has already been defined")]
-    DuplicateLabel(String),
+    DuplicateLabel(Ident),
 
     // invalid loop label
     #[error("'break' statement can only be used within a loop")]

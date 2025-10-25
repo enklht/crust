@@ -3,6 +3,8 @@ pub use super::operator::*;
 use super::typ::Type;
 use rustc_hash::FxHashMap;
 
+type Ident = &'static str;
+
 #[derive(Debug, Clone)]
 pub enum Program {
     Program(Vec<Decl>),
@@ -16,12 +18,12 @@ pub enum Decl {
 
 #[derive(Clone)]
 pub enum FuncDecl {
-    FuncDecl(String, Vec<String>, Option<Block>, Type, StorageClass),
+    FuncDecl(Ident, Vec<Ident>, Option<Block>, Type, StorageClass),
 }
 
 #[derive(Debug, Clone)]
 pub enum VarDecl {
-    VarDecl(String, Option<Exp>, Type, StorageClass),
+    VarDecl(Ident, Option<Exp>, Type, StorageClass),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,13 +50,13 @@ pub enum ForInit {
 
 #[derive(Debug, Clone)]
 pub enum Label {
-    Ident(String),
+    Ident(Ident),
     Case(Exp),
     Default,
 }
 
-type BlockLabel = Option<String>;
-type SwitchInfo = Option<(FxHashMap<Const, String>, Option<String>)>;
+type BlockLabel = Option<Ident>;
+type SwitchInfo = Option<(FxHashMap<Const, Ident>, Option<Ident>)>;
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
@@ -62,7 +64,7 @@ pub enum Stmt {
     Expression(Exp),
     If(Exp, Box<Stmt>, Option<Box<Stmt>>),
     Labelled(Label, Box<Stmt>),
-    Goto(String),
+    Goto(Ident),
     Compound(Block),
     Break(BlockLabel),
     Continue(BlockLabel),
@@ -76,13 +78,13 @@ pub enum Stmt {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Exp {
     Const(Const),
-    Var(String, Option<Type>),
+    Var(Ident, Option<Type>),
     Cast(Type, Box<Exp>),
     Unary(UnaryOp, Box<Exp>, Option<Type>),
     Binary(BinaryOp, Box<Exp>, Box<Exp>, Option<Type>),
     Assignment(Box<Exp>, Box<Exp>, Option<Type>),
     Conditional(Box<Exp>, Box<Exp>, Box<Exp>, Option<Type>),
-    FuncCall(String, Vec<Exp>, Option<Type>),
+    FuncCall(Ident, Vec<Exp>, Option<Type>),
 }
 
 impl Exp {

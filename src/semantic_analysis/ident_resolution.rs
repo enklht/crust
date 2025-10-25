@@ -4,9 +4,11 @@ use crate::models::ast::*;
 use crate::utils::make_label;
 use rustc_hash::FxHashMap;
 
-type MapEntry = (String, bool);
+type Ident = &'static str;
 
-type IdentMap = FxHashMap<String, MapEntry>;
+type MapEntry = (Ident, bool);
+
+type IdentMap = FxHashMap<Ident, MapEntry>;
 
 struct ScopeManager {
     scopes: Vec<IdentMap>,
@@ -27,7 +29,7 @@ impl ScopeManager {
         self.scopes.pop();
     }
 
-    fn insert(&mut self, name: String, entry: MapEntry) {
+    fn insert(&mut self, name: Ident, entry: MapEntry) {
         self.scopes.last_mut().unwrap().insert(name, entry);
     }
 
@@ -68,7 +70,7 @@ fn resolve_local_decl(decl: &mut Decl, scope_manager: &mut ScopeManager) -> Vali
         Decl::VarDecl(var_decl) => resolve_local_var_decl(var_decl, scope_manager)?,
         Decl::FuncDecl(func_decl) => {
             if let FuncDecl::FuncDecl(name, _, Some(_), _, _) = func_decl {
-                return Err(ValidationError::NestedFuncDef(name.clone()));
+                return Err(ValidationError::NestedFuncDef(name));
             }
             resolve_func_decl(func_decl, scope_manager)?
         }
@@ -82,7 +84,7 @@ fn resolve_file_scope_var_decl(
 ) -> ValidationResult<()> {
     match var_decl {
         VarDecl::VarDecl(name, _, _, _) => {
-            scope_manager.insert(name.clone(), (name.clone(), true));
+            scope_manager.insert(name, (name, true));
         }
     };
     Ok(())
@@ -97,15 +99,15 @@ fn resolve_local_var_decl(
     if let Some(&(_, has_linkage)) = scope_manager.get_from_current_scope(name)
         && !(has_linkage && storage_class == &StorageClass::Extern)
     {
-        return Err(ValidationError::DuplicateVarDecl(name.clone()));
+        return Err(ValidationError::DuplicateVarDecl(name));
     }
 
     let (new_name, has_linkage) = match storage_class {
-        StorageClass::Extern => (name.clone(), true),
+        StorageClass::Extern => (*name, true),
         _ => (make_label(name), false),
     };
 
-    scope_manager.insert(name.clone(), (new_name.clone(), has_linkage));
+    scope_manager.insert(name, (new_name, has_linkage));
     *name = new_name;
 
     if let Some(init) = init {
@@ -122,10 +124,10 @@ fn resolve_func_decl(
     let FuncDecl::FuncDecl(name, params, body, _, _) = func_decl;
 
     if let Some(&(_, false)) = scope_manager.get_from_current_scope(name) {
-        return Err(ValidationError::DuplicateFuncDecl(name.clone()));
+        return Err(ValidationError::DuplicateFuncDecl(name));
     }
 
-    scope_manager.insert(name.clone(), (name.clone(), true));
+    scope_manager.insert(name, (name, true));
 
     scope_manager.enter_scope();
     params
@@ -140,13 +142,13 @@ fn resolve_func_decl(
     Ok(())
 }
 
-fn resolve_param(name: &mut String, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
+fn resolve_param(name: &mut Ident, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
     if scope_manager.is_in_current_scope(name) {
-        return Err(ValidationError::DuplicateVarDecl(name.clone()));
+        return Err(ValidationError::DuplicateVarDecl(name));
     }
 
     let unique_name = make_label(name);
-    scope_manager.insert(name.clone(), (unique_name.clone(), false));
+    scope_manager.insert(name, (unique_name, false));
     *name = unique_name;
 
     Ok(())
@@ -238,8 +240,8 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
             other => return Err(ValidationError::InvalidLvalue(other.clone())),
         },
         Exp::Var(name, _) => match scope_manager.get(name) {
-            Some((unique_name, _)) => *name = unique_name.clone(),
-            None => return Err(ValidationError::UndefinedVariable(name.clone())),
+            Some((unique_name, _)) => *name = unique_name,
+            None => return Err(ValidationError::UndefinedVariable(name)),
         },
         Exp::Cast(_, exp) => resolve_exp(exp, scope_manager)?,
         Exp::Unary(_, exp, _) => resolve_exp(exp, scope_manager)?,
@@ -254,10 +256,10 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
         }
         Exp::FuncCall(name, args, _) => {
             let Some((new_name, _)) = scope_manager.get(name) else {
-                return Err(ValidationError::UndefinedFunction(name.clone()));
+                return Err(ValidationError::UndefinedFunction(name));
             };
 
-            *name = new_name.clone();
+            *name = new_name;
             args.iter_mut()
                 .try_for_each(|arg| resolve_exp(arg, scope_manager))?;
         }

@@ -1,6 +1,6 @@
 use super::typ::Type;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Const {
     Int(i32),
     Long(i64),
@@ -54,12 +54,12 @@ impl Const {
         }
     }
 
-    pub fn to_u64(&self) -> u64 {
+    pub fn to_u64(self) -> u64 {
         match self {
-            Const::Int(i) => *i as u64,
-            Const::Long(i) => *i as u64,
-            Const::UInt(i) => *i as u64,
-            Const::ULong(i) => *i,
+            Const::Int(i) => i as u64,
+            Const::Long(i) => i as u64,
+            Const::UInt(i) => i as u64,
+            Const::ULong(i) => i,
             Const::Double(i) => i.to_bits(),
         }
     }

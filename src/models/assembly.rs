@@ -2,6 +2,8 @@ pub use super::operator::*;
 use crate::models::symbol::StaticInit;
 use derive_more::Display;
 
+type Ident = &'static str;
+
 #[derive(Debug)]
 pub enum Program {
     Program(Vec<TopLevel>),
@@ -20,9 +22,9 @@ pub enum AsmType {
 }
 
 pub enum TopLevel {
-    Function(String, bool, Vec<Instruction>, Option<usize>),
-    StaticVar(String, bool, usize, StaticInit),
-    StaticConst(String, usize, StaticInit),
+    Function(Ident, bool, Vec<Instruction>, Option<usize>),
+    StaticVar(Ident, bool, usize, StaticInit),
+    StaticConst(Ident, usize, StaticInit),
 }
 
 #[derive(Debug)]
@@ -39,22 +41,22 @@ pub enum Instruction {
     Idiv(Operand, AsmType),
     Div(Operand, AsmType),
     Cdq(AsmType),
-    Jmp(String),
-    JmpCC(CondCode, String),
+    Jmp(Ident),
+    JmpCC(CondCode, Ident),
     SetCC(CondCode, Operand),
-    Label(String),
+    Label(Ident),
     Push(Operand),
-    Call(String),
+    Call(Ident),
     Ret,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Operand {
     Imm(u64),
     Reg(Reg),
-    Pseudo(String),
+    Pseudo(Ident),
     Stack(isize),
-    Data(String),
+    Data(Ident),
 }
 
 #[derive(Debug, Display)]

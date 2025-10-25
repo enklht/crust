@@ -2,14 +2,16 @@ pub use super::constant::Const;
 pub use super::operator::*;
 use super::symbol::StaticInit;
 
+type Ident = &'static str;
+
 #[derive(Debug)]
 pub enum Program {
     Program(Vec<TopLevel>),
 }
 
 pub enum TopLevel {
-    Function(String, bool, Vec<String>, Vec<Instruction>),
-    StaticVar(String, bool, StaticInit),
+    Function(Ident, bool, Vec<Ident>, Vec<Instruction>),
+    StaticVar(Ident, bool, StaticInit),
 }
 
 #[derive(Debug)]
@@ -25,17 +27,17 @@ pub enum Instruction {
     Unary(UnaryOp, Val, Val),
     Binary(BinaryOp, Val, Val, Val),
     Copy(Val, Val),
-    Jump(String),
-    JumpIfZero(Val, String),
-    JumpIfNotZero(Val, String),
-    Label(String),
-    FuncCall(String, Vec<Val>, Val),
+    Jump(Ident),
+    JumpIfZero(Val, Ident),
+    JumpIfNotZero(Val, Ident),
+    Label(Ident),
+    FuncCall(Ident, Vec<Val>, Val),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Val {
     Const(Const),
-    Var(String),
+    Var(Ident),
 }
 
 impl std::fmt::Debug for TopLevel {

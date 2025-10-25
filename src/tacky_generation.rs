@@ -13,7 +13,7 @@ use std::cmp::Ordering;
 
 fn make_temp_var(typ: Type, symbols: &mut Symbols) -> tacky::Val {
     let name = make_temporary();
-    symbols.insert(name.clone(), Symbol::LocalVar { typ });
+    symbols.insert(name, Symbol::LocalVar { typ });
     tacky::Val::Var(name)
 }
 
@@ -37,11 +37,9 @@ fn convert_symbols(symbols: &Symbols) -> Vec<TopLevel> {
         .filter_map(|(name, symbol)| {
             if let Symbol::StaticVar { typ, init, global } = symbol {
                 match init {
-                    InitialValue::Initial(i) => {
-                        Some(TopLevel::StaticVar(name.clone(), *global, i.clone()))
-                    }
+                    InitialValue::Initial(i) => Some(TopLevel::StaticVar(name, *global, i.clone())),
                     InitialValue::Tentative => Some(TopLevel::StaticVar(
-                        name.clone(),
+                        name,
                         *global,
                         match typ {
                             Type::Int => StaticInit::Int(0),
@@ -142,7 +140,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             let end_label = make_label("if_end");
 
             let cond = emit_exp(cond, instructions, symbols);
-            instructions.push(Instruction::JumpIfZero(cond, end_label.clone()));
+            instructions.push(Instruction::JumpIfZero(cond, end_label));
             emit_stmt(*then, instructions, symbols);
             instructions.push(Instruction::Label(end_label))
         }
@@ -151,12 +149,9 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             let end_label = make_label("if_end");
 
             let cond = emit_exp(cond, instructions, symbols);
-            instructions.push(Instruction::JumpIfZero(cond, else_label.clone()));
+            instructions.push(Instruction::JumpIfZero(cond, else_label));
             emit_stmt(*then, instructions, symbols);
-            instructions.extend([
-                Instruction::Jump(end_label.clone()),
-                Instruction::Label(else_label.clone()),
-            ]);
+            instructions.extend([Instruction::Jump(end_label), Instruction::Label(else_label)]);
             emit_stmt(*else_, instructions, symbols);
             instructions.push(Instruction::Label(end_label))
         }
@@ -166,17 +161,19 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
         }
         Stmt::Goto(label) => instructions.push(Instruction::Jump(label)),
         Stmt::Compound(block) => emit_block(block, instructions, symbols),
-        Stmt::Break(Some(label)) => instructions.push(Instruction::Jump(format!("break_{label}"))),
-        Stmt::Continue(Some(label)) => {
-            instructions.push(Instruction::Jump(format!("continue_{label}")))
+        Stmt::Break(Some(label)) => {
+            instructions.push(Instruction::Jump(Box::new(format!("break_{label}")).leak()))
         }
+        Stmt::Continue(Some(label)) => instructions.push(Instruction::Jump(
+            Box::new(format!("continue_{label}")).leak(),
+        )),
         Stmt::While(cond, body, Some(label)) => {
-            let break_label = format!("break_{label}");
-            let continue_label = format!("continue_{label}");
+            let break_label = Box::new(format!("break_{label}")).leak();
+            let continue_label = Box::new(format!("continue_{label}")).leak();
 
-            instructions.push(Instruction::Label(continue_label.clone()));
+            instructions.push(Instruction::Label(continue_label));
             let cond = emit_exp(cond, instructions, symbols);
-            instructions.push(Instruction::JumpIfZero(cond, break_label.clone()));
+            instructions.push(Instruction::JumpIfZero(cond, break_label));
             emit_stmt(*body, instructions, symbols);
             instructions.extend([
                 Instruction::Jump(continue_label),
@@ -184,11 +181,11 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             ]);
         }
         Stmt::DoWhile(body, cond, Some(label)) => {
-            let start_label = format!("start_{label}");
-            let break_label = format!("break_{label}");
-            let continue_label = format!("continue_{label}");
+            let start_label = Box::new(format!("start_{label}")).leak();
+            let break_label = Box::new(format!("break_{label}")).leak();
+            let continue_label = Box::new(format!("continue_{label}")).leak();
 
-            instructions.push(Instruction::Label(start_label.clone()));
+            instructions.push(Instruction::Label(start_label));
             emit_stmt(*body, instructions, symbols);
             instructions.push(Instruction::Label(continue_label));
             let cond = emit_exp(cond, instructions, symbols);
@@ -198,9 +195,9 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             ]);
         }
         Stmt::For(init, cond, post, body, Some(label)) => {
-            let start_label = format!("start_{label}");
-            let break_label = format!("break_{label}");
-            let continue_label = format!("continue_{label}");
+            let start_label = Box::new(format!("start_{label}")).leak();
+            let break_label = Box::new(format!("break_{label}")).leak();
+            let continue_label = Box::new(format!("continue_{label}")).leak();
 
             match init {
                 ForInit::InitDecl(decl) => emit_var_decl(decl, instructions, symbols),
@@ -209,10 +206,10 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
                 }
                 ForInit::Null => {}
             }
-            instructions.push(Instruction::Label(start_label.clone()));
+            instructions.push(Instruction::Label(start_label));
             if let Some(cond) = cond {
                 let cond = emit_exp(cond, instructions, symbols);
-                instructions.push(Instruction::JumpIfZero(cond, break_label.clone()));
+                instructions.push(Instruction::JumpIfZero(cond, break_label));
             }
             emit_stmt(*body, instructions, symbols);
             instructions.push(Instruction::Label(continue_label));
@@ -225,7 +222,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             ])
         }
         Stmt::Switch(cond, body, Some(label), Some((cases, default))) => {
-            let break_label = format!("break_{label}");
+            let break_label = Box::new(format!("break_{label}")).leak();
             let flag = make_temp_var(cond.typ().clone(), symbols);
 
             let cond = emit_exp(cond, instructions, symbols);
@@ -234,16 +231,16 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
                 instructions.extend([
                     Instruction::Binary(
                         tacky::BinaryOp::Equal,
-                        cond.clone(),
+                        cond,
                         tacky::Val::Const(case),
-                        flag.clone(),
+                        flag,
                     ),
-                    Instruction::JumpIfNotZero(flag.clone(), case_label),
+                    Instruction::JumpIfNotZero(flag, case_label),
                 ])
             }
             match default {
                 Some(default_label) => instructions.push(Instruction::Jump(default_label)),
-                None => instructions.push(Instruction::Jump(break_label.clone())),
+                None => instructions.push(Instruction::Jump(break_label)),
             }
             emit_stmt(*body, instructions, symbols);
             instructions.push(Instruction::Label(break_label));
@@ -259,7 +256,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
         Exp::Unary(op, inner, typ) => {
             let src = emit_exp(*inner, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
-            instructions.push(Instruction::Unary(op, src, dst.clone()));
+            instructions.push(Instruction::Unary(op, src, dst));
             dst
         }
         Exp::Binary(BinaryOp::LogicalAnd, v1, v2, typ) => {
@@ -268,14 +265,14 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
 
             let dst = make_temp_var(typ.unwrap(), symbols);
             let v1 = emit_exp(*v1, instructions, symbols);
-            instructions.push(Instruction::JumpIfZero(v1, false_label.clone()));
+            instructions.push(Instruction::JumpIfZero(v1, false_label));
             let v2 = emit_exp(*v2, instructions, symbols);
             instructions.extend([
-                Instruction::JumpIfZero(v2, false_label.clone()),
-                Instruction::Copy(tacky::Val::Const(Const::Int(1)), dst.clone()),
-                Instruction::Jump(end_label.clone()),
+                Instruction::JumpIfZero(v2, false_label),
+                Instruction::Copy(tacky::Val::Const(Const::Int(1)), dst),
+                Instruction::Jump(end_label),
                 Instruction::Label(false_label),
-                Instruction::Copy(tacky::Val::Const(Const::Int(0)), dst.clone()),
+                Instruction::Copy(tacky::Val::Const(Const::Int(0)), dst),
                 Instruction::Label(end_label),
             ]);
             dst
@@ -286,14 +283,14 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
 
             let dst = make_temp_var(typ.unwrap(), symbols);
             let v1 = emit_exp(*v1, instructions, symbols);
-            instructions.push(Instruction::JumpIfNotZero(v1, true_label.clone()));
+            instructions.push(Instruction::JumpIfNotZero(v1, true_label));
             let v2 = emit_exp(*v2, instructions, symbols);
             instructions.extend([
-                Instruction::JumpIfNotZero(v2, true_label.clone()),
-                Instruction::Copy(tacky::Val::Const(Const::Int(0)), dst.clone()),
-                Instruction::Jump(end_label.clone()),
+                Instruction::JumpIfNotZero(v2, true_label),
+                Instruction::Copy(tacky::Val::Const(Const::Int(0)), dst),
+                Instruction::Jump(end_label),
                 Instruction::Label(true_label),
-                Instruction::Copy(tacky::Val::Const(Const::Int(1)), dst.clone()),
+                Instruction::Copy(tacky::Val::Const(Const::Int(1)), dst),
                 Instruction::Label(end_label),
             ]);
             dst
@@ -302,14 +299,14 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             let v1 = emit_exp(*e1, instructions, symbols);
             let v2 = emit_exp(*e2, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
-            instructions.push(Instruction::Binary(op, v1, v2, dst.clone()));
+            instructions.push(Instruction::Binary(op, v1, v2, dst));
             dst
         }
         Exp::Var(name, _) => tacky::Val::Var(name),
         Exp::Assignment(left, right, _) => match *left {
             Exp::Var(v, _) => {
                 let result = emit_exp(*right, instructions, symbols);
-                instructions.push(Instruction::Copy(result, tacky::Val::Var(v.clone())));
+                instructions.push(Instruction::Copy(result, tacky::Val::Var(v)));
                 tacky::Val::Var(v)
             }
             _ => unreachable!(),
@@ -320,16 +317,16 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             let result = make_temp_var(typ.unwrap(), symbols);
 
             let cond = emit_exp(*cond, instructions, symbols);
-            instructions.push(Instruction::JumpIfZero(cond, else_label.clone()));
+            instructions.push(Instruction::JumpIfZero(cond, else_label));
             let then = emit_exp(*then, instructions, symbols);
             instructions.extend([
-                Instruction::Copy(then, result.clone()),
-                Instruction::Jump(end_label.clone()),
+                Instruction::Copy(then, result),
+                Instruction::Jump(end_label),
                 Instruction::Label(else_label),
             ]);
             let else_ = emit_exp(*else_, instructions, symbols);
             instructions.extend([
-                Instruction::Copy(else_, result.clone()),
+                Instruction::Copy(else_, result),
                 Instruction::Label(end_label),
             ]);
             result
@@ -341,7 +338,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
                 .into_iter()
                 .map(|arg| emit_exp(arg, instructions, symbols))
                 .collect();
-            instructions.push(Instruction::FuncCall(name, args, result.clone()));
+            instructions.push(Instruction::FuncCall(name, args, result));
             result
         }
         Exp::Cast(typ, inner) => {
@@ -355,26 +352,24 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
 
             if inner_typ == Type::Double {
                 if typ.is_signed() {
-                    instructions.push(Instruction::DoubleToInt(result, dst.clone()));
+                    instructions.push(Instruction::DoubleToInt(result, dst));
                 } else {
-                    instructions.push(Instruction::DoubleToUInt(result, dst.clone()));
+                    instructions.push(Instruction::DoubleToUInt(result, dst));
                 }
             } else if typ == Type::Double {
                 if inner_typ.is_signed() {
-                    instructions.push(Instruction::IntToDouble(result, dst.clone()));
+                    instructions.push(Instruction::IntToDouble(result, dst));
                 } else {
-                    instructions.push(Instruction::UIntToDouble(result, dst.clone()));
+                    instructions.push(Instruction::UIntToDouble(result, dst));
                 }
             } else {
                 match typ.size().cmp(&inner_typ.size()) {
-                    Ordering::Equal => instructions.push(Instruction::Copy(result, dst.clone())),
-                    Ordering::Less => instructions.push(Instruction::Truncate(result, dst.clone())),
+                    Ordering::Equal => instructions.push(Instruction::Copy(result, dst)),
+                    Ordering::Less => instructions.push(Instruction::Truncate(result, dst)),
                     Ordering::Greater if inner_typ.is_signed() => {
-                        instructions.push(Instruction::SignExtend(result, dst.clone()))
+                        instructions.push(Instruction::SignExtend(result, dst))
                     }
-                    Ordering::Greater => {
-                        instructions.push(Instruction::ZeroExtend(result, dst.clone()))
-                    }
+                    Ordering::Greater => instructions.push(Instruction::ZeroExtend(result, dst)),
                 }
             }
 

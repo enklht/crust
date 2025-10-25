@@ -44,7 +44,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             };
 
             acc.extend([
-                Instruction::Mov(src, tmp.clone(), asm_type),
+                Instruction::Mov(src, tmp, asm_type),
                 Instruction::Mov(tmp, dst, asm_type),
             ]);
         }
@@ -89,19 +89,6 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
                 Instruction::Mov(reg!(R11), dst, Quadword),
             ]);
         }
-        // Instruction::Cvttsd2si(src @ Operand::Imm(_), dst @ memory!(), asm_type) => {
-        //     acc.extend([
-        //         Instruction::Mov(src, reg!(XMM14), Double),
-        //         Instruction::Cvttsd2si(reg!(XMM14), reg!(R11), asm_type),
-        //         Instruction::Mov(reg!(R11), dst, asm_type),
-        //     ]);
-        // }
-        // Instruction::Cvttsd2si(src @ Operand::Imm(_), dst, asm_type) => {
-        //     acc.extend([
-        //         Instruction::Mov(src, reg!(XMM14), Double),
-        //         Instruction::Cvttsd2si(reg!(XMM14), dst, asm_type),
-        //     ]);
-        // }
         Instruction::Cvttsd2si(src, dst @ memory!(), asm_type) => {
             acc.extend([
                 Instruction::Cvttsd2si(src, reg!(R11), asm_type),
@@ -140,7 +127,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             Double,
         ) => {
             acc.extend([
-                Instruction::Mov(dst.clone(), reg!(XMM15), Double),
+                Instruction::Mov(dst, reg!(XMM15), Double),
                 Instruction::Binary(op, src, reg!(XMM15), Double),
                 Instruction::Mov(reg!(XMM15), dst, Double),
             ]);
@@ -183,7 +170,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
         ) if !fits_in_i32(i) => {
             acc.extend([
                 Instruction::Mov(src, reg!(R10), Quadword),
-                Instruction::Mov(dst.clone(), reg!(R11), Quadword),
+                Instruction::Mov(dst, reg!(R11), Quadword),
                 Instruction::Binary(BinaryOp::Multiply, reg!(R10), reg!(R11), Quadword),
                 Instruction::Mov(reg!(R11), dst, Quadword),
             ]);
@@ -198,7 +185,7 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
         }
         Instruction::Binary(BinaryOp::Multiply, src, dst @ memory!(), asm_type) => {
             acc.extend([
-                Instruction::Mov(dst.clone(), reg!(R11), asm_type),
+                Instruction::Mov(dst, reg!(R11), asm_type),
                 Instruction::Binary(BinaryOp::Multiply, src, reg!(R11), asm_type),
                 Instruction::Mov(reg!(R11), dst, asm_type),
             ]);

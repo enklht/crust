@@ -24,7 +24,7 @@ where
         let atom = choice((
             func_call,
             select! {
-                Token::Ident(ident) => Exp::Var(ident.clone(), None),
+                Token::Ident(ident) => Exp::Var(ident, None),
                 Token::ConstInt(i) => Exp::Const(Const::Int(i)),
                 Token::ConstLong(i) => Exp::Const(Const::Long(i)),
                 Token::ConstUInt(i) => Exp::Const(Const::UInt(i)),

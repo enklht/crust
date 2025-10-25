@@ -20,7 +20,8 @@ const DOUBLE_ARG_REGISTERS: [Reg; 8] = [
     Reg::XMM7,
 ];
 
-type Consts = FxHashMap<u64, (usize, String)>;
+type Ident = &'static str;
+type Consts = FxHashMap<u64, (usize, Ident)>;
 
 fn type_of_var(name: &str, symbols: &Symbols) -> Type {
     symbols.get(name).unwrap().typ().clone()
@@ -163,10 +164,10 @@ fn gen_instructions(
                         let dst = gen_val(dst, consts);
 
                         asm_instructions.extend([
-                            Instruction::Cmp(imm!(0), src.clone(), Quadword),
-                            Instruction::JmpCC(CondCode::L, out_of_range_label.clone()),
-                            Instruction::Cvtsi2sd(src.clone(), dst.clone(), Quadword),
-                            Instruction::Jmp(end_label.clone()),
+                            Instruction::Cmp(imm!(0), src, Quadword),
+                            Instruction::JmpCC(CondCode::L, out_of_range_label),
+                            Instruction::Cvtsi2sd(src, dst, Quadword),
+                            Instruction::Jmp(end_label),
                             Instruction::Label(out_of_range_label),
                             Instruction::Mov(src, reg!(R8), Quadword),
                             Instruction::Mov(reg!(R8), reg!(R9), Quadword),
@@ -174,8 +175,8 @@ fn gen_instructions(
                             Instruction::Binary(BinaryOp::BitAnd, imm!(1), reg!(R8), Quadword),
                             Instruction::Binary(BinaryOp::BitAnd, imm!(1), reg!(R8), Quadword),
                             Instruction::Binary(BinaryOp::BitOr, reg!(R8), reg!(R9), Quadword),
-                            Instruction::Cvtsi2sd(reg!(R9), dst.clone(), Quadword),
-                            Instruction::Binary(BinaryOp::Add, dst.clone(), dst.clone(), Double),
+                            Instruction::Cvtsi2sd(reg!(R9), dst, Quadword),
+                            Instruction::Binary(BinaryOp::Add, dst, dst, Double),
                             Instruction::Label(end_label),
                         ]);
                     }
@@ -195,7 +196,7 @@ fn gen_instructions(
                         let (_, upper_bound) = consts
                             .entry(9223372036854775808.0f64.to_bits())
                             .or_insert((8, make_label("upper_bound")));
-                        let upper_bound = Operand::Data(upper_bound.clone());
+                        let upper_bound = Operand::Data(upper_bound);
 
                         let out_of_range_label = make_label("d2ul_out_of_range");
                         let end_label = make_label("d2ul_end");
@@ -204,10 +205,10 @@ fn gen_instructions(
                         let dst = gen_val(dst, consts);
 
                         asm_instructions.extend([
-                            Instruction::Cmp(upper_bound.clone(), src.clone(), Double),
-                            Instruction::JmpCC(CondCode::AE, out_of_range_label.clone()),
-                            Instruction::Cvttsd2si(src.clone(), dst.clone(), Quadword),
-                            Instruction::Jmp(end_label.clone()),
+                            Instruction::Cmp(upper_bound, src, Double),
+                            Instruction::JmpCC(CondCode::AE, out_of_range_label),
+                            Instruction::Cvttsd2si(src, dst, Quadword),
+                            Instruction::Jmp(end_label),
                             Instruction::Label(out_of_range_label),
                             Instruction::Mov(src, reg!(XMM7), Double),
                             Instruction::Binary(
@@ -216,7 +217,7 @@ fn gen_instructions(
                                 reg!(XMM7),
                                 Double,
                             ),
-                            Instruction::Cvttsd2si(reg!(XMM7), dst.clone(), Quadword),
+                            Instruction::Cvttsd2si(reg!(XMM7), dst, Quadword),
                             Instruction::Mov(imm!(i32::MAX as u64), reg!(R8), Quadword),
                             Instruction::Binary(BinaryOp::Add, reg!(R8), dst, Quadword),
                             Instruction::Label(end_label),
@@ -236,8 +237,8 @@ fn gen_instructions(
                         asm_instructions.extend([
                             Instruction::Binary(BinaryOp::BitXor, reg!(XMM0), reg!(XMM0), Double),
                             Instruction::Cmp(src, reg!(XMM0), Double),
-                            Instruction::Mov(imm!(0), dst.clone(), dst_type),
-                            Instruction::SetCC(CondCode::E, dst.clone()),
+                            Instruction::Mov(imm!(0), dst, dst_type),
+                            Instruction::SetCC(CondCode::E, dst),
                             Instruction::SetCC(CondCode::NP, reg!(AX)),
                             Instruction::Binary(BinaryOp::BitAnd, reg!(AX), dst, Byte),
                         ]);
@@ -245,7 +246,7 @@ fn gen_instructions(
                     UnaryOp::LogicalNot => {
                         asm_instructions.extend([
                             Instruction::Cmp(imm!(0), src, src_type),
-                            Instruction::Mov(imm!(0), dst.clone(), Longword),
+                            Instruction::Mov(imm!(0), dst, Longword),
                             Instruction::SetCC(CondCode::E, dst),
                         ]);
                     }
@@ -253,15 +254,15 @@ fn gen_instructions(
                         let (_, neg_zero) = consts
                             .entry((-0.0f64).to_bits())
                             .or_insert((16, make_label("negative_zero")));
-                        let neg_zero = Operand::Data(neg_zero.clone());
+                        let neg_zero = Operand::Data(neg_zero);
                         asm_instructions.extend([
-                            Instruction::Mov(src, dst.clone(), Double),
+                            Instruction::Mov(src, dst, Double),
                             Instruction::Binary(BinaryOp::BitXor, neg_zero, dst, Double),
                         ]);
                     }
                     _ => {
                         asm_instructions.extend([
-                            Instruction::Mov(src, dst.clone(), src_type),
+                            Instruction::Mov(src, dst, src_type),
                             Instruction::Unary(op, dst, src_type),
                         ]);
                     }
@@ -283,14 +284,14 @@ fn gen_instructions(
                     | BinaryOp::BitOr
                     | BinaryOp::BitXor => {
                         asm_instructions.extend([
-                            Instruction::Mov(src1, dst.clone(), src1_type),
+                            Instruction::Mov(src1, dst, src1_type),
                             Instruction::Binary(op, src2, dst, src1_type),
                         ]);
                     }
                     BinaryOp::Divide => {
                         if src1_type == Double {
                             asm_instructions.extend([
-                                Instruction::Mov(src1, dst.clone(), src1_type),
+                                Instruction::Mov(src1, dst, src1_type),
                                 Instruction::Binary(BinaryOp::Divide, src2, dst, src1_type),
                             ]);
                         } else if signed {
@@ -328,7 +329,7 @@ fn gen_instructions(
                     }
                     BinaryOp::LShift | BinaryOp::RShift => {
                         asm_instructions.extend([
-                            Instruction::Mov(src1, dst.clone(), src1_type),
+                            Instruction::Mov(src1, dst, src1_type),
                             Instruction::Mov(src2, reg!(CX), src1_type),
                             Instruction::Shift(gen_shift_op(op, signed), dst, src1_type),
                         ]);
@@ -342,19 +343,19 @@ fn gen_instructions(
                     {
                         asm_instructions.extend([
                             Instruction::Cmp(src2, src1, src1_type),
-                            Instruction::Mov(imm!(0), dst.clone(), Longword),
-                            Instruction::SetCC(gen_rel(op, true), dst.clone()),
+                            Instruction::Mov(imm!(0), dst, Longword),
+                            Instruction::SetCC(gen_rel(op, true), dst),
                             Instruction::SetCC(CondCode::NP, reg!(AX)),
-                            Instruction::Binary(BinaryOp::BitAnd, reg!(AX), dst.clone(), Byte),
+                            Instruction::Binary(BinaryOp::BitAnd, reg!(AX), dst, Byte),
                         ]);
                     }
                     BinaryOp::NotEqual if src1_type == Double => {
                         asm_instructions.extend([
                             Instruction::Cmp(src2, src1, src1_type),
-                            Instruction::Mov(imm!(0), dst.clone(), Longword),
-                            Instruction::SetCC(gen_rel(op, true), dst.clone()),
+                            Instruction::Mov(imm!(0), dst, Longword),
+                            Instruction::SetCC(gen_rel(op, true), dst),
                             Instruction::SetCC(CondCode::P, reg!(AX)),
-                            Instruction::Binary(BinaryOp::BitOr, reg!(AX), dst.clone(), Byte),
+                            Instruction::Binary(BinaryOp::BitOr, reg!(AX), dst, Byte),
                         ]);
                     }
                     BinaryOp::Equal
@@ -365,8 +366,8 @@ fn gen_instructions(
                     | BinaryOp::GreaterOrEqual => {
                         asm_instructions.extend([
                             Instruction::Cmp(src2, src1, src1_type),
-                            Instruction::Mov(imm!(0), dst.clone(), Longword),
-                            Instruction::SetCC(gen_rel(op, !signed), dst.clone()),
+                            Instruction::Mov(imm!(0), dst, Longword),
+                            Instruction::SetCC(gen_rel(op, !signed), dst),
                         ]);
                     }
                     _ => unreachable!(),
@@ -532,7 +533,7 @@ fn gen_val(val: tacky::Val, consts: &mut Consts) -> Operand {
             let (_, label) = consts
                 .entry(d.to_bits())
                 .or_insert((8, make_label("static_const")));
-            Operand::Data(label.clone())
+            Operand::Data(label)
         }
         tacky::Val::Const(c) => imm!(c.to_u64()),
         tacky::Val::Var(ident) => Operand::Pseudo(ident),

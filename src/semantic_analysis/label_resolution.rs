@@ -4,6 +4,9 @@ use crate::models::ast::*;
 use crate::utils::make_label;
 use rustc_hash::FxHashMap;
 
+type Ident = &'static str;
+type Labels = FxHashMap<Ident, Ident>;
+
 pub fn resolve_program(program: Program) -> ValidationResult<Program> {
     let program = match program {
         Program::Program(decls) => Program::Program(
@@ -46,10 +49,7 @@ fn resolve_func_decl(func_def: FuncDecl) -> ValidationResult<FuncDecl> {
     Ok(func_def)
 }
 
-fn resolve_block_item(
-    block_item: BlockItem,
-    labels: &FxHashMap<String, String>,
-) -> ValidationResult<BlockItem> {
+fn resolve_block_item(block_item: BlockItem, labels: &Labels) -> ValidationResult<BlockItem> {
     let block_item = match block_item {
         BlockItem::S(stmt) => BlockItem::S(resolve_stmt(stmt, labels)?),
         decl => decl,
@@ -57,7 +57,7 @@ fn resolve_block_item(
     Ok(block_item)
 }
 
-fn collect_labels(stmt: &Stmt, labels: &mut FxHashMap<String, String>) -> ValidationResult<()> {
+fn collect_labels(stmt: &Stmt, labels: &mut Labels) -> ValidationResult<()> {
     match stmt {
         Stmt::If(_, then, Some(else_)) => {
             collect_labels(then, labels)?;
@@ -66,10 +66,10 @@ fn collect_labels(stmt: &Stmt, labels: &mut FxHashMap<String, String>) -> Valida
         Stmt::If(_, then, None) => collect_labels(then, labels)?,
         Stmt::Labelled(Label::Ident(label), stmt) => {
             match labels.get(label) {
-                Some(_) => return Err(ValidationError::DuplicateLabel(label.clone())),
+                Some(_) => return Err(ValidationError::DuplicateLabel(label)),
                 None => {
                     let new_label = make_label(label);
-                    labels.insert(label.clone(), new_label)
+                    labels.insert(label, new_label)
                 }
             };
             collect_labels(stmt, labels)?;
@@ -95,7 +95,7 @@ fn collect_labels(stmt: &Stmt, labels: &mut FxHashMap<String, String>) -> Valida
     Ok(())
 }
 
-fn resolve_stmt(stmt: Stmt, labels: &FxHashMap<String, String>) -> ValidationResult<Stmt> {
+fn resolve_stmt(stmt: Stmt, labels: &Labels) -> ValidationResult<Stmt> {
     let stmt = match stmt {
         Stmt::If(cond, then, Some(else_)) => Stmt::If(
             cond,
@@ -104,17 +104,16 @@ fn resolve_stmt(stmt: Stmt, labels: &FxHashMap<String, String>) -> ValidationRes
         ),
         Stmt::If(cond, then, None) => Stmt::If(cond, Box::new(resolve_stmt(*then, labels)?), None),
         Stmt::Labelled(Label::Ident(label), stmt) => match labels.get(&label) {
-            Some(label) => Stmt::Labelled(
-                Label::Ident(label.clone()),
-                Box::new(resolve_stmt(*stmt, labels)?),
-            ),
-            None => return Err(ValidationError::UndefinedLabel(label.clone())),
+            Some(label) => {
+                Stmt::Labelled(Label::Ident(label), Box::new(resolve_stmt(*stmt, labels)?))
+            }
+            None => return Err(ValidationError::UndefinedLabel(label)),
         },
         Stmt::Labelled(label, stmt) => {
             Stmt::Labelled(label, Box::new(resolve_stmt(*stmt, labels)?))
         }
         Stmt::Goto(label) => match labels.get(&label) {
-            Some(label) => Stmt::Goto(label.clone()),
+            Some(label) => Stmt::Goto(label),
             None => return Err(ValidationError::UndefinedLabel(label)),
         },
         Stmt::Compound(block) => {

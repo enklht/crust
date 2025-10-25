@@ -5,10 +5,12 @@ use crate::models::typ::Type;
 use crate::utils::make_label;
 use rustc_hash::FxHashMap;
 
+type Ident = &'static str;
+
 #[derive(Debug)]
 struct Context {
-    cases: FxHashMap<Const, String>,
-    default: Option<String>,
+    cases: FxHashMap<Const, Ident>,
+    default: Option<Ident>,
     typ: Type,
 }
 
@@ -57,7 +59,7 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
         }
         Stmt::Labelled(label @ Label::Case(_), stmt) => {
             let new_label = make_label("case");
-            let Label::Case(exp) = std::mem::replace(label, Label::Ident(new_label.clone())) else {
+            let Label::Case(exp) = std::mem::replace(label, Label::Ident(new_label)) else {
                 unreachable!()
             };
 
@@ -73,7 +75,7 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
                 if context.cases.contains_key(&c) {
                     return Err(ValidationError::DuplicateCaseValue(c));
                 }
-                context.cases.insert(c, new_label.clone());
+                context.cases.insert(c, new_label);
             } else {
                 return Err(ValidationError::CaseOutsideSwitch);
             }
@@ -82,7 +84,7 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
         }
         Stmt::Labelled(label @ Label::Default, stmt) => {
             let new_label = make_label("default");
-            *label = Label::Ident(new_label.clone());
+            *label = Label::Ident(new_label);
 
             if let Some(context) = context.as_mut() {
                 match context.default {
