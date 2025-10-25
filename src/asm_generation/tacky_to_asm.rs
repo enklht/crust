@@ -7,6 +7,7 @@ use crate::models::constant::Const;
 use crate::models::symbol::*;
 use crate::models::tacky;
 use crate::models::typ::Type;
+use crate::utils::Ident;
 use crate::utils::make_label;
 use rustc_hash::FxHashMap;
 
@@ -22,7 +23,6 @@ const DOUBLE_ARG_REGISTERS: [Reg; 8] = [
     Reg::XMM7,
 ];
 
-type Ident = &'static str;
 type Consts = FxHashMap<u64, (usize, Ident)>;
 
 fn type_of_var(name: &str, symbols: &Symbols) -> Type {

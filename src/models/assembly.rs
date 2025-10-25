@@ -1,11 +1,9 @@
-use crate::models::{
-    asm_symbol::{AsmSymbol, AsmSymbols},
-    symbol::StaticInit,
-};
+use crate::models::asm_symbol::AsmSymbol;
+use crate::models::asm_symbol::AsmSymbols;
+use crate::models::symbol::StaticInit;
+use crate::utils::Ident;
 use derive_more::Display;
 use std::fmt;
-
-type Ident = &'static str;
 
 #[derive(Debug)]
 pub enum Program {

@@ -2,10 +2,9 @@ use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
 use crate::models::typ::Type;
+use crate::utils::Ident;
 use crate::utils::make_label;
 use rustc_hash::FxHashMap;
-
-type Ident = &'static str;
 
 #[derive(Debug)]
 struct Context {

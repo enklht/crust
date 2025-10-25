@@ -1,8 +1,7 @@
 pub use super::constant::Const;
 pub use super::operator::*;
 use super::symbol::StaticInit;
-
-type Ident = &'static str;
+use crate::utils::Ident;
 
 #[derive(Debug)]
 pub enum Program {

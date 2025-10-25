@@ -2,6 +2,8 @@ use std::fmt;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
+pub type Ident = &'static str;
+
 static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub fn make_temporary() -> &'static str {

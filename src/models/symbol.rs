@@ -1,9 +1,9 @@
 use super::typ::Type;
 use crate::models::ast::Exp;
 use crate::models::constant::Const;
+use crate::utils::Ident;
 use rustc_hash::FxHashMap;
 
-type Ident = &'static str;
 pub type Symbols = FxHashMap<Ident, Symbol>;
 
 #[derive(Debug)]

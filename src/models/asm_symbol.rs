@@ -1,7 +1,7 @@
 use super::assembly::AsmType;
+use crate::utils::Ident;
 use rustc_hash::FxHashMap;
 
-type Ident = &'static str;
 pub type AsmSymbols = FxHashMap<Ident, AsmSymbol>;
 
 pub enum AsmSymbol {

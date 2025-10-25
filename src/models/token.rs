@@ -1,6 +1,5 @@
+use crate::utils::Ident;
 use derive_more::Display;
-
-type Ident = &'static str;
 
 #[derive(Debug, PartialEq, Clone, Display)]
 pub enum Token {

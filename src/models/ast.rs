@@ -1,9 +1,8 @@
 pub use super::constant::Const;
 pub use super::operator::*;
 use super::typ::Type;
+use crate::utils::Ident;
 use rustc_hash::FxHashMap;
-
-type Ident = &'static str;
 
 #[derive(Debug, Clone)]
 pub enum Program {

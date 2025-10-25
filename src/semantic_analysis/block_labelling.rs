@@ -1,9 +1,8 @@
 use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
+use crate::utils::Ident;
 use crate::utils::make_label;
-
-type Ident = &'static str;
 
 pub fn label_program(program: &mut Program) -> ValidationResult<()> {
     match program {

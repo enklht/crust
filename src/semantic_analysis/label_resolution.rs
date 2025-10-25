@@ -1,10 +1,10 @@
 use super::ValidationError;
 use super::ValidationResult;
 use crate::models::ast::*;
+use crate::utils::Ident;
 use crate::utils::make_label;
 use rustc_hash::FxHashMap;
 
-type Ident = &'static str;
 type Labels = FxHashMap<Ident, Ident>;
 
 pub fn resolve_program(program: Program) -> ValidationResult<Program> {
