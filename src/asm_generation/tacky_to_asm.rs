@@ -237,7 +237,9 @@ fn gen_instructions(
                             Instruction::Binary(BinaryOp::BitXor, reg!(XMM0), reg!(XMM0), Double),
                             Instruction::Cmp(src, reg!(XMM0), Double),
                             Instruction::Mov(imm!(0), dst.clone(), dst_type),
-                            Instruction::SetCC(CondCode::E, dst),
+                            Instruction::SetCC(CondCode::E, dst.clone()),
+                            Instruction::SetCC(CondCode::NP, reg!(AX)),
+                            Instruction::Binary(BinaryOp::BitAnd, reg!(AX), dst, Byte),
                         ]);
                     }
                     UnaryOp::LogicalNot => {
@@ -268,7 +270,11 @@ fn gen_instructions(
             Binary(op, src1, src2, dst) => {
                 let src1_type = type_of_val(&src1, symbols);
                 let (src1_type, signed) = (src1_type.to_asm_type(), src1_type.is_signed());
+
+                let src1 = gen_val(src1, consts);
+                let src2 = gen_val(src2, consts);
                 let dst = gen_val(dst, consts);
+
                 match op {
                     BinaryOp::Add
                     | BinaryOp::Subtract
@@ -277,58 +283,78 @@ fn gen_instructions(
                     | BinaryOp::BitOr
                     | BinaryOp::BitXor => {
                         asm_instructions.extend([
-                            Instruction::Mov(gen_val(src1, consts), dst.clone(), src1_type),
-                            Instruction::Binary(op, gen_val(src2, consts), dst, src1_type),
+                            Instruction::Mov(src1, dst.clone(), src1_type),
+                            Instruction::Binary(op, src2, dst, src1_type),
                         ]);
                     }
                     BinaryOp::Divide => {
                         if src1_type == Double {
                             asm_instructions.extend([
-                                Instruction::Mov(gen_val(src1, consts), dst.clone(), src1_type),
-                                Instruction::Binary(
-                                    BinaryOp::Divide,
-                                    gen_val(src2, consts),
-                                    dst,
-                                    src1_type,
-                                ),
+                                Instruction::Mov(src1, dst.clone(), src1_type),
+                                Instruction::Binary(BinaryOp::Divide, src2, dst, src1_type),
                             ]);
                         } else if signed {
                             asm_instructions.extend([
-                                Instruction::Mov(gen_val(src1, consts), reg!(AX), src1_type),
+                                Instruction::Mov(src1, reg!(AX), src1_type),
                                 Instruction::Cdq(src1_type),
-                                Instruction::Idiv(gen_val(src2, consts), src1_type),
+                                Instruction::Idiv(src2, src1_type),
                                 Instruction::Mov(reg!(AX), dst, src1_type),
                             ]);
                         } else {
                             asm_instructions.extend([
-                                Instruction::Mov(gen_val(src1, consts), reg!(AX), src1_type),
+                                Instruction::Mov(src1, reg!(AX), src1_type),
                                 Instruction::Mov(imm!(0), reg!(DX), src1_type),
-                                Instruction::Div(gen_val(src2, consts), src1_type),
+                                Instruction::Div(src2, src1_type),
                                 Instruction::Mov(reg!(AX), dst, src1_type),
                             ]);
                         }
                     }
-                    BinaryOp::Remainder if signed => {
-                        asm_instructions.extend([
-                            Instruction::Mov(gen_val(src1, consts), reg!(AX), src1_type),
-                            Instruction::Cdq(src1_type),
-                            Instruction::Idiv(gen_val(src2, consts), src1_type),
-                            Instruction::Mov(reg!(DX), dst, src1_type),
-                        ]);
-                    }
-                    BinaryOp::Remainder if !signed => {
-                        asm_instructions.extend([
-                            Instruction::Mov(gen_val(src1, consts), reg!(AX), src1_type),
-                            Instruction::Mov(imm!(0), reg!(DX), src1_type),
-                            Instruction::Div(gen_val(src2, consts), src1_type),
-                            Instruction::Mov(reg!(DX), dst, src1_type),
-                        ]);
+                    BinaryOp::Remainder => {
+                        if signed {
+                            asm_instructions.extend([
+                                Instruction::Mov(src1, reg!(AX), src1_type),
+                                Instruction::Cdq(src1_type),
+                                Instruction::Idiv(src2, src1_type),
+                                Instruction::Mov(reg!(DX), dst, src1_type),
+                            ]);
+                        } else {
+                            asm_instructions.extend([
+                                Instruction::Mov(src1, reg!(AX), src1_type),
+                                Instruction::Mov(imm!(0), reg!(DX), src1_type),
+                                Instruction::Div(src2, src1_type),
+                                Instruction::Mov(reg!(DX), dst, src1_type),
+                            ]);
+                        }
                     }
                     BinaryOp::LShift | BinaryOp::RShift => {
                         asm_instructions.extend([
-                            Instruction::Mov(gen_val(src1, consts), dst.clone(), src1_type),
-                            Instruction::Mov(gen_val(src2, consts), reg!(CX), src1_type),
+                            Instruction::Mov(src1, dst.clone(), src1_type),
+                            Instruction::Mov(src2, reg!(CX), src1_type),
                             Instruction::Shift(gen_shift_op(op, signed), dst, src1_type),
+                        ]);
+                    }
+                    BinaryOp::Equal
+                    | BinaryOp::LessThan
+                    | BinaryOp::LessOrEqual
+                    | BinaryOp::GreaterThan
+                    | BinaryOp::GreaterOrEqual
+                        if src1_type == Double =>
+                    {
+                        asm_instructions.extend([
+                            Instruction::Cmp(src2, src1, src1_type),
+                            Instruction::Mov(imm!(0), dst.clone(), Longword),
+                            Instruction::SetCC(gen_rel(op, true), dst.clone()),
+                            Instruction::SetCC(CondCode::NP, reg!(AX)),
+                            Instruction::Binary(BinaryOp::BitAnd, reg!(AX), dst.clone(), Byte),
+                        ]);
+                    }
+                    BinaryOp::NotEqual if src1_type == Double => {
+                        asm_instructions.extend([
+                            Instruction::Cmp(src2, src1, src1_type),
+                            Instruction::Mov(imm!(0), dst.clone(), Longword),
+                            Instruction::SetCC(gen_rel(op, true), dst.clone()),
+                            Instruction::SetCC(CondCode::P, reg!(AX)),
+                            Instruction::Binary(BinaryOp::BitOr, reg!(AX), dst.clone(), Byte),
                         ]);
                     }
                     BinaryOp::Equal
@@ -338,13 +364,9 @@ fn gen_instructions(
                     | BinaryOp::GreaterThan
                     | BinaryOp::GreaterOrEqual => {
                         asm_instructions.extend([
-                            Instruction::Cmp(
-                                gen_val(src2, consts),
-                                gen_val(src1, consts),
-                                src1_type,
-                            ),
+                            Instruction::Cmp(src2, src1, src1_type),
                             Instruction::Mov(imm!(0), dst.clone(), Longword),
-                            Instruction::SetCC(gen_rel(op, !signed || src1_type == Double), dst),
+                            Instruction::SetCC(gen_rel(op, !signed), dst.clone()),
                         ]);
                     }
                     _ => unreachable!(),
@@ -355,17 +377,22 @@ fn gen_instructions(
             }
             JumpIfZero(cond, target) => {
                 let cond_type = type_of_val(&cond, symbols).to_asm_type();
+                let cond = gen_val(cond, consts);
                 match cond_type {
                     Double => {
                         asm_instructions.extend([
                             Instruction::Binary(BinaryOp::BitXor, reg!(XMM0), reg!(XMM0), Double),
-                            Instruction::Cmp(gen_val(cond, consts), reg!(XMM0), Double),
-                            Instruction::JmpCC(CondCode::E, target),
+                            Instruction::Cmp(cond, reg!(XMM0), Double),
+                            Instruction::SetCC(CondCode::E, reg!(AX)),
+                            Instruction::SetCC(CondCode::NP, reg!(DX)),
+                            Instruction::Binary(BinaryOp::BitAnd, reg!(DX), reg!(AX), Byte),
+                            Instruction::Cmp(imm!(0), reg!(AX), Byte),
+                            Instruction::JmpCC(CondCode::NE, target),
                         ]);
                     }
                     _ => {
                         asm_instructions.extend([
-                            Instruction::Cmp(imm!(0), gen_val(cond, consts), cond_type),
+                            Instruction::Cmp(imm!(0), cond, cond_type),
                             Instruction::JmpCC(CondCode::E, target),
                         ]);
                     }
@@ -373,17 +400,22 @@ fn gen_instructions(
             }
             JumpIfNotZero(cond, target) => {
                 let cond_type = type_of_val(&cond, symbols).to_asm_type();
+                let cond = gen_val(cond, consts);
                 match cond_type {
                     Double => {
                         asm_instructions.extend([
                             Instruction::Binary(BinaryOp::BitXor, reg!(XMM0), reg!(XMM0), Double),
-                            Instruction::Cmp(gen_val(cond, consts), reg!(XMM0), Double),
+                            Instruction::Cmp(cond, reg!(XMM0), Double),
+                            Instruction::SetCC(CondCode::NE, reg!(AX)),
+                            Instruction::SetCC(CondCode::P, reg!(DX)),
+                            Instruction::Binary(BinaryOp::BitOr, reg!(DX), reg!(AX), Byte),
+                            Instruction::Cmp(imm!(0), reg!(AX), Byte),
                             Instruction::JmpCC(CondCode::NE, target),
                         ]);
                     }
                     _ => {
                         asm_instructions.extend([
-                            Instruction::Cmp(imm!(0), gen_val(cond, consts), cond_type),
+                            Instruction::Cmp(imm!(0), cond, cond_type),
                             Instruction::JmpCC(CondCode::NE, target),
                         ]);
                     }
@@ -499,7 +531,7 @@ fn gen_val(val: tacky::Val, consts: &mut Consts) -> Operand {
         tacky::Val::Const(Const::Double(d)) => {
             let (_, label) = consts
                 .entry(d.to_bits())
-                .or_insert((8, make_label(&format!("const_{d}"))));
+                .or_insert((8, make_label("static_const")));
             Operand::Data(label.clone())
         }
         tacky::Val::Const(c) => imm!(c.to_u64()),

@@ -9,7 +9,7 @@ pub enum Program {
 
 #[derive(Debug, Clone, Copy, PartialEq, Display)]
 pub enum AsmType {
-    #[display("b")]
+    #[display("")]
     Byte,
     #[display("l")]
     Longword,
@@ -79,6 +79,10 @@ pub enum CondCode {
     B,
     #[display("be")]
     BE,
+    #[display("p")]
+    P,
+    #[display("np")]
+    NP,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -186,16 +190,7 @@ impl Reg {
             Reg::R10 => write!(f, "%r10d"),
             Reg::R11 => write!(f, "%r11d"),
             Reg::SP => write!(f, "%esp"),
-            Reg::XMM0 => write!(f, "%xmm0"),
-            Reg::XMM1 => write!(f, "%xmm1"),
-            Reg::XMM2 => write!(f, "%xmm2"),
-            Reg::XMM3 => write!(f, "%xmm3"),
-            Reg::XMM4 => write!(f, "%xmm4"),
-            Reg::XMM5 => write!(f, "%xmm5"),
-            Reg::XMM6 => write!(f, "%xmm6"),
-            Reg::XMM7 => write!(f, "%xmm7"),
-            Reg::XMM14 => write!(f, "%xmm14"),
-            Reg::XMM15 => write!(f, "%xmm15"),
+            _ => unreachable!(),
         }
     }
 

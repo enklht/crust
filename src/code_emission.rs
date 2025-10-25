@@ -66,7 +66,10 @@ fn emit_top_level(
                 UInt(i) => writeln!(acc, "    .long {i}"),
                 Long(i) => writeln!(acc, "    .quad {i}"),
                 ULong(i) => writeln!(acc, "    .quad {i}"),
-                Double(i) => writeln!(acc, "    .quad {}", i.to_bits()),
+                Double(i) => {
+                    writeln!(acc, "    # {i}")?;
+                    writeln!(acc, "    .quad {}", i.to_bits())
+                }
             }
         }
     }
@@ -96,14 +99,14 @@ fn emit_instructions(
                     acc,
                     "    cvtsi2sd{typ} {}, {}",
                     fmt(&src, typ),
-                    fmt(&dst, typ)
+                    fmt(&dst, Double)
                 )?;
             }
             Instruction::Cvttsd2si(src, dst, typ) => {
                 writeln!(
                     acc,
                     "    cvttsd2si{typ} {}, {}",
-                    fmt(&src, typ),
+                    fmt(&src, Double),
                     fmt(&dst, typ)
                 )?;
             }
@@ -125,11 +128,11 @@ fn emit_instructions(
                 }
             }
             Instruction::Shift(op, dst, typ) => {
-                writeln!(acc, "    {op}{typ} %cl, {}", fmt(&dst, typ))?
+                writeln!(acc, "    {op}{typ} %cl, {}", fmt(&dst, typ))?;
             }
             Instruction::Cmp(src, dst, typ) => {
                 match typ {
-                    Double => writeln!(acc, "    comisd {}, {}", fmt(&src, typ), fmt(&dst, typ))?,
+                    Double => writeln!(acc, "    ucomisd {}, {}", fmt(&src, typ), fmt(&dst, typ))?,
                     _ => writeln!(acc, "    cmp{typ} {}, {}", fmt(&src, typ), fmt(&dst, typ))?,
                 };
             }
