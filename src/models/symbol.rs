@@ -66,9 +66,24 @@ fn to_f64(c: Const) -> InitialValue {
 }
 
 impl InitialValue {
+    pub fn from_none(typ: &Type) -> InitialValue {
+        match typ {
+            Type::Int => InitialValue::Initial(StaticInit::Int(0)),
+            Type::Long => InitialValue::Initial(StaticInit::Long(0)),
+            Type::UInt => InitialValue::Initial(StaticInit::UInt(0)),
+            Type::ULong => InitialValue::Initial(StaticInit::ULong(0)),
+            Type::Pointer(_) => InitialValue::Initial(StaticInit::ULong(0)),
+            _ => unreachable!(),
+        }
+    }
+
     pub fn from_exp(init: &Exp, typ: &Type) -> Option<InitialValue> {
+        if typ.is_pointer() && init.is_null_pointer_constant() {
+            return Some(InitialValue::from_none(typ));
+        }
+
         let c = match init {
-            Exp::Const(c) => c,
+            Exp::Const(c) if !typ.is_pointer() => c,
             _ => return None,
         };
 

@@ -239,17 +239,10 @@ fn resolve_for_init(init: &mut ForInit, scope_manager: &mut ScopeManager) -> Val
 fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
     match exp {
         Exp::Const(_) => {}
-        Exp::Assignment(left, right, _) => match left.as_mut() {
-            left @ Exp::Var(_, _) => {
-                resolve_exp(left, scope_manager)?;
-                resolve_exp(right, scope_manager)?;
-            }
-            other => {
-                return Err(ValidationError::VarDecl(format!(
-                    "Expression '{other:?}' cannot be used as an lvalue"
-                )));
-            }
-        },
+        Exp::Assignment(left, right, _) => {
+            resolve_exp(left, scope_manager)?;
+            resolve_exp(right, scope_manager)?;
+        }
         Exp::Var(name, _) => match scope_manager.get(name) {
             Some((unique_name, _)) => *name = unique_name,
             None => {
@@ -280,7 +273,12 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
             args.iter_mut()
                 .try_for_each(|arg| resolve_exp(arg, scope_manager))?;
         }
-        _ => todo!(),
+        Exp::Dereference(inner, _) => {
+            resolve_exp(inner, scope_manager)?;
+        }
+        Exp::AddrOf(inner, _) => {
+            resolve_exp(inner, scope_manager)?;
+        }
     }
     Ok(())
 }

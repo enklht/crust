@@ -10,7 +10,50 @@ use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use specifiers::type_specifiers;
 
-#[derive(Debug, Clone)]
+pub fn var_decl<'tokens, I>() -> impl Parser<'tokens, I, VarDecl, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    specifiers()
+        .then(declarator())
+        .then(just(Token::Equal).ignore_then(exp()).or_not())
+        .semicolon()
+        .try_map(|(((base_typ, storage_class), declarator), init), span| {
+            let (name, typ, _params) =
+                process_declarator(declarator, base_typ).ok_or(Rich::custom(span, ""))?;
+            if matches!(typ, Type::Func(_, _)) {
+                return Err(Rich::custom(span, ""));
+            }
+            Ok(VarDecl::VarDecl(name, init, typ, storage_class))
+        })
+        .labelled("variable declaration")
+        .as_context()
+}
+
+pub fn decl<'tokens, I>(
+    block: impl Parser<'tokens, I, Vec<BlockItem>, ParserError<'tokens>> + Clone,
+) -> impl Parser<'tokens, I, Decl, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    let func_decl = specifiers()
+        .then(declarator())
+        .then(block.map(Some).or(just(Token::Semicolon).to(None)))
+        .try_map(|(((base_typ, storage_class), declarator), body), span| {
+            let (name, typ, params) =
+                process_declarator(declarator, base_typ).ok_or(Rich::custom(span, ""))?;
+            if !matches!(typ, Type::Func(_, _)) {
+                return Err(Rich::custom(span, ""));
+            }
+            Ok(FuncDecl::FuncDecl(name, params, body, typ, storage_class))
+        })
+        .labelled("function declaration")
+        .as_context();
+
+    choice((func_decl.map(Decl::FuncDecl), var_decl().map(Decl::VarDecl)))
+}
+
+#[derive(Clone)]
 enum Declarator {
     Ident(Ident),
     Pointer(Box<Declarator>),
@@ -80,47 +123,4 @@ fn process_declarator(declarator: Declarator, base_typ: Type) -> Option<(Ident, 
             _ => None,
         },
     }
-}
-
-pub fn var_decl<'tokens, I>() -> impl Parser<'tokens, I, VarDecl, ParserError<'tokens>> + Clone
-where
-    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
-{
-    specifiers()
-        .then(declarator())
-        .then(just(Token::Equal).ignore_then(exp()).or_not())
-        .semicolon()
-        .try_map(|(((base_typ, storage_class), declarator), init), span| {
-            let (name, typ, _params) =
-                process_declarator(declarator, base_typ).ok_or(Rich::custom(span, ""))?;
-            if matches!(typ, Type::Func(_, _)) {
-                return Err(Rich::custom(span, ""));
-            }
-            Ok(VarDecl::VarDecl(name, init, typ, storage_class))
-        })
-        .labelled("variable declaration")
-        .as_context()
-}
-
-pub fn decl<'tokens, I>(
-    block: impl Parser<'tokens, I, Vec<BlockItem>, ParserError<'tokens>> + Clone,
-) -> impl Parser<'tokens, I, Decl, ParserError<'tokens>> + Clone
-where
-    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
-{
-    let func_decl = specifiers()
-        .then(declarator())
-        .then(block.map(Some).or(just(Token::Semicolon).to(None)))
-        .try_map(|(((base_typ, storage_class), declarator), body), span| {
-            let (name, typ, params) =
-                process_declarator(declarator, base_typ).ok_or(Rich::custom(span, ""))?;
-            if !matches!(typ, Type::Func(_, _)) {
-                return Err(Rich::custom(span, ""));
-            }
-            Ok(FuncDecl::FuncDecl(name, params, body, typ, storage_class))
-        })
-        .labelled("function declaration")
-        .as_context();
-
-    choice((func_decl.map(Decl::FuncDecl), var_decl().map(Decl::VarDecl)))
 }

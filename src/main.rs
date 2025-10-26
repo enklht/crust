@@ -85,8 +85,8 @@ fn main() -> Result<(), CrustError> {
 
     let (validated_ast, mut symbols) = match semantic_analysis::validate(ast) {
         Ok(program) => program,
-        Err(e) => {
-            eprintln!("Validation error: {e}");
+        Err(err) => {
+            eprintln!("Validation error: {err}");
             std::process::exit(1);
         }
     };

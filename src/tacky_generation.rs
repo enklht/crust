@@ -72,10 +72,10 @@ fn convert_func_decl(func_decl: FuncDecl, symbols: &mut Symbols) -> Option<TopLe
         FuncDecl::FuncDecl(name, params, Some(body), typ, _) => {
             let mut instructions = Vec::new();
             emit_block(body, &mut instructions, symbols);
-            let Type::Func(_, ret_typ) = typ else {
+            let Type::Func(_, ret_type) = typ else {
                 unreachable!()
             };
-            match *ret_typ {
+            match *ret_type {
                 Type::Int => {
                     instructions.push(Instruction::Return(tacky::Val::Const(Const::Int(0))))
                 }
@@ -343,31 +343,31 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             result
         }
         Exp::Cast(typ, inner) => {
-            let inner_typ = inner.typ().clone();
+            let inner_type = inner.typ().clone();
             let result = emit_exp(*inner, instructions, symbols);
-            if typ == inner_typ {
+            if typ == inner_type {
                 return result;
             }
 
             let dst = make_temp_var(typ.clone(), symbols);
 
-            if inner_typ == Type::Double {
+            if inner_type == Type::Double {
                 if typ.is_signed() {
                     instructions.push(Instruction::DoubleToInt(result, dst));
                 } else {
                     instructions.push(Instruction::DoubleToUInt(result, dst));
                 }
             } else if typ == Type::Double {
-                if inner_typ.is_signed() {
+                if inner_type.is_signed() {
                     instructions.push(Instruction::IntToDouble(result, dst));
                 } else {
                     instructions.push(Instruction::UIntToDouble(result, dst));
                 }
             } else {
-                match typ.size().cmp(&inner_typ.size()) {
+                match typ.size().cmp(&inner_type.size()) {
                     Ordering::Equal => instructions.push(Instruction::Copy(result, dst)),
                     Ordering::Less => instructions.push(Instruction::Truncate(result, dst)),
-                    Ordering::Greater if inner_typ.is_signed() => {
+                    Ordering::Greater if inner_type.is_signed() => {
                         instructions.push(Instruction::SignExtend(result, dst))
                     }
                     Ordering::Greater => instructions.push(Instruction::ZeroExtend(result, dst)),

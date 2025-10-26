@@ -12,39 +12,6 @@ fn binary(op: BinaryOp, left: Exp, right: Exp) -> Exp {
     Exp::Binary(op, Box::new(left), Box::new(right), None)
 }
 
-#[derive(Debug, Clone)]
-enum AbsDeclarator {
-    Base,
-    Pointer(Box<AbsDeclarator>),
-}
-
-fn abs_declarator<'tokens, I>()
--> impl Parser<'tokens, I, AbsDeclarator, ParserError<'tokens>> + Clone
-where
-    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
-{
-    recursive(|abs_declarator| {
-        choice((
-            just(Token::Star)
-                .ignore_then(abs_declarator.clone())
-                .map(|abs_declarator| AbsDeclarator::Pointer(Box::new(abs_declarator))),
-            abs_declarator.delimited_by(just(Token::LParen), just(Token::RParen)),
-            empty().to(AbsDeclarator::Base),
-        ))
-    })
-}
-
-fn process_abs_declarator(abs_declarator: AbsDeclarator, base_typ: Type) -> Option<Type> {
-    use AbsDeclarator::*;
-    match abs_declarator {
-        Base => Some(base_typ),
-        Pointer(abs_declarator) => Some(Type::Pointer(Box::new(process_abs_declarator(
-            *abs_declarator,
-            base_typ,
-        )?))),
-    }
-}
-
 pub fn exp<'tokens, I>() -> impl Parser<'tokens, I, Exp, ParserError<'tokens>> + Clone
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
@@ -124,7 +91,7 @@ where
                 |typ, v, _| Exp::Cast(typ, Box::new(v)),
             ),
             prefix(13, just(Token::Ampersand), |_, v, _| {
-                Exp::AddressOf(Box::new(v), None)
+                Exp::AddrOf(Box::new(v), None)
             }),
             prefix(13, just(Token::Star), |_, v, _| {
                 Exp::Dereference(Box::new(v), None)
@@ -211,6 +178,39 @@ where
     })
     .labelled("expession")
     .as_context()
+}
+
+#[derive(Clone)]
+enum AbsDeclarator {
+    Base,
+    Pointer(Box<AbsDeclarator>),
+}
+
+fn abs_declarator<'tokens, I>()
+-> impl Parser<'tokens, I, AbsDeclarator, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    recursive(|abs_declarator| {
+        choice((
+            just(Token::Star)
+                .ignore_then(abs_declarator.clone())
+                .map(|abs_declarator| AbsDeclarator::Pointer(Box::new(abs_declarator))),
+            abs_declarator.delimited_by(just(Token::LParen), just(Token::RParen)),
+            empty().to(AbsDeclarator::Base),
+        ))
+    })
+}
+
+fn process_abs_declarator(abs_declarator: AbsDeclarator, base_typ: Type) -> Option<Type> {
+    use AbsDeclarator::*;
+    match abs_declarator {
+        Base => Some(base_typ),
+        Pointer(abs_declarator) => Some(Type::Pointer(Box::new(process_abs_declarator(
+            *abs_declarator,
+            base_typ,
+        )?))),
+    }
 }
 
 fn convert_binop(token: Token) -> BinaryOp {

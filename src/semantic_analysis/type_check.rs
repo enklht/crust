@@ -4,6 +4,28 @@ use crate::models::ast::*;
 use crate::models::symbol::*;
 use crate::models::typ::Type;
 
+pub fn convert_to(exp: &mut Exp, typ: &Type) {
+    if exp.typ() != typ {
+        *exp = Exp::Cast(typ.clone(), Box::new(exp.clone()))
+    }
+}
+
+pub fn convert_by_assignment_to(exp: &mut Exp, target_type: &Type) -> Result<(), Error> {
+    match exp.typ() {
+        typ if typ == target_type => {}
+        typ if typ.is_arithmetic() && target_type.is_arithmetic() => convert_to(exp, target_type),
+        _ if exp.is_null_pointer_constant() && target_type.is_pointer() => {
+            convert_to(exp, target_type)
+        }
+        _ => {
+            return Err(Error::Type(format!(
+                "'{exp:?}' cannot converted to '{target_type}' by assignment"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub fn check_program(program: &mut Program) -> ValidationResult<Symbols> {
     let mut symbols = Symbols::default();
     match program {
@@ -49,10 +71,10 @@ fn check_func_decl(
             if let Some(old_symbol) = symbols.get(name) {
                 match old_symbol {
                     Symbol::Func {
-                        typ: old_typ,
+                        typ: old_type,
                         defined: old_defined,
                         global: old_global,
-                    } if old_typ == typ => {
+                    } if old_type == typ => {
                         if *old_defined && body.is_some() {
                             return Err(Error::FuncDecl(format!(
                                 "Function '{name}' has already been declared",
@@ -119,10 +141,10 @@ fn check_file_scope_var_decl(
             if let Some(old_symbol) = symbols.get(name) {
                 match old_symbol {
                     Symbol::StaticVar {
-                        typ: old_typ,
+                        typ: old_type,
                         init: old_init,
                         global: old_global,
-                    } if old_typ == typ => {
+                    } if old_type == typ => {
                         if storage_class == &StorageClass::Extern {
                             global = *old_global;
                         } else if old_global != &global {
@@ -145,7 +167,7 @@ fn check_file_scope_var_decl(
                             _ => {}
                         }
                     }
-                    Symbol::LocalVar { typ: old_typ } if old_typ == typ => {}
+                    Symbol::LocalVar { typ: old_type } if old_type == typ => {}
                     symbol => {
                         return Err(Error::VarDecl(format!(
                             "Variable '{name}' is previously defined as {}, now defined as {}",
@@ -189,16 +211,16 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                                 old_typ, typ
                             )));
                         }
-                        Some(Symbol::StaticVar { typ: old_typ, .. }) if old_typ != typ => {
+                        Some(Symbol::StaticVar { typ: old_type, .. }) if old_type != typ => {
                             return Err(Error::VarDecl(format!(
                                 "Variable '{name}' is previously defined as {}, now defined as {}",
-                                old_typ, typ
+                                old_type, typ
                             )));
                         }
-                        Some(Symbol::LocalVar { typ: old_typ, .. }) if old_typ != typ => {
+                        Some(Symbol::LocalVar { typ: old_type, .. }) if old_type != typ => {
                             return Err(Error::VarDecl(format!(
                                 "Variable '{name}' is previously defined as {}, now defined as {}",
-                                old_typ, typ
+                                old_type, typ
                             )));
                         }
                         None => {
@@ -221,11 +243,7 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                                 "Static variable '{name}' has a non-constant initializer {init:?}"
                             )))?
                         }
-                        None => match typ {
-                            Type::Int => InitialValue::Initial(StaticInit::Int(0)),
-                            Type::Long => InitialValue::Initial(StaticInit::Long(0)),
-                            _ => unreachable!(),
-                        },
+                        None => InitialValue::from_none(typ),
                     };
                     symbols.insert(
                         name,
@@ -240,7 +258,7 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                     symbols.insert(name, Symbol::LocalVar { typ: typ.clone() });
                     if let Some(init) = init {
                         check_exp(init, symbols)?;
-                        init.convert_to(typ);
+                        convert_by_assignment_to(init, typ)?;
                     }
                 }
             }
@@ -270,7 +288,7 @@ fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols, ret_type: &Type) -> Valida
     match stmt {
         Stmt::Return(exp) => {
             check_exp(exp, symbols)?;
-            exp.convert_to(ret_type);
+            convert_by_assignment_to(exp, ret_type)?;
         }
         Stmt::Expression(exp) => {
             check_exp(exp, symbols)?;
@@ -335,37 +353,64 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
     match exp {
         Exp::Const(_) => {}
         Exp::Assignment(left, right, typ) => {
-            check_exp(left, symbols)?;
-            check_exp(right, symbols)?;
-            let left_typ = left.typ().clone();
-            right.convert_to(&left_typ);
-            *typ = Some(left_typ.clone());
-        }
-        Exp::Var(name, typ) => match symbols.get(name).unwrap() {
-            Symbol::Func { .. } => {
+            if !left.is_lvalue() {
                 return Err(Error::Type(format!(
-                    "'{name}' is a function and cannot be used as a variable"
+                    "Assignment to non-lvalue variable '{left:?}'"
                 )));
             }
-            symbol => *typ = Some(symbol.typ().clone()),
-        },
-        Exp::Cast(_, inner) => {
+
+            check_exp(left, symbols)?;
+            check_exp(right, symbols)?;
+
+            let left_type = left.typ();
+            convert_by_assignment_to(right, left_type)?;
+            *typ = Some(left_type.clone());
+        }
+        Exp::Var(name, typ) => {
+            match symbols.get(name).unwrap() {
+                Symbol::Func { .. } => {
+                    return Err(Error::Type(format!(
+                        "'{name}' is a function and cannot be used as a variable"
+                    )));
+                }
+                symbol => *typ = Some(symbol.typ().clone()),
+            };
+        }
+        Exp::Cast(typ, inner) => {
+            use Type::*;
             check_exp(inner, symbols)?;
+            if matches!(
+                (inner.typ(), &typ),
+                (Double, Pointer(_)) | (Pointer(_), Double)
+            ) {
+                return Err(Error::Type(format!(
+                    "Cast from {} to {typ} is illegal",
+                    inner.typ()
+                )));
+            }
         }
         Exp::Unary(op, inner, typ) => {
+            use UnaryOp::*;
+
             check_exp(inner, symbols)?;
+
             match op {
-                UnaryOp::LogicalNot => *typ = Some(Type::Int),
-                UnaryOp::BitNot => {
-                    let typ_inner = inner.typ().clone();
-                    if inner.typ() == &Type::Double {
+                LogicalNot => {
+                    *typ = Some(Type::Int);
+                }
+                BitNot => {
+                    let inner_type = inner.typ().clone();
+                    if inner_type == Type::Double || inner_type.is_pointer() {
                         panic!()
                     }
-                    *typ = Some(typ_inner)
+                    *typ = Some(inner_type)
                 }
-                _ => {
-                    let typ_inner = inner.typ().clone();
-                    *typ = Some(typ_inner)
+                Negate => {
+                    let inner_type = inner.typ().clone();
+                    if inner_type.is_pointer() {
+                        panic!()
+                    }
+                    *typ = Some(inner_type)
                 }
             };
         }
@@ -374,38 +419,75 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
 
             check_exp(e1, symbols)?;
             check_exp(e2, symbols)?;
-            if matches!(op, LogicalAnd | LogicalOr) {
-                *typ = Some(Type::Int);
-            } else if matches!(op, LShift | RShift) {
-                if e1.typ() == &Type::Double || e2.typ() == &Type::Double {
-                    panic!()
-                }
-                *typ = Some(e1.typ().clone())
-            } else {
-                if matches!(op, Remainder | BitAnd | BitOr | BitXor)
-                    && (e1.typ() == &Type::Double || e2.typ() == &Type::Double)
-                {
-                    panic!()
-                }
 
-                let common_type = e1.typ().common_type_with(e2.typ());
+            let e1_type = e1.typ();
+            let e2_type = e2.typ();
 
-                e1.convert_to(&common_type);
-                e2.convert_to(&common_type);
-                match op {
-                    Add | Subtract | Multiply | Divide | Remainder | LShift | RShift | BitAnd
-                    | BitOr | BitXor => *typ = Some(common_type),
-                    _ => *typ = Some(Type::Int),
-                };
+            match op {
+                LogicalAnd | LogicalOr => {
+                    *typ = Some(Type::Int);
+                }
+                LShift | RShift => {
+                    if e1_type == &Type::Double
+                        || e2_type == &Type::Double
+                        || e1_type.is_pointer()
+                        || e2_type.is_pointer()
+                    {
+                        panic!()
+                    }
+                    *typ = Some(e1_type.clone())
+                }
+                Equal | NotEqual | GreaterThan | GreaterOrEqual | LessThan | LessOrEqual => {
+                    let common_type = if e1_type.is_pointer() || e2_type.is_pointer() {
+                        e1.common_pointer_type_with(e2)
+                    } else {
+                        e1.common_type_with(e2)
+                    }
+                    .ok_or(Error::Type(format!(
+                        "{e1:?} and {e2:?} do not have a common type"
+                    )))?;
+
+                    convert_to(e1, &common_type);
+                    convert_to(e2, &common_type);
+
+                    *typ = Some(Type::Int)
+                }
+                _ => {
+                    let common_type = e1.common_type_with(e2).ok_or(Error::Type(format!(
+                        "{e1:?} and {e2:?} do not have a common type"
+                    )))?;
+
+                    if matches!(op, Remainder | BitAnd | BitOr | BitXor)
+                        && common_type == Type::Double
+                    {
+                        panic!()
+                    }
+                    if matches!(op, Multiply | Divide | Remainder | BitAnd | BitOr | BitXor)
+                        && common_type.is_pointer()
+                    {
+                        panic!()
+                    }
+
+                    convert_to(e1, &common_type);
+                    convert_to(e2, &common_type);
+                    *typ = Some(common_type);
+                }
             }
         }
         Exp::Conditional(cond, then, else_, typ) => {
             check_exp(cond, symbols)?;
             check_exp(then, symbols)?;
             check_exp(else_, symbols)?;
-            let common_type = then.typ().common_type_with(else_.typ());
-            then.convert_to(&common_type);
-            else_.convert_to(&common_type);
+            let common_type = if then.typ().is_pointer() || else_.typ().is_pointer() {
+                then.common_pointer_type_with(else_)
+            } else {
+                then.common_type_with(else_)
+            }
+            .ok_or(Error::Type(format!(
+                "{then:?} and {else_:?} do not have a common type"
+            )))?;
+            convert_to(then, &common_type);
+            convert_to(else_, &common_type);
             *typ = Some(common_type);
         }
         Exp::FuncCall(name, args, typ) => {
@@ -431,12 +513,31 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
 
             for (arg, param_type) in args.iter_mut().zip(param_types) {
                 check_exp(arg, symbols)?;
-                arg.convert_to(&param_type);
+                convert_by_assignment_to(arg, &param_type)?;
             }
 
-            *typ = Some(*ret_type.clone())
+            *typ = Some(*ret_type.clone());
         }
-        _ => todo!(),
+        Exp::Dereference(inner, typ) => {
+            check_exp(inner, symbols)?;
+            match inner.typ() {
+                Type::Pointer(referenced_type) => *typ = Some(*referenced_type.clone()),
+                _ => {
+                    return Err(Error::Type(format!(
+                        "Trying to dereference non-pointer {typ:?}",
+                    )));
+                }
+            }
+        }
+        Exp::AddrOf(inner, typ) => {
+            if !inner.is_lvalue() {
+                return Err(Error::Type(format!(
+                    "Cannot take the address of a non-lvalue {inner:?}",
+                )));
+            }
+            check_exp(inner, symbols)?;
+            *typ = Some(Type::Pointer(Box::new(inner.typ().clone())));
+        }
     };
     Ok(())
 }
