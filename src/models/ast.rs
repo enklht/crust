@@ -84,20 +84,22 @@ pub enum Exp {
     Assignment(Box<Exp>, Box<Exp>, Option<Type>),
     Conditional(Box<Exp>, Box<Exp>, Box<Exp>, Option<Type>),
     FuncCall(Ident, Vec<Exp>, Option<Type>),
+    Dereference(Box<Exp>, Option<Type>),
+    AddressOf(Box<Exp>, Option<Type>),
 }
 
 impl Exp {
     pub fn typ(&self) -> &Type {
-        use Exp as E;
+        use Exp::*;
         match self {
-            E::Const(c) => c.typ(),
-            E::Var(_, Some(typ)) => typ,
-            E::Cast(typ, _) => typ,
-            E::Unary(_, _, Some(typ)) => typ,
-            E::Binary(_, _, _, Some(typ)) => typ,
-            E::Assignment(_, _, Some(typ)) => typ,
-            E::Conditional(_, _, _, Some(typ)) => typ,
-            E::FuncCall(_, _, Some(typ)) => typ,
+            Const(c) => c.typ(),
+            Var(_, Some(typ)) => typ,
+            Cast(typ, _) => typ,
+            Unary(_, _, Some(typ)) => typ,
+            Binary(_, _, _, Some(typ)) => typ,
+            Assignment(_, _, Some(typ)) => typ,
+            Conditional(_, _, _, Some(typ)) => typ,
+            FuncCall(_, _, Some(typ)) => typ,
             _ => unreachable!("the type is not assigned"),
         }
     }

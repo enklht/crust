@@ -26,12 +26,13 @@ impl core::hash::Hash for Const {
 
 impl Const {
     pub fn convert_to(self, typ: &Type) -> Const {
+        use Const::*;
         let i = match self {
-            Const::Int(i) => i as u64,
-            Const::Long(i) => i as u64,
-            Const::UInt(i) => i as u64,
-            Const::ULong(i) => i,
-            Const::Double(i) => i.to_bits(),
+            Int(i) => i as u64,
+            Long(i) => i as u64,
+            UInt(i) => i as u64,
+            ULong(i) => i,
+            Double(i) => i.to_bits(),
         };
 
         match typ {
@@ -45,22 +46,24 @@ impl Const {
     }
 
     pub fn typ(&self) -> &Type {
+        use Const::*;
         match self {
-            Const::Int(_) => &Type::Int,
-            Const::Long(_) => &Type::Long,
-            Const::UInt(_) => &Type::UInt,
-            Const::ULong(_) => &Type::ULong,
-            Const::Double(_) => &Type::Double,
+            Int(_) => &Type::Int,
+            Long(_) => &Type::Long,
+            UInt(_) => &Type::UInt,
+            ULong(_) => &Type::ULong,
+            Double(_) => &Type::Double,
         }
     }
 
     pub fn to_u64(self) -> u64 {
+        use Const::*;
         match self {
-            Const::Int(i) => i as u64,
-            Const::Long(i) => i as u64,
-            Const::UInt(i) => i as u64,
-            Const::ULong(i) => i,
-            Const::Double(i) => i.to_bits(),
+            Int(i) => i as u64,
+            Long(i) => i as u64,
+            UInt(i) => i as u64,
+            ULong(i) => i,
+            Double(i) => i.to_bits(),
         }
     }
 }

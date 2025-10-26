@@ -436,6 +436,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
 
             *typ = Some(*ret_type.clone())
         }
+        _ => todo!(),
     };
     Ok(())
 }

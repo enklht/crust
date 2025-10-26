@@ -376,5 +376,6 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
 
             dst
         }
+        _ => todo!(),
     }
 }

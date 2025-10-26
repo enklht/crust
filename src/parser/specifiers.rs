@@ -5,8 +5,8 @@ use crate::models::typ::Type;
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
-#[derive(Debug, PartialEq, PartialOrd)]
-pub enum Specifier {
+#[derive(Debug, PartialEq)]
+enum Specifier {
     Int,
     Long,
     Unsigned,

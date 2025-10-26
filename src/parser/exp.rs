@@ -2,12 +2,47 @@ use super::ParserError;
 use super::specifiers::type_specifiers;
 use crate::models::ast::*;
 use crate::models::token::Token;
+use crate::models::typ::Type;
 use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
 
+#[inline(always)]
 fn binary(op: BinaryOp, left: Exp, right: Exp) -> Exp {
     Exp::Binary(op, Box::new(left), Box::new(right), None)
+}
+
+#[derive(Debug, Clone)]
+enum AbsDeclarator {
+    Base,
+    Pointer(Box<AbsDeclarator>),
+}
+
+fn abs_declarator<'tokens, I>()
+-> impl Parser<'tokens, I, AbsDeclarator, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    recursive(|abs_declarator| {
+        choice((
+            just(Token::Star)
+                .ignore_then(abs_declarator.clone())
+                .map(|abs_declarator| AbsDeclarator::Pointer(Box::new(abs_declarator))),
+            abs_declarator.delimited_by(just(Token::LParen), just(Token::RParen)),
+            empty().to(AbsDeclarator::Base),
+        ))
+    })
+}
+
+fn process_abs_declarator(abs_declarator: AbsDeclarator, base_typ: Type) -> Option<Type> {
+    use AbsDeclarator::*;
+    match abs_declarator {
+        Base => Some(base_typ),
+        Pointer(abs_declarator) => Some(Type::Pointer(Box::new(process_abs_declarator(
+            *abs_declarator,
+            base_typ,
+        )?))),
+    }
 }
 
 pub fn exp<'tokens, I>() -> impl Parser<'tokens, I, Exp, ParserError<'tokens>> + Clone
@@ -61,24 +96,14 @@ where
             prefix(13, just(Token::DoublePlus), |_, v: Exp, _| {
                 Exp::Assignment(
                     Box::new(v.clone()),
-                    Box::new(Exp::Binary(
-                        BinaryOp::Add,
-                        Box::new(v),
-                        Box::new(Exp::Const(Const::Int(1))),
-                        None,
-                    )),
+                    Box::new(binary(BinaryOp::Add, v, Exp::Const(Const::Int(1)))),
                     None,
                 )
             }),
             prefix(13, just(Token::DoubleHyphen), |_, v: Exp, _| {
                 Exp::Assignment(
                     Box::new(v.clone()),
-                    Box::new(Exp::Binary(
-                        BinaryOp::Subtract,
-                        Box::new(v),
-                        Box::new(Exp::Const(Const::Int(1))),
-                        None,
-                    )),
+                    Box::new(binary(BinaryOp::Subtract, v, Exp::Const(Const::Int(1)))),
                     None,
                 )
             }),
@@ -89,9 +114,21 @@ where
             ),
             prefix(
                 13,
-                type_specifiers().delimited_by(just(Token::LParen), just(Token::RParen)),
+                type_specifiers()
+                    .then(abs_declarator())
+                    .delimited_by(just(Token::LParen), just(Token::RParen))
+                    .try_map(|(base_type, abs_declarator), span| {
+                        process_abs_declarator(abs_declarator, base_type)
+                            .ok_or(Rich::custom(span, ""))
+                    }),
                 |typ, v, _| Exp::Cast(typ, Box::new(v)),
             ),
+            prefix(13, just(Token::Ampersand), |_, v, _| {
+                Exp::AddressOf(Box::new(v), None)
+            }),
+            prefix(13, just(Token::Star), |_, v, _| {
+                Exp::Dereference(Box::new(v), None)
+            }),
             infix(
                 left(12),
                 one_of([Token::Star, Token::Slash, Token::Percent]),

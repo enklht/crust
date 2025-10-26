@@ -14,6 +14,8 @@ pub enum Type {
     ULong,
     #[display("double")]
     Double,
+    #[display("*{_0}")]
+    Pointer(Box<Type>),
     #[display("fn{_0:?} -> {_1}")]
     Func(Vec<Type>, Box<Type>),
 }

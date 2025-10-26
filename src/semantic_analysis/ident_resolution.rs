@@ -280,6 +280,7 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
             args.iter_mut()
                 .try_for_each(|arg| resolve_exp(arg, scope_manager))?;
         }
+        _ => todo!(),
     }
     Ok(())
 }
