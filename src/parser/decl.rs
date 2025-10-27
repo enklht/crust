@@ -19,8 +19,8 @@ where
         .then(just(Token::Equal).ignore_then(exp()).or_not())
         .semicolon()
         .try_map(|(((base_typ, storage_class), declarator), init), span| {
-            let (name, typ, _params) =
-                process_declarator(declarator, base_typ).ok_or(Rich::custom(span, ""))?;
+            let (name, typ, _params) = process_declarator(declarator, base_typ)
+                .ok_or(Rich::custom(span, "invalid declarator"))?;
             if matches!(typ, Type::Func(_, _)) {
                 return Err(Rich::custom(span, ""));
             }
@@ -40,10 +40,13 @@ where
         .then(declarator())
         .then(block.map(Some).or(just(Token::Semicolon).to(None)))
         .try_map(|(((base_typ, storage_class), declarator), body), span| {
-            let (name, typ, params) =
-                process_declarator(declarator, base_typ).ok_or(Rich::custom(span, ""))?;
+            let (name, typ, params) = process_declarator(declarator, base_typ)
+                .ok_or(Rich::custom(span, "invalid declarator"))?;
             if !matches!(typ, Type::Func(_, _)) {
-                return Err(Rich::custom(span, ""));
+                return Err(Rich::custom(
+                    span,
+                    "variable declaration with function type",
+                ));
             }
             Ok(FuncDecl::FuncDecl(name, params, body, typ, storage_class))
         })

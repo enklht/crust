@@ -7,7 +7,6 @@ use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
 
-#[inline(always)]
 fn binary(op: BinaryOp, left: Exp, right: Exp) -> Exp {
     Exp::Binary(op, Box::new(left), Box::new(right), None)
 }
@@ -79,17 +78,7 @@ where
                 one_of([Token::Hyphen, Token::Tilde, Token::Bang]),
                 |op, v, _| Exp::Unary(convert_unop(op), Box::new(v), None),
             ),
-            prefix(
-                13,
-                type_specifiers()
-                    .then(abs_declarator())
-                    .delimited_by(just(Token::LParen), just(Token::RParen))
-                    .try_map(|(base_type, abs_declarator), span| {
-                        process_abs_declarator(abs_declarator, base_type)
-                            .ok_or(Rich::custom(span, ""))
-                    }),
-                |typ, v, _| Exp::Cast(typ, Box::new(v)),
-            ),
+            prefix(13, cast_op(), |typ, v, _| Exp::Cast(typ, Box::new(v))),
             prefix(13, just(Token::Ampersand), |_, v, _| {
                 Exp::AddressOf(Box::new(v), None)
             }),
@@ -178,6 +167,19 @@ where
     })
     .labelled("expession")
     .as_context()
+}
+
+fn cast_op<'tokens, I>() -> impl Parser<'tokens, I, Type, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    type_specifiers()
+        .then(abs_declarator())
+        .delimited_by(just(Token::LParen), just(Token::RParen))
+        .try_map(|(base_type, abs_declarator), span| {
+            process_abs_declarator(abs_declarator, base_type)
+                .ok_or(Rich::custom(span, "invalid abstract declarator"))
+        })
 }
 
 #[derive(Clone)]

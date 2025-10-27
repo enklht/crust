@@ -401,14 +401,18 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 BitNot => {
                     let inner_type = inner.typ().clone();
                     if inner_type == Type::Double || inner_type.is_pointer() {
-                        panic!()
+                        return Err(Error::Type(format!(
+                            "Complement of non-integer type {inner_type}"
+                        )));
                     }
                     *typ = Some(inner_type)
                 }
                 Negate => {
                     let inner_type = inner.typ().clone();
                     if inner_type.is_pointer() {
-                        panic!()
+                        return Err(Error::Type(format!(
+                            "Negation of non-integer type {inner_type}"
+                        )));
                     }
                     *typ = Some(inner_type)
                 }
@@ -433,7 +437,9 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                         || e1_type.is_pointer()
                         || e2_type.is_pointer()
                     {
-                        panic!()
+                        return Err(Error::Type(format!(
+                            "Both arguments for shift must have integer type: found {e1_type}, {e2_type}"
+                        )));
                     }
                     *typ = Some(e1_type.clone())
                 }
@@ -460,12 +466,16 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                     if matches!(op, Remainder | BitAnd | BitOr | BitXor)
                         && common_type == Type::Double
                     {
-                        panic!()
+                        return Err(Error::Type(format!(
+                            "Expected integer type, found: {common_type}"
+                        )));
                     }
                     if matches!(op, Multiply | Divide | Remainder | BitAnd | BitOr | BitXor)
                         && common_type.is_pointer()
                     {
-                        panic!()
+                        return Err(Error::Type(format!(
+                            "Expected non-pointer type, found: {common_type}"
+                        )));
                     }
 
                     convert_to(e1, &common_type);
