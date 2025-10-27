@@ -33,6 +33,7 @@ pub enum Instruction {
     Mov(Operand, Operand, AsmType),
     Movsx(Operand, Operand),
     MovZeroExtend(Operand, Operand),
+    Lea(Operand, Operand),
     Cvttsd2si(Operand, Operand, AsmType),
     Cvtsi2sd(Operand, Operand, AsmType),
     Unary(UnaryOp, Operand, AsmType),
@@ -55,7 +56,7 @@ pub enum Operand {
     Imm(u64),
     Reg(Reg),
     Pseudo(Ident),
-    Stack(isize),
+    Memory(Reg, isize),
     Data(Ident),
 }
 
@@ -99,6 +100,7 @@ pub enum Reg {
     R10,
     R11,
     SP,
+    BP,
     XMM0,
     XMM1,
     XMM2,
@@ -171,7 +173,11 @@ impl Operand {
         match self {
             Operand::Reg(reg) => reg.one_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
-            Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
+            Operand::Memory(reg, offset) => {
+                write!(f, "{}(", offset)?;
+                reg.eight_byte(f)?;
+                write!(f, ")")
+            }
             Operand::Data(label) => match symbols.get(label).unwrap() {
                 AsmSymbol::ObjEntry(_, _, true) => {
                     write!(f, ".L{}(%rip)", label)
@@ -188,7 +194,11 @@ impl Operand {
         match self {
             Operand::Reg(reg) => reg.four_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
-            Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
+            Operand::Memory(reg, offset) => {
+                write!(f, "{}(", offset)?;
+                reg.eight_byte(f)?;
+                write!(f, ")")
+            }
             Operand::Data(label) => match symbols.get(label).unwrap() {
                 AsmSymbol::ObjEntry(_, _, true) => {
                     write!(f, ".L{}(%rip)", label)
@@ -205,7 +215,11 @@ impl Operand {
         match self {
             Operand::Reg(reg) => reg.eight_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
-            Operand::Stack(offset) => write!(f, "{}(%rbp)", offset),
+            Operand::Memory(reg, offset) => {
+                write!(f, "{}(", offset)?;
+                reg.eight_byte(f)?;
+                write!(f, ")")
+            }
             Operand::Data(label) => match symbols.get(label).unwrap() {
                 AsmSymbol::ObjEntry(_, _, true) => {
                     write!(f, ".L{}(%rip)", label)
@@ -264,6 +278,7 @@ impl Reg {
             Reg::R10 => write!(f, "%r10"),
             Reg::R11 => write!(f, "%r11"),
             Reg::SP => write!(f, "%rsp"),
+            Reg::BP => write!(f, "%rbp"),
             Reg::XMM0 => write!(f, "%xmm0"),
             Reg::XMM1 => write!(f, "%xmm1"),
             Reg::XMM2 => write!(f, "%xmm2"),

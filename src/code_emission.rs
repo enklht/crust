@@ -83,17 +83,27 @@ fn emit_instructions(
     use AsmType::*;
     for instruction in instructions {
         match instruction {
-            Instruction::Mov(src, dst, typ) => writeln!(
-                acc,
-                "    mov{typ} {}, {}",
-                fmt(&src, typ, symbols),
-                fmt(&dst, typ, symbols)
-            )?,
+            Instruction::Mov(src, dst, typ) => {
+                writeln!(
+                    acc,
+                    "    mov{typ} {}, {}",
+                    fmt(&src, typ, symbols),
+                    fmt(&dst, typ, symbols)
+                )?;
+            }
             Instruction::Movsx(src, dst) => {
                 writeln!(
                     acc,
                     "    movslq {}, {}",
                     fmt(&src, Longword, symbols),
+                    fmt(&dst, Quadword, symbols)
+                )?;
+            }
+            Instruction::Lea(src, dst) => {
+                writeln!(
+                    acc,
+                    "    leaq {}, {}",
+                    fmt(&src, Quadword, symbols),
                     fmt(&dst, Quadword, symbols)
                 )?;
             }
@@ -200,7 +210,7 @@ fn emit_instructions(
                 writeln!(acc, "    ret")?;
             }
             Instruction::MovZeroExtend(_, _) => unreachable!(),
-            _ => todo!(),
+            Instruction::Cdq(_) => unreachable!(),
         }
     }
     Ok(())

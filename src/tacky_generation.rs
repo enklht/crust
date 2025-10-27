@@ -1,14 +1,10 @@
 use crate::models::ast::*;
-use crate::models::symbol::InitialValue;
-use crate::models::symbol::StaticInit;
-use crate::models::symbol::Symbol;
-use crate::models::symbol::Symbols;
+use crate::models::symbol::*;
 use crate::models::tacky;
 use crate::models::tacky::Instruction;
 use crate::models::tacky::TopLevel;
 use crate::models::typ::Type;
-use crate::utils::make_label;
-use crate::utils::make_temporary;
+use crate::utils::*;
 use std::cmp::Ordering;
 
 fn make_temp_var(typ: Type, symbols: &mut Symbols) -> tacky::Val {
@@ -47,6 +43,7 @@ fn convert_symbols(symbols: &Symbols) -> Vec<TopLevel> {
                             Type::Long => StaticInit::Long(0),
                             Type::UInt => StaticInit::UInt(0),
                             Type::ULong => StaticInit::ULong(0),
+                            Type::Pointer(_) => StaticInit::ULong(0),
                             Type::Double => StaticInit::Double(0.),
                             _ => unreachable!(),
                         },
@@ -69,12 +66,11 @@ fn convert_decl(decl: Decl, symbols: &mut Symbols) -> Option<TopLevel> {
 
 fn convert_func_decl(func_decl: FuncDecl, symbols: &mut Symbols) -> Option<TopLevel> {
     match func_decl {
-        FuncDecl::FuncDecl(name, params, Some(body), typ, _) => {
+        FuncDecl::FuncDecl(name, params, Some(body), Type::Func(_, ret_type), _) => {
             let mut instructions = Vec::new();
+
             emit_block(body, &mut instructions, symbols);
-            let Type::Func(_, ret_type) = typ else {
-                unreachable!()
-            };
+
             match *ret_type {
                 Type::Int => {
                     instructions.push(Instruction::Return(tacky::Val::Const(Const::Int(0))))
@@ -85,7 +81,7 @@ fn convert_func_decl(func_decl: FuncDecl, symbols: &mut Symbols) -> Option<TopLe
                 Type::UInt => {
                     instructions.push(Instruction::Return(tacky::Val::Const(Const::UInt(0))))
                 }
-                Type::ULong => {
+                Type::ULong | Type::Pointer(_) => {
                     instructions.push(Instruction::Return(tacky::Val::Const(Const::ULong(0))))
                 }
                 Type::Double => {
@@ -123,7 +119,7 @@ fn emit_block_item(
 
 fn emit_var_decl(var_decl: VarDecl, instructions: &mut Vec<Instruction>, symbols: &mut Symbols) {
     if let VarDecl::VarDecl(name, Some(exp), _, StorageClass::None) = var_decl {
-        let result = emit_exp(exp, instructions, symbols);
+        let result = emit_exp_and_convert(exp, instructions, symbols);
         instructions.push(Instruction::Copy(result, tacky::Val::Var(name)));
     }
 }
@@ -131,7 +127,7 @@ fn emit_var_decl(var_decl: VarDecl, instructions: &mut Vec<Instruction>, symbols
 fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symbols) {
     match stmt {
         Stmt::Return(exp) => {
-            let tacky_exp = emit_exp(exp, instructions, symbols);
+            let tacky_exp = emit_exp_and_convert(exp, instructions, symbols);
             instructions.push(Instruction::Return(tacky_exp))
         }
         Stmt::Expression(exp) => {
@@ -140,7 +136,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
         Stmt::If(cond, then, None) => {
             let end_label = make_label("if_end");
 
-            let cond = emit_exp(cond, instructions, symbols);
+            let cond = emit_exp_and_convert(cond, instructions, symbols);
             instructions.push(Instruction::JumpIfZero(cond, end_label));
             emit_stmt(*then, instructions, symbols);
             instructions.push(Instruction::Label(end_label))
@@ -149,7 +145,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             let else_label = make_label("if_else");
             let end_label = make_label("if_end");
 
-            let cond = emit_exp(cond, instructions, symbols);
+            let cond = emit_exp_and_convert(cond, instructions, symbols);
             instructions.push(Instruction::JumpIfZero(cond, else_label));
             emit_stmt(*then, instructions, symbols);
             instructions.extend([Instruction::Jump(end_label), Instruction::Label(else_label)]);
@@ -160,20 +156,26 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             instructions.push(Instruction::Label(label));
             emit_stmt(*stmt, instructions, symbols);
         }
-        Stmt::Goto(label) => instructions.push(Instruction::Jump(label)),
-        Stmt::Compound(block) => emit_block(block, instructions, symbols),
+        Stmt::Goto(label) => {
+            instructions.push(Instruction::Jump(label));
+        }
+        Stmt::Compound(block) => {
+            emit_block(block, instructions, symbols);
+        }
         Stmt::Break(Some(label)) => {
             instructions.push(Instruction::Jump(Box::new(format!("break_{label}")).leak()))
         }
-        Stmt::Continue(Some(label)) => instructions.push(Instruction::Jump(
-            Box::new(format!("continue_{label}")).leak(),
-        )),
+        Stmt::Continue(Some(label)) => {
+            instructions.push(Instruction::Jump(
+                Box::new(format!("continue_{label}")).leak(),
+            ));
+        }
         Stmt::While(cond, body, Some(label)) => {
             let break_label = Box::new(format!("break_{label}")).leak();
             let continue_label = Box::new(format!("continue_{label}")).leak();
 
             instructions.push(Instruction::Label(continue_label));
-            let cond = emit_exp(cond, instructions, symbols);
+            let cond = emit_exp_and_convert(cond, instructions, symbols);
             instructions.push(Instruction::JumpIfZero(cond, break_label));
             emit_stmt(*body, instructions, symbols);
             instructions.extend([
@@ -189,7 +191,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             instructions.push(Instruction::Label(start_label));
             emit_stmt(*body, instructions, symbols);
             instructions.push(Instruction::Label(continue_label));
-            let cond = emit_exp(cond, instructions, symbols);
+            let cond = emit_exp_and_convert(cond, instructions, symbols);
             instructions.extend([
                 Instruction::JumpIfNotZero(cond, start_label),
                 Instruction::Label(break_label),
@@ -209,7 +211,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             }
             instructions.push(Instruction::Label(start_label));
             if let Some(cond) = cond {
-                let cond = emit_exp(cond, instructions, symbols);
+                let cond = emit_exp_and_convert(cond, instructions, symbols);
                 instructions.push(Instruction::JumpIfZero(cond, break_label));
             }
             emit_stmt(*body, instructions, symbols);
@@ -226,7 +228,7 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
             let break_label = Box::new(format!("break_{label}")).leak();
             let flag = make_temp_var(cond.typ().clone(), symbols);
 
-            let cond = emit_exp(cond, instructions, symbols);
+            let cond = emit_exp_and_convert(cond, instructions, symbols);
 
             for (case, case_label) in cases {
                 instructions.extend([
@@ -251,11 +253,32 @@ fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symb
     }
 }
 
-fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols) -> tacky::Val {
-    match exp {
+enum ExpResult {
+    PlainOperand(tacky::Val),
+    DereferencedPointer(tacky::Val, Type),
+}
+
+fn emit_exp_and_convert(
+    exp: Exp,
+    instructions: &mut Vec<Instruction>,
+    symbols: &mut Symbols,
+) -> tacky::Val {
+    let result = emit_exp(exp, instructions, symbols);
+    match result {
+        ExpResult::PlainOperand(val) => val,
+        ExpResult::DereferencedPointer(ptr, typ) => {
+            let dst = make_temp_var(typ.clone(), symbols);
+            instructions.push(tacky::Instruction::Load(ptr, dst));
+            dst
+        }
+    }
+}
+
+fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols) -> ExpResult {
+    let op = match exp {
         Exp::Const(c) => tacky::Val::Const(c),
         Exp::Unary(op, inner, typ) => {
-            let src = emit_exp(*inner, instructions, symbols);
+            let src = emit_exp_and_convert(*inner, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
             instructions.push(Instruction::Unary(op, src, dst));
             dst
@@ -265,9 +288,9 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             let end_label = make_label("and_end");
 
             let dst = make_temp_var(typ.unwrap(), symbols);
-            let v1 = emit_exp(*v1, instructions, symbols);
+            let v1 = emit_exp_and_convert(*v1, instructions, symbols);
             instructions.push(Instruction::JumpIfZero(v1, false_label));
-            let v2 = emit_exp(*v2, instructions, symbols);
+            let v2 = emit_exp_and_convert(*v2, instructions, symbols);
             instructions.extend([
                 Instruction::JumpIfZero(v2, false_label),
                 Instruction::Copy(tacky::Val::Const(Const::Int(1)), dst),
@@ -283,9 +306,9 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             let end_label = make_label("or_end");
 
             let dst = make_temp_var(typ.unwrap(), symbols);
-            let v1 = emit_exp(*v1, instructions, symbols);
+            let v1 = emit_exp_and_convert(*v1, instructions, symbols);
             instructions.push(Instruction::JumpIfNotZero(v1, true_label));
-            let v2 = emit_exp(*v2, instructions, symbols);
+            let v2 = emit_exp_and_convert(*v2, instructions, symbols);
             instructions.extend([
                 Instruction::JumpIfNotZero(v2, true_label),
                 Instruction::Copy(tacky::Val::Const(Const::Int(0)), dst),
@@ -297,35 +320,42 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             dst
         }
         Exp::Binary(op, e1, e2, typ) => {
-            let v1 = emit_exp(*e1, instructions, symbols);
-            let v2 = emit_exp(*e2, instructions, symbols);
+            let v1 = emit_exp_and_convert(*e1, instructions, symbols);
+            let v2 = emit_exp_and_convert(*e2, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
             instructions.push(Instruction::Binary(op, v1, v2, dst));
             dst
         }
         Exp::Var(name, _) => tacky::Val::Var(name),
-        Exp::Assignment(left, right, _) => match *left {
-            Exp::Var(v, _) => {
-                let result = emit_exp(*right, instructions, symbols);
-                instructions.push(Instruction::Copy(result, tacky::Val::Var(v)));
-                tacky::Val::Var(v)
+        Exp::Assignment(left, right, _) => {
+            let lval = emit_exp(*left, instructions, symbols);
+            let rval = emit_exp_and_convert(*right, instructions, symbols);
+
+            match lval {
+                ExpResult::PlainOperand(op) => {
+                    instructions.push(Instruction::Copy(rval, op));
+                    op
+                }
+                ExpResult::DereferencedPointer(ptr, _) => {
+                    instructions.push(Instruction::Store(rval, ptr));
+                    rval
+                }
             }
-            _ => unreachable!(),
-        },
+        }
         Exp::Conditional(cond, then, else_, typ) => {
             let else_label = make_label("ternary_else");
             let end_label = make_label("ternary_end");
             let result = make_temp_var(typ.unwrap(), symbols);
 
-            let cond = emit_exp(*cond, instructions, symbols);
+            let cond = emit_exp_and_convert(*cond, instructions, symbols);
             instructions.push(Instruction::JumpIfZero(cond, else_label));
-            let then = emit_exp(*then, instructions, symbols);
+            let then = emit_exp_and_convert(*then, instructions, symbols);
             instructions.extend([
                 Instruction::Copy(then, result),
                 Instruction::Jump(end_label),
                 Instruction::Label(else_label),
             ]);
-            let else_ = emit_exp(*else_, instructions, symbols);
+            let else_ = emit_exp_and_convert(*else_, instructions, symbols);
             instructions.extend([
                 Instruction::Copy(else_, result),
                 Instruction::Label(end_label),
@@ -337,45 +367,67 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
 
             let args = args
                 .into_iter()
-                .map(|arg| emit_exp(arg, instructions, symbols))
+                .map(|arg| emit_exp_and_convert(arg, instructions, symbols))
                 .collect();
             instructions.push(Instruction::FuncCall(name, args, result));
             result
         }
         Exp::Cast(typ, inner) => {
             let inner_type = inner.typ().clone();
-            let result = emit_exp(*inner, instructions, symbols);
+            let result = emit_exp_and_convert(*inner, instructions, symbols);
             if typ == inner_type {
-                return result;
-            }
-
-            let dst = make_temp_var(typ.clone(), symbols);
-
-            if inner_type == Type::Double {
-                if typ.is_signed() {
-                    instructions.push(Instruction::DoubleToInt(result, dst));
-                } else {
-                    instructions.push(Instruction::DoubleToUInt(result, dst));
-                }
-            } else if typ == Type::Double {
-                if inner_type.is_signed() {
-                    instructions.push(Instruction::IntToDouble(result, dst));
-                } else {
-                    instructions.push(Instruction::UIntToDouble(result, dst));
-                }
+                result
             } else {
-                match typ.size().cmp(&inner_type.size()) {
-                    Ordering::Equal => instructions.push(Instruction::Copy(result, dst)),
-                    Ordering::Less => instructions.push(Instruction::Truncate(result, dst)),
-                    Ordering::Greater if inner_type.is_signed() => {
-                        instructions.push(Instruction::SignExtend(result, dst))
-                    }
-                    Ordering::Greater => instructions.push(Instruction::ZeroExtend(result, dst)),
-                }
-            }
+                let dst = make_temp_var(typ.clone(), symbols);
 
-            dst
+                if inner_type == Type::Double {
+                    if typ.is_signed() {
+                        instructions.push(Instruction::DoubleToInt(result, dst));
+                    } else {
+                        instructions.push(Instruction::DoubleToUInt(result, dst));
+                    }
+                } else if typ == Type::Double {
+                    if inner_type.is_signed() {
+                        instructions.push(Instruction::IntToDouble(result, dst));
+                    } else {
+                        instructions.push(Instruction::UIntToDouble(result, dst));
+                    }
+                } else {
+                    match typ.size().cmp(&inner_type.size()) {
+                        Ordering::Equal => {
+                            instructions.push(Instruction::Copy(result, dst));
+                        }
+                        Ordering::Less => {
+                            instructions.push(Instruction::Truncate(result, dst));
+                        }
+                        Ordering::Greater if inner_type.is_signed() => {
+                            instructions.push(Instruction::SignExtend(result, dst));
+                        }
+                        Ordering::Greater => {
+                            instructions.push(Instruction::ZeroExtend(result, dst));
+                        }
+                    }
+                }
+
+                dst
+            }
         }
-        _ => todo!(),
-    }
+        Exp::Dereference(inner, typ) => {
+            let result = emit_exp_and_convert(*inner, instructions, symbols);
+            return ExpResult::DereferencedPointer(result, typ.unwrap());
+        }
+        Exp::AddressOf(inner, typ) => {
+            let result = emit_exp(*inner, instructions, symbols);
+            match result {
+                ExpResult::PlainOperand(op) => {
+                    let dst = make_temp_var(typ.unwrap(), symbols);
+                    instructions.push(Instruction::GetAddress(op, dst));
+                    dst
+                }
+                ExpResult::DereferencedPointer(ptr, _) => ptr,
+            }
+        }
+    };
+
+    ExpResult::PlainOperand(op)
 }

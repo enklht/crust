@@ -91,7 +91,7 @@ where
                 |typ, v, _| Exp::Cast(typ, Box::new(v)),
             ),
             prefix(13, just(Token::Ampersand), |_, v, _| {
-                Exp::AddrOf(Box::new(v), None)
+                Exp::AddressOf(Box::new(v), None)
             }),
             prefix(13, just(Token::Star), |_, v, _| {
                 Exp::Dereference(Box::new(v), None)

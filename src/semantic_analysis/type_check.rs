@@ -529,7 +529,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 }
             }
         }
-        Exp::AddrOf(inner, typ) => {
+        Exp::AddressOf(inner, typ) => {
             if !inner.is_lvalue() {
                 return Err(Error::Type(format!(
                     "Cannot take the address of a non-lvalue {inner:?}",

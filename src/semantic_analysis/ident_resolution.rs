@@ -276,7 +276,7 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
         Exp::Dereference(inner, _) => {
             resolve_exp(inner, scope_manager)?;
         }
-        Exp::AddrOf(inner, _) => {
+        Exp::AddressOf(inner, _) => {
             resolve_exp(inner, scope_manager)?;
         }
     }

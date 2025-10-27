@@ -68,6 +68,10 @@ fn replace_pseudos_in_instruction(
             replace_operand(src, state, symbols);
             replace_operand(dst, state, symbols);
         }
+        Instruction::Lea(src, dst) => {
+            replace_operand(src, state, symbols);
+            replace_operand(dst, state, symbols);
+        }
         Instruction::Cvttsd2si(src, dst, _) => {
             replace_operand(src, state, symbols);
             replace_operand(dst, state, symbols);
@@ -108,10 +112,10 @@ fn replace_operand(operand: &mut Operand, state: &mut State, symbols: &AsmSymbol
         match symbols.get(ident).unwrap() {
             AsmSymbol::ObjEntry(_, true, _) => *operand = Operand::Data(ident),
             AsmSymbol::ObjEntry(AsmType::Longword, false, _) => {
-                *operand = Operand::Stack(-(state.longword(ident) as isize))
+                *operand = Operand::Memory(Reg::BP, -(state.longword(ident) as isize))
             }
             AsmSymbol::ObjEntry(AsmType::Quadword | AsmType::Double, false, _) => {
-                *operand = Operand::Stack(-(state.quadword(ident) as isize))
+                *operand = Operand::Memory(Reg::BP, -(state.quadword(ident) as isize))
             }
             _ => unreachable!(),
         }

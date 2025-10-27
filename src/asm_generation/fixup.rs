@@ -1,9 +1,27 @@
+use super::imm;
 use super::reg;
 use crate::models::assembly::*;
 
 macro_rules! memory {
     () => {
-        Operand::Stack(_) | Operand::Data(_)
+        Operand::Memory(_, _) | Operand::Data(_)
+    };
+}
+
+macro_rules! xmm {
+    () => {
+        Operand::Reg(
+            Reg::XMM0
+                | Reg::XMM1
+                | Reg::XMM2
+                | Reg::XMM3
+                | Reg::XMM4
+                | Reg::XMM5
+                | Reg::XMM6
+                | Reg::XMM7
+                | Reg::XMM14
+                | Reg::XMM15,
+        )
     };
 }
 
@@ -85,6 +103,12 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
         Instruction::MovZeroExtend(src, dst @ memory!()) => {
             acc.extend([
                 Instruction::Mov(src, reg!(R11), Longword),
+                Instruction::Mov(reg!(R11), dst, Quadword),
+            ]);
+        }
+        Instruction::Lea(src, dst @ memory!()) => {
+            acc.extend([
+                Instruction::Lea(src, reg!(R11)),
                 Instruction::Mov(reg!(R11), dst, Quadword),
             ]);
         }
@@ -232,6 +256,12 @@ fn emit_instruction(instruction: Instruction, acc: &mut Vec<Instruction>) {
             acc.extend([
                 Instruction::Mov(dst, reg!(R11), asm_type),
                 Instruction::Cmp(src, reg!(R11), asm_type),
+            ]);
+        }
+        Instruction::Push(op @ xmm!()) => {
+            acc.extend([
+                Instruction::Binary(BinaryOp::Subtract, imm!(8), reg!(SP), Quadword),
+                Instruction::Mov(op, Operand::Memory(Reg::SP, 0), Double),
             ]);
         }
         Instruction::Push(op @ memory!()) => {

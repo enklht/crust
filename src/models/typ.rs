@@ -53,7 +53,7 @@ impl Type {
         use Type::*;
         match self {
             Int | UInt => AsmType::Longword,
-            Long | ULong => AsmType::Quadword,
+            Long | ULong | Pointer(_) => AsmType::Quadword,
             Double => AsmType::Double,
             _ => unreachable!(),
         }

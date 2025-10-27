@@ -95,7 +95,7 @@ fn gen_top_level(top_level: tacky::TopLevel, symbols: &Symbols, consts: &mut Con
 
             for (i, (arg, typ)) in stack_params.into_iter().enumerate() {
                 asm_instructions.push(Instruction::Mov(
-                    Operand::Stack((i as isize + 2) * 8),
+                    Operand::Memory(Reg::BP, (i as isize + 2) * 8),
                     arg,
                     typ,
                 ))
@@ -454,6 +454,23 @@ fn gen_instructions(
                     gen_val(dst, consts),
                     src_type,
                 ));
+            }
+            GetAddress(src, dst) => {
+                asm_instructions.push(Instruction::Lea(gen_val(src, consts), gen_val(dst, consts)))
+            }
+            Load(ptr, dst) => {
+                let dst_type = type_of_val(&dst, symbols).to_asm_type();
+                asm_instructions.extend([
+                    Instruction::Mov(gen_val(ptr, consts), reg!(AX), Quadword),
+                    Instruction::Mov(Operand::Memory(Reg::AX, 0), gen_val(dst, consts), dst_type),
+                ])
+            }
+            Store(src, ptr) => {
+                let src_type = type_of_val(&src, symbols).to_asm_type();
+                asm_instructions.extend([
+                    Instruction::Mov(gen_val(ptr, consts), reg!(AX), Quadword),
+                    Instruction::Mov(gen_val(src, consts), Operand::Memory(Reg::AX, 0), src_type),
+                ])
             }
             Label(label) => {
                 asm_instructions.push(Instruction::Label(label));

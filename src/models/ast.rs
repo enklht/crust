@@ -87,7 +87,7 @@ pub enum Exp {
     Conditional(Box<Exp>, Box<Exp>, Box<Exp>, Option<Type>),
     FuncCall(Ident, Vec<Exp>, Option<Type>),
     Dereference(Box<Exp>, Option<Type>),
-    AddrOf(Box<Exp>, Option<Type>),
+    AddressOf(Box<Exp>, Option<Type>),
 }
 
 impl Exp {
@@ -103,7 +103,7 @@ impl Exp {
             Conditional(_, _, _, Some(typ)) => typ,
             FuncCall(_, _, Some(typ)) => typ,
             Dereference(_, Some(typ)) => typ,
-            AddrOf(_, Some(typ)) => typ,
+            AddressOf(_, Some(typ)) => typ,
             _ => unreachable!("the type is not assigned"),
         }
     }
