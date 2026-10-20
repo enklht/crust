@@ -3,7 +3,6 @@ use super::specifiers::type_specifiers;
 use crate::models::ast::*;
 use crate::models::token::Token;
 use crate::models::typ::Type;
-use crate::utils::make_temporary;
 use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
@@ -13,27 +12,12 @@ fn binary(op: BinaryOp, left: Exp, right: Exp) -> Exp {
 }
 
 fn update(op: BinaryOp, left: Exp, right: Exp, postfix: bool) -> Exp {
-    let ptr_name = make_temporary();
-    let ptr = Exp::new(ExpKind::Var(ptr_name));
-    let deref = Exp::new(ExpKind::Dereference(Box::new(ptr)));
-    let mut bindings = vec![(ptr_name, Exp::new(ExpKind::AddressOf(Box::new(left))))];
-    let old = if postfix {
-        let old_name = make_temporary();
-        bindings.push((old_name, deref.clone()));
-        Exp::new(ExpKind::Var(old_name))
-    } else {
-        deref.clone()
-    };
-    let assignment = Exp::new(ExpKind::Assignment(
-        Box::new(deref),
-        Box::new(binary(op, old.clone(), right)),
-    ));
-    let (effects, result) = if postfix {
-        (vec![assignment], old)
-    } else {
-        (vec![], assignment)
-    };
-    Exp::new(ExpKind::Sequence(bindings, effects, Box::new(result)))
+    Exp::new(ExpKind::Update(
+        op,
+        Box::new(left),
+        Box::new(right),
+        postfix,
+    ))
 }
 
 pub fn exp<'tokens, I>() -> impl Parser<'tokens, I, Exp, ParserError<'tokens>> + Clone

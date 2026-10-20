@@ -343,16 +343,14 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
                 }
             }
         }
-        ExpKind::Sequence(bindings, effects, result) => {
-            for (name, init) in bindings {
-                let value = emit_exp_and_convert(init, instructions, symbols);
-                instructions.push(Instruction::Copy(value, tacky::Val::Var(name)));
+        ExpKind::Sequence(mut expressions) => {
+            let result = expressions.pop().expect("empty sequence");
+            for expression in expressions {
+                emit_exp(expression, instructions, symbols);
             }
-            for effect in effects {
-                emit_exp(effect, instructions, symbols);
-            }
-            emit_exp_and_convert(*result, instructions, symbols)
+            emit_exp_and_convert(result, instructions, symbols)
         }
+        ExpKind::Update { .. } => unreachable!("updates are expanded during type checking"),
         ExpKind::Conditional(cond, then, else_) => {
             let else_label = make_label("ternary_else");
             let end_label = make_label("ternary_end");

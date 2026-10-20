@@ -3,6 +3,7 @@ use super::ValidationResult;
 use crate::models::ast::*;
 use crate::models::symbol::*;
 use crate::models::typ::Type;
+use crate::utils::make_temporary;
 
 pub fn convert_to(exp: &mut Exp, typ: &Type) {
     if exp.typ() != typ {
@@ -554,21 +555,58 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(inner, symbols)?;
             *typ = Some(Type::Pointer(Box::new(inner.typ().clone())));
         }
-        ExpKind::Sequence(bindings, effects, result) => {
-            for (name, init) in bindings {
-                check_exp(init, symbols)?;
-                symbols.insert(
-                    name,
-                    Symbol::LocalVar {
-                        typ: init.typ().clone(),
-                    },
-                );
+        ExpKind::Update(op, left, right, postfix) => {
+            fn make_ast_temp(typ: Type, symbols: &mut Symbols) -> Exp {
+                let name = make_temporary();
+                symbols.insert(name, Symbol::LocalVar { typ });
+                Exp::new(ExpKind::Var(name))
             }
-            for effect in effects {
-                check_exp(effect, symbols)?;
+
+            fn assignment(left: Exp, right: Exp) -> Exp {
+                Exp::new(ExpKind::Assignment(Box::new(left), Box::new(right)))
             }
-            check_exp(result, symbols)?;
-            *typ = Some(result.typ().clone());
+
+            if !left.is_lvalue() {
+                return Err(Error::Type(format!(
+                    "Assignment to non-lvalue variable '{left:?}'"
+                )));
+            }
+            check_exp(left, symbols)?;
+            let value_type = left.typ().clone();
+            let ptr = make_ast_temp(Type::Pointer(Box::new(value_type.clone())), symbols);
+            let deref = Exp::new(ExpKind::Dereference(Box::new(ptr.clone())));
+            let left = std::mem::replace(left.as_mut(), Exp::new(ExpKind::Const(Const::Int(0))));
+            let right = std::mem::replace(right.as_mut(), Exp::new(ExpKind::Const(Const::Int(0))));
+            let mut expressions = vec![assignment(
+                ptr,
+                Exp::new(ExpKind::AddressOf(Box::new(left))),
+            )];
+
+            if *postfix {
+                let old = make_ast_temp(value_type, symbols);
+                expressions.push(assignment(old.clone(), deref.clone()));
+                expressions.push(assignment(
+                    deref,
+                    Exp::new(ExpKind::Binary(*op, Box::new(old.clone()), Box::new(right))),
+                ));
+                expressions.push(old);
+            } else {
+                expressions.push(assignment(
+                    deref.clone(),
+                    Exp::new(ExpKind::Binary(*op, Box::new(deref), Box::new(right))),
+                ));
+            }
+
+            let mut sequence = Exp::new(ExpKind::Sequence(expressions));
+            check_exp(&mut sequence, symbols)?;
+
+            *exp = sequence;
+        }
+        ExpKind::Sequence(expressions) => {
+            for expression in expressions.iter_mut() {
+                check_exp(expression, symbols)?;
+            }
+            *typ = Some(expressions.last().expect("empty sequence").typ().clone());
         }
     };
     Ok(())

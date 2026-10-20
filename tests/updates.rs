@@ -97,7 +97,7 @@ fn updates_evaluate_lvalues_once_and_preserve_results() {
 }
 
 #[test]
-fn sequence_bindings_handle_nested_updates_and_shadowing() {
+fn sequences_handle_nested_updates_and_shadowing() {
     assert_runs(
         r#"
         int main(void) {
@@ -121,7 +121,15 @@ fn sequence_bindings_handle_nested_updates_and_shadowing() {
 fn updates_still_require_lvalues_and_valid_operands() {
     let dir = TestDir::new();
     let input = dir.0.join("invalid.c");
-    for expression in ["(1 + 2)++", "++(++x)", "(x += 1) += 2", "x <<= 1.5"] {
+    for expression in [
+        "(1 + 2)++",
+        "++(++x)",
+        "(x += 1) += 2",
+        "x <<= 1.5",
+        "missing = 1",
+        "missing += 1",
+        "missing++",
+    ] {
         fs::write(
             &input,
             format!("int main(void) {{ int x = 0; {expression}; return x; }}"),

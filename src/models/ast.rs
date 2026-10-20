@@ -94,7 +94,8 @@ pub enum ExpKind {
     FuncCall(Ident, Vec<Exp>),
     Dereference(Box<Exp>),
     AddressOf(Box<Exp>),
-    Sequence(Vec<(Ident, Exp)>, Vec<Exp>, Box<Exp>),
+    Update(BinaryOp, Box<Exp>, Box<Exp>, bool),
+    Sequence(Vec<Exp>),
 }
 
 impl Exp {

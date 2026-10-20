@@ -279,17 +279,14 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
         ExpKind::AddressOf(inner) => {
             resolve_exp(inner, scope_manager)?;
         }
-        ExpKind::Sequence(bindings, effects, result) => {
-            scope_manager.enter_scope();
-            for (name, init) in bindings {
-                resolve_exp(init, scope_manager)?;
-                scope_manager.insert(name, (name, false));
+        ExpKind::Update(_, left, right, _) => {
+            resolve_exp(left, scope_manager)?;
+            resolve_exp(right, scope_manager)?;
+        }
+        ExpKind::Sequence(expressions) => {
+            for expression in expressions {
+                resolve_exp(expression, scope_manager)?;
             }
-            for effect in effects {
-                resolve_exp(effect, scope_manager)?;
-            }
-            resolve_exp(result, scope_manager)?;
-            scope_manager.exit_scope();
         }
     }
     Ok(())
