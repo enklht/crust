@@ -9,32 +9,31 @@ use chumsky::pratt::*;
 use chumsky::prelude::*;
 
 fn binary(op: BinaryOp, left: Exp, right: Exp) -> Exp {
-    Exp::Binary(op, Box::new(left), Box::new(right), None)
+    Exp::new(ExpKind::Binary(op, Box::new(left), Box::new(right)))
 }
 
 fn update(op: BinaryOp, left: Exp, right: Exp, postfix: bool) -> Exp {
     let ptr_name = make_temporary();
-    let ptr = Exp::Var(ptr_name, None);
-    let deref = Exp::Dereference(Box::new(ptr), None);
-    let mut bindings = vec![(ptr_name, Exp::AddressOf(Box::new(left), None))];
+    let ptr = Exp::new(ExpKind::Var(ptr_name));
+    let deref = Exp::new(ExpKind::Dereference(Box::new(ptr)));
+    let mut bindings = vec![(ptr_name, Exp::new(ExpKind::AddressOf(Box::new(left))))];
     let old = if postfix {
         let old_name = make_temporary();
         bindings.push((old_name, deref.clone()));
-        Exp::Var(old_name, None)
+        Exp::new(ExpKind::Var(old_name))
     } else {
         deref.clone()
     };
-    let assignment = Exp::Assignment(
+    let assignment = Exp::new(ExpKind::Assignment(
         Box::new(deref),
         Box::new(binary(op, old.clone(), right)),
-        None,
-    );
+    ));
     let (effects, result) = if postfix {
         (vec![assignment], old)
     } else {
         (vec![], assignment)
     };
-    Exp::Sequence(bindings, effects, Box::new(result))
+    Exp::new(ExpKind::Sequence(bindings, effects, Box::new(result)))
 }
 
 pub fn exp<'tokens, I>() -> impl Parser<'tokens, I, Exp, ParserError<'tokens>> + Clone
@@ -46,17 +45,17 @@ where
 
         let func_call = select! { Token::Ident(ident) => ident }
             .then(argument_list.delimited_by(just(Token::LParen), just(Token::RParen)))
-            .map(|(name, args)| Exp::FuncCall(name, args, None));
+            .map(|(name, args)| Exp::new(ExpKind::FuncCall(name, args)));
 
         let atom = choice((
             func_call,
             select! {
-                Token::Ident(ident) => Exp::Var(ident, None),
-                Token::ConstInt(i) => Exp::Const(Const::Int(i)),
-                Token::ConstLong(i) => Exp::Const(Const::Long(i)),
-                Token::ConstUInt(i) => Exp::Const(Const::UInt(i)),
-                Token::ConstULong(i) => Exp::Const(Const::ULong(i)),
-                Token::ConstDouble(i) => Exp::Const(Const::Double(i)),
+                Token::Ident(ident) => Exp::new(ExpKind::Var(ident)),
+                Token::ConstInt(i) => Exp::new(ExpKind::Const(Const::Int(i))),
+                Token::ConstLong(i) => Exp::new(ExpKind::Const(Const::Long(i))),
+                Token::ConstUInt(i) => Exp::new(ExpKind::Const(Const::UInt(i))),
+                Token::ConstULong(i) => Exp::new(ExpKind::Const(Const::ULong(i))),
+                Token::ConstDouble(i) => Exp::new(ExpKind::Const(Const::Double(i))),
             },
             exp.clone()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
@@ -64,28 +63,50 @@ where
 
         atom.pratt((
             postfix(14, just(Token::DoublePlus), |v: Exp, _, _| {
-                update(BinaryOp::Add, v, Exp::Const(Const::Int(1)), true)
+                update(
+                    BinaryOp::Add,
+                    v,
+                    Exp::new(ExpKind::Const(Const::Int(1))),
+                    true,
+                )
             }),
             postfix(14, just(Token::DoubleHyphen), |v: Exp, _, _| {
-                update(BinaryOp::Subtract, v, Exp::Const(Const::Int(1)), true)
+                update(
+                    BinaryOp::Subtract,
+                    v,
+                    Exp::new(ExpKind::Const(Const::Int(1))),
+                    true,
+                )
             }),
             prefix(13, just(Token::DoublePlus), |_, v: Exp, _| {
-                update(BinaryOp::Add, v, Exp::Const(Const::Int(1)), false)
+                update(
+                    BinaryOp::Add,
+                    v,
+                    Exp::new(ExpKind::Const(Const::Int(1))),
+                    false,
+                )
             }),
             prefix(13, just(Token::DoubleHyphen), |_, v: Exp, _| {
-                update(BinaryOp::Subtract, v, Exp::Const(Const::Int(1)), false)
+                update(
+                    BinaryOp::Subtract,
+                    v,
+                    Exp::new(ExpKind::Const(Const::Int(1))),
+                    false,
+                )
             }),
             prefix(
                 13,
                 one_of([Token::Hyphen, Token::Tilde, Token::Bang]),
-                |op, v, _| Exp::Unary(convert_unop(op), Box::new(v), None),
+                |op, v, _| Exp::new(ExpKind::Unary(convert_unop(op), Box::new(v))),
             ),
-            prefix(13, cast_op(), |typ, v, _| Exp::Cast(typ, Box::new(v))),
+            prefix(13, cast_op(), |typ, v, _| {
+                Exp::new(ExpKind::Cast(typ, Box::new(v)))
+            }),
             prefix(13, just(Token::Ampersand), |_, v, _| {
-                Exp::AddressOf(Box::new(v), None)
+                Exp::new(ExpKind::AddressOf(Box::new(v)))
             }),
             prefix(13, just(Token::Star), |_, v, _| {
-                Exp::Dereference(Box::new(v), None)
+                Exp::new(ExpKind::Dereference(Box::new(v)))
             }),
             infix(
                 left(12),
@@ -136,11 +157,15 @@ where
                 right(2),
                 exp.delimited_by(just(Token::Question), just(Token::Colon)),
                 |cond, then, else_, _| {
-                    Exp::Conditional(Box::new(cond), Box::new(then), Box::new(else_), None)
+                    Exp::new(ExpKind::Conditional(
+                        Box::new(cond),
+                        Box::new(then),
+                        Box::new(else_),
+                    ))
                 },
             ),
             infix(right(1), just(Token::Equal), |left, _, right, _| {
-                Exp::Assignment(Box::new(left), Box::new(right), None)
+                Exp::new(ExpKind::Assignment(Box::new(left), Box::new(right)))
             }),
             infix(
                 right(1),

@@ -77,37 +77,33 @@ pub enum Stmt {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Exp {
+pub struct Exp {
+    pub kind: ExpKind,
+    pub typ: Option<Type>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExpKind {
     Const(Const),
-    Var(Ident, Option<Type>),
+    Var(Ident),
     Cast(Type, Box<Exp>),
-    Unary(UnaryOp, Box<Exp>, Option<Type>),
-    Binary(BinaryOp, Box<Exp>, Box<Exp>, Option<Type>),
-    Assignment(Box<Exp>, Box<Exp>, Option<Type>),
-    Conditional(Box<Exp>, Box<Exp>, Box<Exp>, Option<Type>),
-    FuncCall(Ident, Vec<Exp>, Option<Type>),
-    Dereference(Box<Exp>, Option<Type>),
-    AddressOf(Box<Exp>, Option<Type>),
+    Unary(UnaryOp, Box<Exp>),
+    Binary(BinaryOp, Box<Exp>, Box<Exp>),
+    Assignment(Box<Exp>, Box<Exp>),
+    Conditional(Box<Exp>, Box<Exp>, Box<Exp>),
+    FuncCall(Ident, Vec<Exp>),
+    Dereference(Box<Exp>),
+    AddressOf(Box<Exp>),
     Sequence(Vec<(Ident, Exp)>, Vec<Exp>, Box<Exp>),
 }
 
 impl Exp {
+    pub fn new(kind: ExpKind) -> Self {
+        Self { kind, typ: None }
+    }
+
     pub fn typ(&self) -> &Type {
-        use Exp::*;
-        match self {
-            Const(c) => c.typ(),
-            Var(_, Some(typ)) => typ,
-            Cast(typ, _) => typ,
-            Unary(_, _, Some(typ)) => typ,
-            Binary(_, _, _, Some(typ)) => typ,
-            Assignment(_, _, Some(typ)) => typ,
-            Sequence(_, _, result) => result.typ(),
-            Conditional(_, _, _, Some(typ)) => typ,
-            FuncCall(_, _, Some(typ)) => typ,
-            Dereference(_, Some(typ)) => typ,
-            AddressOf(_, Some(typ)) => typ,
-            _ => unreachable!("the type is not assigned"),
-        }
+        self.typ.as_ref().expect("the type is not assigned")
     }
 
     pub fn common_type_with(&self, other: &Exp) -> Option<Type> {
@@ -130,7 +126,10 @@ impl Exp {
 
     pub fn is_null_pointer_constant(&self) -> bool {
         use Const::*;
-        matches!(self, Exp::Const(Int(0) | Long(0) | UInt(0) | ULong(0)))
+        matches!(
+            self.kind,
+            ExpKind::Const(Int(0) | Long(0) | UInt(0) | ULong(0))
+        )
     }
 
     pub fn common_pointer_type_with(&self, other: &Exp) -> Option<Type> {
@@ -151,7 +150,7 @@ impl Exp {
     }
 
     pub fn is_lvalue(&self) -> bool {
-        matches!(self, Exp::Var(_, _) | Exp::Dereference(_, _))
+        matches!(self.kind, ExpKind::Var(_) | ExpKind::Dereference(_))
     }
 }
 

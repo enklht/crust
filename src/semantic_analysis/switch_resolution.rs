@@ -63,7 +63,7 @@ fn resolve_stmt(stmt: &mut Stmt, context: &mut Option<&mut Context>) -> Validati
             };
 
             if let Some(context) = context.as_mut() {
-                let Exp::Const(c) = exp else {
+                let ExpKind::Const(c) = exp.kind else {
                     return Err(ValidationError::Switch(format!(
                         "Case value must be a constant expression, found: {exp:?}"
                     )));

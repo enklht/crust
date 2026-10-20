@@ -6,7 +6,11 @@ use crate::models::typ::Type;
 
 pub fn convert_to(exp: &mut Exp, typ: &Type) {
     if exp.typ() != typ {
-        *exp = Exp::Cast(typ.clone(), Box::new(exp.clone()))
+        let inner = std::mem::replace(exp, Exp::new(ExpKind::Const(Const::Int(0))));
+        *exp = Exp {
+            kind: ExpKind::Cast(typ.clone(), Box::new(inner)),
+            typ: Some(typ.clone()),
+        };
     }
 }
 
@@ -350,9 +354,10 @@ fn check_for_init(for_init: &mut ForInit, symbols: &mut Symbols) -> ValidationRe
 }
 
 fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
-    match exp {
-        Exp::Const(_) => {}
-        Exp::Assignment(left, right, typ) => {
+    let Exp { kind, typ } = exp;
+    match kind {
+        ExpKind::Const(c) => *typ = Some(c.typ().clone()),
+        ExpKind::Assignment(left, right) => {
             if !left.is_lvalue() {
                 return Err(Error::Type(format!(
                     "Assignment to non-lvalue variable '{left:?}'"
@@ -366,7 +371,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             convert_by_assignment_to(right, left_type)?;
             *typ = Some(left_type.clone());
         }
-        Exp::Var(name, typ) => {
+        ExpKind::Var(name) => {
             match symbols.get(name).unwrap() {
                 Symbol::Func { .. } => {
                     return Err(Error::Type(format!(
@@ -376,20 +381,21 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 symbol => *typ = Some(symbol.typ().clone()),
             };
         }
-        Exp::Cast(typ, inner) => {
+        ExpKind::Cast(target_type, inner) => {
             use Type::*;
             check_exp(inner, symbols)?;
             if matches!(
-                (inner.typ(), &typ),
+                (inner.typ(), &target_type),
                 (Double, Pointer(_)) | (Pointer(_), Double)
             ) {
                 return Err(Error::Type(format!(
-                    "Cast from {} to {typ} is illegal",
+                    "Cast from {} to {target_type} is illegal",
                     inner.typ()
                 )));
             }
+            *typ = Some(target_type.clone());
         }
-        Exp::Unary(op, inner, typ) => {
+        ExpKind::Unary(op, inner) => {
             use UnaryOp::*;
 
             check_exp(inner, symbols)?;
@@ -418,7 +424,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 }
             };
         }
-        Exp::Binary(op, e1, e2, typ) => {
+        ExpKind::Binary(op, e1, e2) => {
             use BinaryOp::*;
 
             check_exp(e1, symbols)?;
@@ -484,7 +490,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 }
             }
         }
-        Exp::Conditional(cond, then, else_, typ) => {
+        ExpKind::Conditional(cond, then, else_) => {
             check_exp(cond, symbols)?;
             check_exp(then, symbols)?;
             check_exp(else_, symbols)?;
@@ -500,7 +506,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             convert_to(else_, &common_type);
             *typ = Some(common_type);
         }
-        Exp::FuncCall(name, args, typ) => {
+        ExpKind::FuncCall(name, args) => {
             let Symbol::Func {
                 typ: Type::Func(param_types, ret_type),
                 ..
@@ -526,9 +532,9 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 convert_by_assignment_to(arg, &param_type)?;
             }
 
-            *typ = Some(*ret_type.clone());
+            *typ = Some(*ret_type);
         }
-        Exp::Dereference(inner, typ) => {
+        ExpKind::Dereference(inner) => {
             check_exp(inner, symbols)?;
             match inner.typ() {
                 Type::Pointer(referenced_type) => *typ = Some(*referenced_type.clone()),
@@ -539,7 +545,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 }
             }
         }
-        Exp::AddressOf(inner, typ) => {
+        ExpKind::AddressOf(inner) => {
             if !inner.is_lvalue() {
                 return Err(Error::Type(format!(
                     "Cannot take the address of a non-lvalue {inner:?}",
@@ -548,7 +554,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(inner, symbols)?;
             *typ = Some(Type::Pointer(Box::new(inner.typ().clone())));
         }
-        Exp::Sequence(bindings, effects, result) => {
+        ExpKind::Sequence(bindings, effects, result) => {
             for (name, init) in bindings {
                 check_exp(init, symbols)?;
                 symbols.insert(
@@ -562,6 +568,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                 check_exp(effect, symbols)?;
             }
             check_exp(result, symbols)?;
+            *typ = Some(result.typ().clone());
         }
     };
     Ok(())

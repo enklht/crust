@@ -237,13 +237,13 @@ fn resolve_for_init(init: &mut ForInit, scope_manager: &mut ScopeManager) -> Val
 }
 
 fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
-    match exp {
-        Exp::Const(_) => {}
-        Exp::Assignment(left, right, _) => {
+    match &mut exp.kind {
+        ExpKind::Const(_) => {}
+        ExpKind::Assignment(left, right) => {
             resolve_exp(left, scope_manager)?;
             resolve_exp(right, scope_manager)?;
         }
-        Exp::Var(name, _) => match scope_manager.get(name) {
+        ExpKind::Var(name) => match scope_manager.get(name) {
             Some((unique_name, _)) => *name = unique_name,
             None => {
                 return Err(ValidationError::VarDecl(format!(
@@ -251,18 +251,18 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
                 )));
             }
         },
-        Exp::Cast(_, exp) => resolve_exp(exp, scope_manager)?,
-        Exp::Unary(_, exp, _) => resolve_exp(exp, scope_manager)?,
-        Exp::Binary(_, e1, e2, _) => {
+        ExpKind::Cast(_, exp) => resolve_exp(exp, scope_manager)?,
+        ExpKind::Unary(_, exp) => resolve_exp(exp, scope_manager)?,
+        ExpKind::Binary(_, e1, e2) => {
             resolve_exp(e1, scope_manager)?;
             resolve_exp(e2, scope_manager)?;
         }
-        Exp::Conditional(cond, then, else_, _) => {
+        ExpKind::Conditional(cond, then, else_) => {
             resolve_exp(cond, scope_manager)?;
             resolve_exp(then, scope_manager)?;
             resolve_exp(else_, scope_manager)?;
         }
-        Exp::FuncCall(name, args, _) => {
+        ExpKind::FuncCall(name, args) => {
             let Some((new_name, _)) = scope_manager.get(name) else {
                 return Err(ValidationError::FuncDecl(format!(
                     "Cannot find function '{name}' in this scope"
@@ -273,13 +273,13 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
             args.iter_mut()
                 .try_for_each(|arg| resolve_exp(arg, scope_manager))?;
         }
-        Exp::Dereference(inner, _) => {
+        ExpKind::Dereference(inner) => {
             resolve_exp(inner, scope_manager)?;
         }
-        Exp::AddressOf(inner, _) => {
+        ExpKind::AddressOf(inner) => {
             resolve_exp(inner, scope_manager)?;
         }
-        Exp::Sequence(bindings, effects, result) => {
+        ExpKind::Sequence(bindings, effects, result) => {
             scope_manager.enter_scope();
             for (name, init) in bindings {
                 resolve_exp(init, scope_manager)?;

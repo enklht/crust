@@ -1,5 +1,5 @@
 use super::typ::Type;
-use crate::models::ast::Exp;
+use crate::models::ast::{Exp, ExpKind};
 use crate::models::constant::Const;
 use crate::utils::Ident;
 use rustc_hash::FxHashMap;
@@ -82,8 +82,8 @@ impl InitialValue {
             return Some(InitialValue::from_none(typ));
         }
 
-        let c = match init {
-            Exp::Const(c) if !typ.is_pointer() => c,
+        let c = match &init.kind {
+            ExpKind::Const(c) if !typ.is_pointer() => c,
             _ => return None,
         };
 

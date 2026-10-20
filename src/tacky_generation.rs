@@ -267,7 +267,7 @@ fn emit_exp_and_convert(
     match result {
         ExpResult::PlainOperand(val) => val,
         ExpResult::DereferencedPointer(ptr, typ) => {
-            let dst = make_temp_var(typ.clone(), symbols);
+            let dst = make_temp_var(typ, symbols);
             instructions.push(tacky::Instruction::Load(ptr, dst));
             dst
         }
@@ -275,15 +275,16 @@ fn emit_exp_and_convert(
 }
 
 fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols) -> ExpResult {
-    let op = match exp {
-        Exp::Const(c) => tacky::Val::Const(c),
-        Exp::Unary(op, inner, typ) => {
+    let Exp { kind, typ } = exp;
+    let op = match kind {
+        ExpKind::Const(c) => tacky::Val::Const(c),
+        ExpKind::Unary(op, inner) => {
             let src = emit_exp_and_convert(*inner, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
             instructions.push(Instruction::Unary(op, src, dst));
             dst
         }
-        Exp::Binary(BinaryOp::LogicalAnd, v1, v2, typ) => {
+        ExpKind::Binary(BinaryOp::LogicalAnd, v1, v2) => {
             let false_label = make_label("and_false");
             let end_label = make_label("and_end");
 
@@ -301,7 +302,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             ]);
             dst
         }
-        Exp::Binary(BinaryOp::LogicalOr, v1, v2, typ) => {
+        ExpKind::Binary(BinaryOp::LogicalOr, v1, v2) => {
             let true_label = make_label("or_true");
             let end_label = make_label("or_end");
 
@@ -319,15 +320,15 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             ]);
             dst
         }
-        Exp::Binary(op, e1, e2, typ) => {
+        ExpKind::Binary(op, e1, e2) => {
             let v1 = emit_exp_and_convert(*e1, instructions, symbols);
             let v2 = emit_exp_and_convert(*e2, instructions, symbols);
             let dst = make_temp_var(typ.unwrap(), symbols);
             instructions.push(Instruction::Binary(op, v1, v2, dst));
             dst
         }
-        Exp::Var(name, _) => tacky::Val::Var(name),
-        Exp::Assignment(left, right, _) => {
+        ExpKind::Var(name) => tacky::Val::Var(name),
+        ExpKind::Assignment(left, right) => {
             let lval = emit_exp(*left, instructions, symbols);
             let rval = emit_exp_and_convert(*right, instructions, symbols);
 
@@ -342,7 +343,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
                 }
             }
         }
-        Exp::Sequence(bindings, effects, result) => {
+        ExpKind::Sequence(bindings, effects, result) => {
             for (name, init) in bindings {
                 let value = emit_exp_and_convert(init, instructions, symbols);
                 instructions.push(Instruction::Copy(value, tacky::Val::Var(name)));
@@ -352,7 +353,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             }
             emit_exp_and_convert(*result, instructions, symbols)
         }
-        Exp::Conditional(cond, then, else_, typ) => {
+        ExpKind::Conditional(cond, then, else_) => {
             let else_label = make_label("ternary_else");
             let end_label = make_label("ternary_end");
             let result = make_temp_var(typ.unwrap(), symbols);
@@ -372,7 +373,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             ]);
             result
         }
-        Exp::FuncCall(name, args, typ) => {
+        ExpKind::FuncCall(name, args) => {
             let result = make_temp_var(typ.unwrap(), symbols);
 
             let args = args
@@ -382,16 +383,16 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             instructions.push(Instruction::FuncCall(name, args, result));
             result
         }
-        Exp::Cast(typ, inner) => {
+        ExpKind::Cast(typ, inner) => {
             let inner_type = inner.typ().clone();
             let result = emit_exp_and_convert(*inner, instructions, symbols);
             emit_cast(result, &inner_type, &typ, instructions, symbols)
         }
-        Exp::Dereference(inner, typ) => {
+        ExpKind::Dereference(inner) => {
             let result = emit_exp_and_convert(*inner, instructions, symbols);
             return ExpResult::DereferencedPointer(result, typ.unwrap());
         }
-        Exp::AddressOf(inner, typ) => {
+        ExpKind::AddressOf(inner) => {
             let result = emit_exp(*inner, instructions, symbols);
             match result {
                 ExpResult::PlainOperand(op) => {
