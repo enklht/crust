@@ -88,6 +88,7 @@ pub enum Exp {
     FuncCall(Ident, Vec<Exp>, Option<Type>),
     Dereference(Box<Exp>, Option<Type>),
     AddressOf(Box<Exp>, Option<Type>),
+    Sequence(Vec<(Ident, Exp)>, Vec<Exp>, Box<Exp>),
 }
 
 impl Exp {
@@ -100,6 +101,7 @@ impl Exp {
             Unary(_, _, Some(typ)) => typ,
             Binary(_, _, _, Some(typ)) => typ,
             Assignment(_, _, Some(typ)) => typ,
+            Sequence(_, _, result) => result.typ(),
             Conditional(_, _, _, Some(typ)) => typ,
             FuncCall(_, _, Some(typ)) => typ,
             Dereference(_, Some(typ)) => typ,

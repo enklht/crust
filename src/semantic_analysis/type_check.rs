@@ -548,6 +548,21 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             check_exp(inner, symbols)?;
             *typ = Some(Type::Pointer(Box::new(inner.typ().clone())));
         }
+        Exp::Sequence(bindings, effects, result) => {
+            for (name, init) in bindings {
+                check_exp(init, symbols)?;
+                symbols.insert(
+                    name,
+                    Symbol::LocalVar {
+                        typ: init.typ().clone(),
+                    },
+                );
+            }
+            for effect in effects {
+                check_exp(effect, symbols)?;
+            }
+            check_exp(result, symbols)?;
+        }
     };
     Ok(())
 }

@@ -3,12 +3,38 @@ use super::specifiers::type_specifiers;
 use crate::models::ast::*;
 use crate::models::token::Token;
 use crate::models::typ::Type;
+use crate::utils::make_temporary;
 use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
 
 fn binary(op: BinaryOp, left: Exp, right: Exp) -> Exp {
     Exp::Binary(op, Box::new(left), Box::new(right), None)
+}
+
+fn update(op: BinaryOp, left: Exp, right: Exp, postfix: bool) -> Exp {
+    let ptr_name = make_temporary();
+    let ptr = Exp::Var(ptr_name, None);
+    let deref = Exp::Dereference(Box::new(ptr), None);
+    let mut bindings = vec![(ptr_name, Exp::AddressOf(Box::new(left), None))];
+    let old = if postfix {
+        let old_name = make_temporary();
+        bindings.push((old_name, deref.clone()));
+        Exp::Var(old_name, None)
+    } else {
+        deref.clone()
+    };
+    let assignment = Exp::Assignment(
+        Box::new(deref),
+        Box::new(binary(op, old.clone(), right)),
+        None,
+    );
+    let (effects, result) = if postfix {
+        (vec![assignment], old)
+    } else {
+        (vec![], assignment)
+    };
+    Exp::Sequence(bindings, effects, Box::new(result))
 }
 
 pub fn exp<'tokens, I>() -> impl Parser<'tokens, I, Exp, ParserError<'tokens>> + Clone
@@ -38,40 +64,16 @@ where
 
         atom.pratt((
             postfix(14, just(Token::DoublePlus), |v: Exp, _, _| {
-                binary(
-                    BinaryOp::Subtract,
-                    Exp::Assignment(
-                        Box::new(v.clone()),
-                        Box::new(binary(BinaryOp::Add, v, Exp::Const(Const::Int(1)))),
-                        None,
-                    ),
-                    Exp::Const(Const::Int(1)),
-                )
+                update(BinaryOp::Add, v, Exp::Const(Const::Int(1)), true)
             }),
             postfix(14, just(Token::DoubleHyphen), |v: Exp, _, _| {
-                binary(
-                    BinaryOp::Add,
-                    Exp::Assignment(
-                        Box::new(v.clone()),
-                        Box::new(binary(BinaryOp::Subtract, v, Exp::Const(Const::Int(1)))),
-                        None,
-                    ),
-                    Exp::Const(Const::Int(1)),
-                )
+                update(BinaryOp::Subtract, v, Exp::Const(Const::Int(1)), true)
             }),
             prefix(13, just(Token::DoublePlus), |_, v: Exp, _| {
-                Exp::Assignment(
-                    Box::new(v.clone()),
-                    Box::new(binary(BinaryOp::Add, v, Exp::Const(Const::Int(1)))),
-                    None,
-                )
+                update(BinaryOp::Add, v, Exp::Const(Const::Int(1)), false)
             }),
             prefix(13, just(Token::DoubleHyphen), |_, v: Exp, _| {
-                Exp::Assignment(
-                    Box::new(v.clone()),
-                    Box::new(binary(BinaryOp::Subtract, v, Exp::Const(Const::Int(1)))),
-                    None,
-                )
+                update(BinaryOp::Subtract, v, Exp::Const(Const::Int(1)), false)
             }),
             prefix(
                 13,
@@ -154,14 +156,7 @@ where
                     Token::LShiftEqual,
                     Token::RShiftEqual,
                 ]),
-                |left: Exp, op, right, _| {
-                    let op = convert_compound(op);
-                    Exp::Assignment(
-                        Box::new(left.clone()),
-                        Box::new(binary(op, left, right)),
-                        None,
-                    )
-                },
+                |left, op, right, _| update(convert_compound(op), left, right, false),
             ),
         ))
     })

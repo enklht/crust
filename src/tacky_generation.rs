@@ -342,6 +342,16 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
                 }
             }
         }
+        Exp::Sequence(bindings, effects, result) => {
+            for (name, init) in bindings {
+                let value = emit_exp_and_convert(init, instructions, symbols);
+                instructions.push(Instruction::Copy(value, tacky::Val::Var(name)));
+            }
+            for effect in effects {
+                emit_exp(effect, instructions, symbols);
+            }
+            emit_exp_and_convert(*result, instructions, symbols)
+        }
         Exp::Conditional(cond, then, else_, typ) => {
             let else_label = make_label("ternary_else");
             let end_label = make_label("ternary_end");
@@ -375,42 +385,7 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
         Exp::Cast(typ, inner) => {
             let inner_type = inner.typ().clone();
             let result = emit_exp_and_convert(*inner, instructions, symbols);
-            if typ == inner_type {
-                result
-            } else {
-                let dst = make_temp_var(typ.clone(), symbols);
-
-                if inner_type == Type::Double {
-                    if typ.is_signed() {
-                        instructions.push(Instruction::DoubleToInt(result, dst));
-                    } else {
-                        instructions.push(Instruction::DoubleToUInt(result, dst));
-                    }
-                } else if typ == Type::Double {
-                    if inner_type.is_signed() {
-                        instructions.push(Instruction::IntToDouble(result, dst));
-                    } else {
-                        instructions.push(Instruction::UIntToDouble(result, dst));
-                    }
-                } else {
-                    match typ.size().cmp(&inner_type.size()) {
-                        Ordering::Equal => {
-                            instructions.push(Instruction::Copy(result, dst));
-                        }
-                        Ordering::Less => {
-                            instructions.push(Instruction::Truncate(result, dst));
-                        }
-                        Ordering::Greater if inner_type.is_signed() => {
-                            instructions.push(Instruction::SignExtend(result, dst));
-                        }
-                        Ordering::Greater => {
-                            instructions.push(Instruction::ZeroExtend(result, dst));
-                        }
-                    }
-                }
-
-                dst
-            }
+            emit_cast(result, &inner_type, &typ, instructions, symbols)
         }
         Exp::Dereference(inner, typ) => {
             let result = emit_exp_and_convert(*inner, instructions, symbols);
@@ -430,4 +405,43 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
     };
 
     ExpResult::PlainOperand(op)
+}
+
+fn emit_cast(
+    src: tacky::Val,
+    from: &Type,
+    to: &Type,
+    instructions: &mut Vec<Instruction>,
+    symbols: &mut Symbols,
+) -> tacky::Val {
+    if to == from {
+        return src;
+    }
+
+    let dst = make_temp_var(to.clone(), symbols);
+
+    if from == &Type::Double {
+        if to.is_signed() {
+            instructions.push(Instruction::DoubleToInt(src, dst));
+        } else {
+            instructions.push(Instruction::DoubleToUInt(src, dst));
+        }
+    } else if to == &Type::Double {
+        if from.is_signed() {
+            instructions.push(Instruction::IntToDouble(src, dst));
+        } else {
+            instructions.push(Instruction::UIntToDouble(src, dst));
+        }
+    } else {
+        match to.size().cmp(&from.size()) {
+            Ordering::Equal => instructions.push(Instruction::Copy(src, dst)),
+            Ordering::Less => instructions.push(Instruction::Truncate(src, dst)),
+            Ordering::Greater if from.is_signed() => {
+                instructions.push(Instruction::SignExtend(src, dst))
+            }
+            Ordering::Greater => instructions.push(Instruction::ZeroExtend(src, dst)),
+        }
+    }
+
+    dst
 }

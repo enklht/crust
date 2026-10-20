@@ -279,6 +279,18 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
         Exp::AddressOf(inner, _) => {
             resolve_exp(inner, scope_manager)?;
         }
+        Exp::Sequence(bindings, effects, result) => {
+            scope_manager.enter_scope();
+            for (name, init) in bindings {
+                resolve_exp(init, scope_manager)?;
+                scope_manager.insert(name, (name, false));
+            }
+            for effect in effects {
+                resolve_exp(effect, scope_manager)?;
+            }
+            resolve_exp(result, scope_manager)?;
+            scope_manager.exit_scope();
+        }
     }
     Ok(())
 }
