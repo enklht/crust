@@ -197,7 +197,7 @@ where
 enum AbsDeclarator {
     Base,
     Pointer(Box<AbsDeclarator>),
-    Array(Box<AbsDeclarator>, isize),
+    Array(Box<AbsDeclarator>, usize),
 }
 
 fn abs_declarator<'tokens, I>()

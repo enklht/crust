@@ -18,7 +18,7 @@ pub enum Type {
     #[display("fn{_0:?} -> {_1}")]
     Func(Vec<Type>, Box<Type>),
     #[display("")]
-    Array(Box<Type>, isize),
+    Array(Box<Type>, usize),
 }
 
 impl Type {
@@ -42,6 +42,10 @@ impl Type {
 
     pub fn is_pointer(&self) -> bool {
         matches!(self, Type::Pointer(_))
+    }
+
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Type::Int | Type::Long | Type::UInt | Type::ULong)
     }
 
     pub fn is_arithmetic(&self) -> bool {

@@ -81,7 +81,7 @@ where
 enum Declarator {
     Ident(Ident),
     Pointer(Box<Declarator>),
-    Array(Box<Declarator>, isize),
+    Array(Box<Declarator>, usize),
     Func(Vec<(Type, Declarator)>, Box<Declarator>),
 }
 

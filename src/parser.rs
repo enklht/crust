@@ -19,15 +19,15 @@ use utils::SemicolonExt;
 
 type ParserError<'tokens> = extra::Err<Rich<'tokens, Token>>;
 
-fn array_suffix<'tokens, I>() -> impl Parser<'tokens, I, isize, ParserError<'tokens>> + Clone
+fn array_suffix<'tokens, I>() -> impl Parser<'tokens, I, usize, ParserError<'tokens>> + Clone
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
     let const_int = select! {
-        Token::ConstInt(i) => i as isize,
-        Token::ConstLong(i) => i as isize,
-        Token::ConstUInt(i) => i as isize,
-        Token::ConstULong(i) => i as isize,
+        Token::ConstInt(i) => i as usize,
+        Token::ConstLong(i) => i as usize,
+        Token::ConstUInt(i) => i as usize,
+        Token::ConstULong(i) => i as usize,
     };
     const_int.delimited_by(just(Token::LBracket), just(Token::RBracket))
 }

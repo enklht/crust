@@ -52,6 +52,7 @@ fn emit_top_level(
                 Long(i) => writeln!(acc, "    .quad {i}"),
                 ULong(i) => writeln!(acc, "    .quad {i}"),
                 Double(i) => writeln!(acc, "    .quad {}", i.to_bits()),
+                _ => todo!(),
             }
         }
         TopLevel::StaticConst(name, alignment, init) => {
@@ -70,6 +71,7 @@ fn emit_top_level(
                     writeln!(acc, "    # {i}")?;
                     writeln!(acc, "    .quad {}", i.to_bits())
                 }
+                _ => todo!(),
             }
         }
     }

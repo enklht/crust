@@ -4,6 +4,53 @@ use crate::models::ast::*;
 use crate::models::symbol::*;
 use crate::models::typ::Type;
 use crate::utils::make_temporary;
+use std::cmp::Ordering;
+
+pub fn common_type_with(left: &Exp, right: &Exp) -> ValidationResult<Type> {
+    let left_type = left.typ();
+    let right_type = right.typ();
+
+    if left_type == right_type {
+        Ok(left_type.clone())
+    } else if left_type == &Type::Double || right_type == &Type::Double {
+        Ok(Type::Double)
+    } else {
+        match left_type
+            .size()
+            .ok_or(Error::Type(format!("{left_type} has no size")))?
+            .cmp(
+                &right_type
+                    .size()
+                    .ok_or(Error::Type(format!("{right_type} has no size")))?,
+            ) {
+            Ordering::Equal if left_type.is_signed() => Ok(right_type.clone()),
+            Ordering::Equal => Ok(left_type.clone()),
+            Ordering::Greater => Ok(left_type.clone()),
+            Ordering::Less => Ok(right_type.clone()),
+        }
+    }
+}
+
+pub fn common_pointer_type_with(left: &Exp, right: &Exp) -> ValidationResult<Type> {
+    let left_type = left.typ();
+    let right_type = right.typ();
+
+    if !left_type.is_pointer() && !right_type.is_pointer() {
+        Err(Error::Type(format!(
+            "{left_type} or {right_type} must be pointer"
+        )))
+    } else if left_type == right_type {
+        Ok(left_type.clone())
+    } else if left.is_null_pointer_constant() {
+        Ok(right_type.clone())
+    } else if right.is_null_pointer_constant() {
+        Ok(left_type.clone())
+    } else {
+        Err(Error::Type(format!(
+            "{left_type} and {right_type} has no common pointer type"
+        )))
+    }
+}
 
 pub fn convert_to(exp: &mut Exp, typ: &Type) {
     if exp.typ() != typ {
@@ -15,7 +62,7 @@ pub fn convert_to(exp: &mut Exp, typ: &Type) {
     }
 }
 
-pub fn convert_by_assignment_to(exp: &mut Exp, target_type: &Type) -> Result<(), Error> {
+pub fn convert_by_assignment_to(exp: &mut Exp, target_type: &Type) -> ValidationResult<()> {
     match exp.typ() {
         typ if typ == target_type => {}
         typ if typ.is_arithmetic() && target_type.is_arithmetic() => convert_to(exp, target_type),
@@ -64,6 +111,24 @@ fn check_func_decl(
 ) -> ValidationResult<()> {
     match func_decl {
         FuncDecl::FuncDecl(name, params, body, typ, storage_class) => {
+            let Type::Func(param_types, ret_type) = typ.clone() else {
+                unreachable!()
+            };
+
+            if matches!(*ret_type, Type::Array(_, _)) {
+                return Err(Error::Type(format!("A function cannot return an array")));
+            }
+
+            let param_types: Vec<Type> = param_types
+                .iter()
+                .map(|t| match t {
+                    Type::Array(element_type, _) => Type::Pointer(element_type.clone()),
+                    _ => t.clone(),
+                })
+                .collect();
+
+            *typ = Type::Func(param_types.clone(), ret_type.clone());
+
             if block_scope && storage_class == &StorageClass::Static {
                 return Err(Error::FuncDecl(format!(
                     "Incompatible storage class for function '{name}'"
@@ -96,16 +161,11 @@ fn check_func_decl(
                     }
                     symbol => {
                         return Err(Error::FuncDecl(format!(
-                            "Function '{name}' is previously defined as {}, now defined as {}",
+                            "Function '{name}' is previously defined as {}, now defined as {typ}",
                             symbol.typ(),
-                            typ
                         )));
                     }
                 }
-            };
-
-            let Type::Func(param_types, ret_type) = typ.clone() else {
-                unreachable!()
             };
 
             let symbol = Symbol::Func {
@@ -134,9 +194,9 @@ fn check_file_scope_var_decl(
     match var_decl {
         VarDecl::VarDecl(name, init, typ, storage_class) => {
             let mut init_value = match init {
-                Some(init) => InitialValue::from_exp(init, typ).ok_or(Error::VarDecl(format!(
-                    "Static variable '{name}' has a non-constant initializer {init:?}"
-                )))?,
+                Some(init) => InitialValue::from_initializer(init, typ).ok_or(Error::VarDecl(
+                    format!("Static variable '{name}' has a non-constant initializer {init:?}"),
+                ))?,
                 None if storage_class == &StorageClass::Extern => InitialValue::NoInitializer,
                 None => InitialValue::Tentative,
             };
@@ -192,7 +252,7 @@ fn check_file_scope_var_decl(
             symbols.insert(name, symbol);
 
             if let Some(init) = init {
-                check_exp(init, symbols)?;
+                check_init(init, symbols, typ)?;
             }
             Ok(())
         }
@@ -243,11 +303,11 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                 }
                 StorageClass::Static => {
                     let init_value = match init {
-                        Some(init) => {
-                            InitialValue::from_exp(init, typ).ok_or(Error::VarDecl(format!(
+                        Some(init) => InitialValue::from_initializer(init, typ).ok_or(
+                            Error::VarDecl(format!(
                                 "Static variable '{name}' has a non-constant initializer {init:?}"
-                            )))?
-                        }
+                            )),
+                        )?,
                         None => InitialValue::from_none(typ),
                     };
                     symbols.insert(
@@ -262,14 +322,79 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                 StorageClass::None => {
                     symbols.insert(name, Symbol::LocalVar { typ: typ.clone() });
                     if let Some(init) = init {
-                        check_exp(init, symbols)?;
-                        convert_by_assignment_to(init, typ)?;
+                        check_init(init, symbols, typ)?;
                     }
                 }
             }
             Ok(())
         }
     }
+}
+
+fn zero_initializer(typ: &Type) -> ValidationResult<Initializer> {
+    let init = match typ {
+        Type::Array(element_type, size) => {
+            Initializer::Compound(vec![zero_initializer(element_type)?; *size])
+        }
+        Type::Int => Initializer::Single(Exp {
+            kind: ExpKind::Const(Const::Int(0)),
+            typ: Some(Type::Int),
+        }),
+        Type::UInt => Initializer::Single(Exp {
+            kind: ExpKind::Const(Const::UInt(0)),
+            typ: Some(Type::UInt),
+        }),
+        Type::Long => Initializer::Single(Exp {
+            kind: ExpKind::Const(Const::Long(0)),
+            typ: Some(Type::Long),
+        }),
+        Type::ULong => Initializer::Single(Exp {
+            kind: ExpKind::Const(Const::ULong(0)),
+            typ: Some(Type::ULong),
+        }),
+        Type::Double => Initializer::Single(Exp {
+            kind: ExpKind::Const(Const::Double(0.)),
+            typ: Some(Type::Double),
+        }),
+        _ => {
+            return Err(Error::Type(format!(
+                "Cannot create zero initializer for type {typ}"
+            )));
+        }
+    };
+
+    Ok(init)
+}
+
+fn check_init(
+    init: &mut Initializer,
+    symbols: &mut Symbols,
+    target_type: &Type,
+) -> ValidationResult<()> {
+    match (target_type, init) {
+        (_, Initializer::Single(e)) => {
+            check_and_convert_exp(e, symbols)?;
+            convert_by_assignment_to(e, target_type)?;
+        }
+        (Type::Array(element_type, size), Initializer::Compound(init_list)) => {
+            if init_list.len() > *size {
+                return Err(Error::Type(format!("todo")));
+            }
+            for init in &mut *init_list {
+                check_init(init, symbols, element_type)?;
+            }
+            while init_list.len() < *size {
+                init_list.push(zero_initializer(element_type)?);
+            }
+        }
+        _ => {
+            return Err(Error::Type(format!(
+                "cannot initialize a scalar object with a compound initializer"
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 fn check_block(block: &mut Block, symbols: &mut Symbols, ret_type: &Type) -> ValidationResult<()> {
@@ -292,19 +417,19 @@ fn check_block_item(
 fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols, ret_type: &Type) -> ValidationResult<()> {
     match stmt {
         Stmt::Return(exp) => {
-            check_exp(exp, symbols)?;
+            check_and_convert_exp(exp, symbols)?;
             convert_by_assignment_to(exp, ret_type)?;
         }
         Stmt::Expression(exp) => {
-            check_exp(exp, symbols)?;
+            check_and_convert_exp(exp, symbols)?;
         }
         Stmt::If(cond, then, Some(else_)) => {
-            check_exp(cond, symbols)?;
+            check_and_convert_exp(cond, symbols)?;
             check_stmt(then, symbols, ret_type)?;
             check_stmt(else_, symbols, ret_type)?;
         }
         Stmt::If(cond, then, None) => {
-            check_exp(cond, symbols)?;
+            check_and_convert_exp(cond, symbols)?;
             check_stmt(then, symbols, ret_type)?;
         }
         Stmt::Labelled(_, stmt) => {
@@ -314,25 +439,25 @@ fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols, ret_type: &Type) -> Valida
             check_block(block, symbols, ret_type)?;
         }
         Stmt::While(cond, body, _) => {
-            check_exp(cond, symbols)?;
+            check_and_convert_exp(cond, symbols)?;
             check_stmt(body, symbols, ret_type)?;
         }
         Stmt::DoWhile(body, cond, _) => {
             check_stmt(body, symbols, ret_type)?;
-            check_exp(cond, symbols)?;
+            check_and_convert_exp(cond, symbols)?;
         }
         Stmt::For(init, cond, post, body, _) => {
             check_for_init(init, symbols)?;
             if let Some(cond) = cond {
-                check_exp(cond, symbols)?;
+                check_and_convert_exp(cond, symbols)?;
             }
             if let Some(post) = post {
-                check_exp(post, symbols)?;
+                check_and_convert_exp(post, symbols)?;
             }
             check_stmt(body, symbols, ret_type)?;
         }
         Stmt::Switch(cond, body, _, _) => {
-            check_exp(cond, symbols)?;
+            check_and_convert_exp(cond, symbols)?;
             check_stmt(body, symbols, ret_type)?;
         }
         // Goto, Break, Continue, Null
@@ -349,9 +474,24 @@ fn check_for_init(for_init: &mut ForInit, symbols: &mut Symbols) -> ValidationRe
                 "Incompatible storage class for variable '{name}'"
             ))),
         },
-        ForInit::InitExp(exp) => check_exp(exp, symbols),
+        ForInit::InitExp(exp) => check_and_convert_exp(exp, symbols),
         ForInit::Null => Ok(()),
     }
+}
+
+fn check_and_convert_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
+    check_exp(exp, symbols)?;
+    match exp.typ().clone() {
+        Type::Array(element_type, _) => {
+            let inner = std::mem::replace(exp, Exp::new(ExpKind::Const(Const::Int(0))));
+            *exp = Exp {
+                kind: ExpKind::AddressOf(Box::new(inner)),
+                typ: Some(Type::Pointer(element_type.clone())),
+            };
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
@@ -359,14 +499,14 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
     match kind {
         ExpKind::Const(c) => *typ = Some(c.typ().clone()),
         ExpKind::Assignment(left, right) => {
+            check_and_convert_exp(left, symbols)?;
             if !left.is_lvalue() {
                 return Err(Error::Type(format!(
                     "Assignment to non-lvalue variable '{left:?}'"
                 )));
             }
 
-            check_exp(left, symbols)?;
-            check_exp(right, symbols)?;
+            check_and_convert_exp(right, symbols)?;
 
             let left_type = left.typ();
             convert_by_assignment_to(right, left_type)?;
@@ -384,7 +524,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
         }
         ExpKind::Cast(target_type, inner) => {
             use Type::*;
-            check_exp(inner, symbols)?;
+            check_and_convert_exp(inner, symbols)?;
             if matches!(
                 (inner.typ(), &target_type),
                 (Double, Pointer(_)) | (Pointer(_), Double)
@@ -399,7 +539,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
         ExpKind::Unary(op, inner) => {
             use UnaryOp::*;
 
-            check_exp(inner, symbols)?;
+            check_and_convert_exp(inner, symbols)?;
 
             match op {
                 LogicalNot => {
@@ -428,8 +568,8 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
         ExpKind::Binary(op, e1, e2) => {
             use BinaryOp::*;
 
-            check_exp(e1, symbols)?;
-            check_exp(e2, symbols)?;
+            check_and_convert_exp(e1, symbols)?;
+            check_and_convert_exp(e2, symbols)?;
 
             let e1_type = e1.typ();
             let e2_type = e2.typ();
@@ -439,36 +579,81 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                     *typ = Some(Type::Int);
                 }
                 LShift | RShift => {
-                    if e1_type == &Type::Double
-                        || e2_type == &Type::Double
-                        || e1_type.is_pointer()
-                        || e2_type.is_pointer()
-                    {
+                    if e1_type.is_integer() && e2_type.is_integer() {
+                        *typ = Some(e1_type.clone())
+                    } else {
                         return Err(Error::Type(format!(
                             "Both arguments for shift must have integer type: found {e1_type}, {e2_type}"
                         )));
                     }
-                    *typ = Some(e1_type.clone())
                 }
-                Equal | NotEqual | GreaterThan | GreaterOrEqual | LessThan | LessOrEqual => {
-                    let common_type = if e1_type.is_pointer() || e2_type.is_pointer() {
-                        e1.common_pointer_type_with(e2)
+                Equal | NotEqual => {
+                    let common_type = if e1_type.is_arithmetic() && e2_type.is_arithmetic() {
+                        common_type_with(e1, e2)?
+                    } else if e1_type.is_pointer() || e2_type.is_pointer() {
+                        common_pointer_type_with(e1, e2)?
                     } else {
-                        e1.common_type_with(e2)
-                    }
-                    .ok_or(Error::Type(format!(
-                        "{e1:?} and {e2:?} do not have a common type"
-                    )))?;
+                        return Err(Error::Type(format!(
+                            "Invalid types for equality: found {e1_type}, {e2_type}"
+                        )));
+                    };
 
                     convert_to(e1, &common_type);
                     convert_to(e2, &common_type);
 
                     *typ = Some(Type::Int)
                 }
+                GreaterThan | GreaterOrEqual | LessThan | LessOrEqual => {
+                    let common_type = if e1_type.is_arithmetic() && e2_type.is_arithmetic() {
+                        common_type_with(e1, e2)?
+                    } else if e1_type.is_pointer() && e2_type.is_pointer() && e1_type == e2_type {
+                        e1_type.clone()
+                    } else {
+                        return Err(Error::Type(format!(
+                            "Invalid types for equality: found {e1_type}, {e2_type}"
+                        )));
+                    };
+
+                    convert_to(e1, &common_type);
+                    convert_to(e2, &common_type);
+
+                    *typ = Some(Type::Int)
+                }
+                Add => {
+                    let common_type = common_type_with(e1, e2)?;
+
+                    if e1_type.is_arithmetic() && e2_type.is_arithmetic() {
+                        convert_to(e1, &common_type);
+                        convert_to(e2, &common_type);
+                        *typ = Some(common_type);
+                    } else if e1_type.is_pointer() && e2_type.is_integer() {
+                        convert_to(e2, &Type::Long);
+                        *typ = Some(e1_type.clone());
+                    } else if e1_type.is_integer() && e1_type.is_pointer() {
+                        convert_to(e1, &Type::Long);
+                        *typ = Some(e2_type.clone());
+                    } else {
+                        return Err(Error::Type(format!("Invalid operands for addition")));
+                    }
+                }
+                Subtract => {
+                    let common_type = common_type_with(e1, e2)?;
+
+                    if e1_type.is_arithmetic() && e2_type.is_arithmetic() {
+                        convert_to(e1, &common_type);
+                        convert_to(e2, &common_type);
+                        *typ = Some(common_type);
+                    } else if e1_type.is_pointer() && e2_type.is_integer() {
+                        convert_to(e2, &Type::Long);
+                        *typ = Some(e1_type.clone());
+                    } else if e1_type.is_pointer() && e1_type == e2_type {
+                        *typ = Some(Type::Long);
+                    } else {
+                        return Err(Error::Type(format!("Invalid operands for addition")));
+                    }
+                }
                 _ => {
-                    let common_type = e1.common_type_with(e2).ok_or(Error::Type(format!(
-                        "{e1:?} and {e2:?} do not have a common type"
-                    )))?;
+                    let common_type = common_type_with(e1, e2)?;
 
                     if matches!(op, Remainder | BitAnd | BitOr | BitXor)
                         && common_type == Type::Double
@@ -477,6 +662,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                             "Expected integer type, found: {common_type}"
                         )));
                     }
+
                     if matches!(op, Multiply | Divide | Remainder | BitAnd | BitOr | BitXor)
                         && common_type.is_pointer()
                     {
@@ -492,17 +678,14 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             }
         }
         ExpKind::Conditional(cond, then, else_) => {
-            check_exp(cond, symbols)?;
-            check_exp(then, symbols)?;
-            check_exp(else_, symbols)?;
+            check_and_convert_exp(cond, symbols)?;
+            check_and_convert_exp(then, symbols)?;
+            check_and_convert_exp(else_, symbols)?;
             let common_type = if then.typ().is_pointer() || else_.typ().is_pointer() {
-                then.common_pointer_type_with(else_)
+                common_pointer_type_with(then, else_)?
             } else {
-                then.common_type_with(else_)
-            }
-            .ok_or(Error::Type(format!(
-                "{then:?} and {else_:?} do not have a common type"
-            )))?;
+                common_type_with(then, else_)?
+            };
             convert_to(then, &common_type);
             convert_to(else_, &common_type);
             *typ = Some(common_type);
@@ -529,14 +712,14 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             }
 
             for (arg, param_type) in args.iter_mut().zip(param_types) {
-                check_exp(arg, symbols)?;
+                check_and_convert_exp(arg, symbols)?;
                 convert_by_assignment_to(arg, &param_type)?;
             }
 
             *typ = Some(*ret_type);
         }
         ExpKind::Dereference(inner) => {
-            check_exp(inner, symbols)?;
+            check_and_convert_exp(inner, symbols)?;
             match inner.typ() {
                 Type::Pointer(referenced_type) => *typ = Some(*referenced_type.clone()),
                 _ => {
@@ -552,7 +735,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                     "Cannot take the address of a non-lvalue {inner:?}",
                 )));
             }
-            check_exp(inner, symbols)?;
+            check_and_convert_exp(inner, symbols)?;
             *typ = Some(Type::Pointer(Box::new(inner.typ().clone())));
         }
         ExpKind::Update(op, left, right, postfix) => {
@@ -571,7 +754,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                     "Assignment to non-lvalue variable '{left:?}'"
                 )));
             }
-            check_exp(left, symbols)?;
+            check_and_convert_exp(left, symbols)?;
             let value_type = left.typ().clone();
             let ptr = make_ast_temp(Type::Pointer(Box::new(value_type.clone())), symbols);
             let deref = Exp::new(ExpKind::Dereference(Box::new(ptr.clone())));
@@ -598,15 +781,40 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
             }
 
             let mut sequence = Exp::new(ExpKind::Sequence(expressions));
-            check_exp(&mut sequence, symbols)?;
+            check_and_convert_exp(&mut sequence, symbols)?;
 
             *exp = sequence;
         }
         ExpKind::Sequence(expressions) => {
             for expression in expressions.iter_mut() {
-                check_exp(expression, symbols)?;
+                check_and_convert_exp(expression, symbols)?;
             }
             *typ = Some(expressions.last().expect("empty sequence").typ().clone());
+        }
+        ExpKind::Subscript(e1, e2) => {
+            check_and_convert_exp(e1, symbols)?;
+            check_and_convert_exp(e2, symbols)?;
+
+            let e1_type = e1.typ();
+            let e2_type = e2.typ();
+
+            let ptr_type;
+            if e1_type.is_pointer() && e2_type.is_integer() {
+                ptr_type = e1_type;
+                convert_to(e2, &Type::Long)
+            } else if e1_type.is_integer() && e2_type.is_pointer() {
+                ptr_type = e2_type;
+                convert_to(e1, &Type::Long)
+            } else {
+                return Err(Error::Type(format!(
+                    "Subscript must have integer and pointer operands"
+                )));
+            }
+
+            let Type::Pointer(referenced_type) = ptr_type else {
+                return Err(Error::Type(format!("Subscript type error")));
+            };
+            *typ = Some(*referenced_type.clone());
         }
     };
     Ok(())

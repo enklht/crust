@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 pub use super::constant::Const;
 pub use super::operator::*;
 use super::typ::Type;
@@ -114,24 +112,6 @@ impl Exp {
         self.typ.as_ref().expect("the type is not assigned")
     }
 
-    pub fn common_type_with(&self, other: &Exp) -> Option<Type> {
-        let self_type = self.typ();
-        let other_type = other.typ();
-
-        if self_type == other_type {
-            Some(self_type.clone())
-        } else if self_type == &Type::Double || other_type == &Type::Double {
-            Some(Type::Double)
-        } else {
-            match self_type.size()?.cmp(&other_type.size()?) {
-                Ordering::Equal if self_type.is_signed() => Some(other_type.clone()),
-                Ordering::Equal => Some(self_type.clone()),
-                Ordering::Greater => Some(self_type.clone()),
-                Ordering::Less => Some(other_type.clone()),
-            }
-        }
-    }
-
     pub fn is_null_pointer_constant(&self) -> bool {
         use Const::*;
         matches!(
@@ -139,24 +119,6 @@ impl Exp {
             ExpKind::Const(Int(0) | Long(0) | UInt(0) | ULong(0))
         )
     }
-
-    pub fn common_pointer_type_with(&self, other: &Exp) -> Option<Type> {
-        let self_type = self.typ();
-        let other_type = other.typ();
-
-        if !self_type.is_pointer() && !other_type.is_pointer() {
-            None
-        } else if self_type == other_type {
-            Some(self_type.clone())
-        } else if self.is_null_pointer_constant() {
-            Some(other_type.clone())
-        } else if other.is_null_pointer_constant() {
-            Some(self_type.clone())
-        } else {
-            None
-        }
-    }
-
     pub fn is_lvalue(&self) -> bool {
         matches!(self.kind, ExpKind::Var(_) | ExpKind::Dereference(_))
     }

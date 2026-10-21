@@ -1,5 +1,6 @@
 use super::typ::Type;
-use crate::models::ast::{Exp, ExpKind};
+use crate::models::ast::ExpKind;
+use crate::models::ast::Initializer;
 use crate::models::constant::Const;
 use crate::utils::Ident;
 use rustc_hash::FxHashMap;
@@ -36,73 +37,101 @@ impl Symbol {
 #[derive(Debug, Clone)]
 pub enum InitialValue {
     Tentative,
-    Initial(StaticInit),
+    Initial(Vec<StaticInit>),
     NoInitializer,
 }
 
-fn from_f64(i: f64, typ: &Type) -> InitialValue {
-    use InitialValue::Initial;
+fn from_f64(i: f64, typ: &Type) -> StaticInit {
     use StaticInit::*;
     match typ {
-        Type::Int => Initial(Int(i as i32)),
-        Type::Long => Initial(Long(i as i64)),
-        Type::UInt => Initial(UInt(i as u32)),
-        Type::ULong => Initial(ULong(i as u64)),
-        Type::Double => Initial(Double(i)),
+        Type::Int => Int(i as i32),
+        Type::Long => Long(i as i64),
+        Type::UInt => UInt(i as u32),
+        Type::ULong => ULong(i as u64),
+        Type::Double => Double(i),
         _ => unreachable!(),
     }
 }
 
-fn to_f64(c: Const) -> InitialValue {
-    use InitialValue::Initial;
+fn to_f64(c: Const) -> StaticInit {
     use StaticInit::*;
     match c {
-        Const::Int(i) => Initial(Double(i as f64)),
-        Const::Long(i) => Initial(Double(i as f64)),
-        Const::UInt(i) => Initial(Double(i as f64)),
-        Const::ULong(i) => Initial(Double(i as f64)),
-        Const::Double(i) => Initial(Double(i)),
+        Const::Int(i) => Double(i as f64),
+        Const::Long(i) => Double(i as f64),
+        Const::UInt(i) => Double(i as f64),
+        Const::ULong(i) => Double(i as f64),
+        Const::Double(i) => Double(i),
+    }
+}
+
+fn from_none(typ: &Type) -> StaticInit {
+    match typ {
+        Type::Int => StaticInit::Int(0),
+        Type::Long => StaticInit::Long(0),
+        Type::UInt => StaticInit::UInt(0),
+        Type::ULong => StaticInit::ULong(0),
+        Type::Pointer(_) => StaticInit::ULong(0),
+        _ => unreachable!(),
     }
 }
 
 impl InitialValue {
     pub fn from_none(typ: &Type) -> InitialValue {
-        match typ {
-            Type::Int => InitialValue::Initial(StaticInit::Int(0)),
-            Type::Long => InitialValue::Initial(StaticInit::Long(0)),
-            Type::UInt => InitialValue::Initial(StaticInit::UInt(0)),
-            Type::ULong => InitialValue::Initial(StaticInit::ULong(0)),
-            Type::Pointer(_) => InitialValue::Initial(StaticInit::ULong(0)),
-            _ => unreachable!(),
-        }
+        InitialValue::Initial(vec![from_none(typ)])
     }
 
-    pub fn from_exp(init: &Exp, typ: &Type) -> Option<InitialValue> {
-        if typ.is_pointer() && init.is_null_pointer_constant() {
-            return Some(InitialValue::from_none(typ));
+    pub fn from_initializer(init: &Initializer, typ: &Type) -> Option<InitialValue> {
+        fn inner(init: &Initializer, typ: &Type) -> Option<Vec<StaticInit>> {
+            match (typ, init) {
+                (Type::Array(element_type, size), Initializer::Compound(inits)) => {
+                    let mut inits: Vec<StaticInit> =
+                        inits.iter().try_fold(Vec::new(), |mut acc, init| {
+                            acc.extend(inner(init, element_type)?);
+                            Some(acc)
+                        })?;
+
+                    if *size == inits.len() {
+                    } else if *size > inits.len() {
+                        let zero_bytes = (*size - inits.len()) * typ.size()?;
+                        inits.push(StaticInit::ZeroInit(zero_bytes));
+                    } else {
+                        return None;
+                    }
+
+                    return Some(inits);
+                }
+                (_, Initializer::Single(exp)) => {
+                    if typ.is_pointer() && exp.is_null_pointer_constant() {
+                        return Some(vec![from_none(typ)]);
+                    }
+
+                    let c = match &exp.kind {
+                        ExpKind::Const(c) if !typ.is_pointer() => c,
+                        _ => return None,
+                    };
+
+                    let i = match c {
+                        _ if typ == &Type::Double => return Some(vec![to_f64(*c)]),
+                        Const::Double(i) => return Some(vec![from_f64(*i, typ)]),
+                        Const::Int(i) => *i as u64,
+                        Const::Long(i) => *i as u64,
+                        Const::UInt(i) => *i as u64,
+                        Const::ULong(i) => *i,
+                    };
+
+                    match typ {
+                        Type::Int => Some(vec![StaticInit::Int(i as i32)]),
+                        Type::Long => Some(vec![StaticInit::Long(i as i64)]),
+                        Type::UInt => Some(vec![StaticInit::UInt(i as u32)]),
+                        Type::ULong => Some(vec![StaticInit::ULong(i)]),
+                        _ => unreachable!(),
+                    }
+                }
+                _ => None,
+            }
         }
 
-        let c = match &init.kind {
-            ExpKind::Const(c) if !typ.is_pointer() => c,
-            _ => return None,
-        };
-
-        let i = match c {
-            _ if typ == &Type::Double => return Some(to_f64(*c)),
-            Const::Double(i) => return Some(from_f64(*i, typ)),
-            Const::Int(i) => *i as u64,
-            Const::Long(i) => *i as u64,
-            Const::UInt(i) => *i as u64,
-            Const::ULong(i) => *i,
-        };
-
-        match typ {
-            Type::Int => Some(InitialValue::Initial(StaticInit::Int(i as i32))),
-            Type::Long => Some(InitialValue::Initial(StaticInit::Long(i as i64))),
-            Type::UInt => Some(InitialValue::Initial(StaticInit::UInt(i as u32))),
-            Type::ULong => Some(InitialValue::Initial(StaticInit::ULong(i))),
-            _ => unreachable!(),
-        }
+        Some(InitialValue::Initial(inner(init, typ)?))
     }
 }
 
@@ -113,6 +142,7 @@ pub enum StaticInit {
     UInt(u32),
     ULong(u64),
     Double(f64),
+    ZeroInit(usize),
 }
 
 impl StaticInit {
@@ -121,6 +151,7 @@ impl StaticInit {
         match self {
             Int(_) | UInt(_) => 4,
             Long(_) | ULong(_) | Double(_) => 8,
+            _ => todo!(),
         }
     }
 }
