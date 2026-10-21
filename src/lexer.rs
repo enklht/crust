@@ -48,6 +48,8 @@ pub fn lexer<'src>()
         just("?").to(Token::Question),
         just(":").to(Token::Colon),
         just(",").to(Token::Comma),
+        just("[").to(Token::LBracket),
+        just("]").to(Token::RBracket),
     ]);
 
     let ident = text::ident().map(|s| match s {

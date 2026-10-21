@@ -24,7 +24,13 @@ pub enum FuncDecl {
 
 #[derive(Debug, Clone)]
 pub enum VarDecl {
-    VarDecl(Ident, Option<Exp>, Type, StorageClass),
+    VarDecl(Ident, Option<Initializer>, Type, StorageClass),
+}
+
+#[derive(Debug, Clone)]
+pub enum Initializer {
+    Single(Exp),
+    Compound(Vec<Initializer>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,6 +102,7 @@ pub enum ExpKind {
     AddressOf(Box<Exp>),
     Update(BinaryOp, Box<Exp>, Box<Exp>, bool),
     Sequence(Vec<Exp>),
+    Subscript(Box<Exp>, Box<Exp>),
 }
 
 impl Exp {

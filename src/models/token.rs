@@ -137,4 +137,8 @@ pub enum Token {
     Colon,
     #[display(",")]
     Comma,
+    #[display("[")]
+    LBracket,
+    #[display("]")]
+    RBracket,
 }

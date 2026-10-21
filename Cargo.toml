@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ariadne = "0.5"
+ariadne = "0.6"
 bpaf = { version = "0.9", features = ["derive", "dull-color"] }
-chumsky = { version = "0.11", features = ["pratt", "regex"] }
+chumsky = { version = "0.13", features = ["pratt", "regex"] }
 derive_more = { version = "2.0", features = ["display"] }
 rustc-hash = "2.1"
 thiserror = "2.0"

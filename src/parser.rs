@@ -13,10 +13,31 @@ use decl::decl;
 use decl::var_decl;
 use exp::exp;
 use specifiers::specifiers;
+use specifiers::type_specifiers;
 use stmt::stmt;
 use utils::SemicolonExt;
 
 type ParserError<'tokens> = extra::Err<Rich<'tokens, Token>>;
+
+fn array_suffix<'tokens, I>() -> impl Parser<'tokens, I, isize, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    let const_int = select! {
+        Token::ConstInt(i) => i as isize,
+        Token::ConstLong(i) => i as isize,
+        Token::ConstUInt(i) => i as isize,
+        Token::ConstULong(i) => i as isize,
+    };
+    const_int.delimited_by(just(Token::LBracket), just(Token::RBracket))
+}
+
+fn ident<'tokens, I>() -> impl Parser<'tokens, I, Ident, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    select! { Token::Ident(ident) => ident }
+}
 
 pub fn parser<'tokens, I>() -> impl Parser<'tokens, I, Program, ParserError<'tokens>>
 where

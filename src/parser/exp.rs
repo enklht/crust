@@ -1,5 +1,6 @@
 use super::ParserError;
-use super::specifiers::type_specifiers;
+use super::array_suffix;
+use super::type_specifiers;
 use crate::models::ast::*;
 use crate::models::token::Token;
 use crate::models::typ::Type;
@@ -62,6 +63,12 @@ where
                     true,
                 )
             }),
+            postfix(
+                14,
+                exp.clone()
+                    .delimited_by(just(Token::LBracket), just(Token::RBracket)),
+                |v: Exp, i: Exp, _| Exp::new(ExpKind::Subscript(Box::new(v), Box::new(i))),
+            ),
             prefix(13, just(Token::DoublePlus), |_, v: Exp, _| {
                 update(
                     BinaryOp::Add,
@@ -190,6 +197,7 @@ where
 enum AbsDeclarator {
     Base,
     Pointer(Box<AbsDeclarator>),
+    Array(Box<AbsDeclarator>, isize),
 }
 
 fn abs_declarator<'tokens, I>()
@@ -198,12 +206,21 @@ where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
     recursive(|abs_declarator| {
+        let direct_abs_declarator = choice((
+            abs_declarator
+                .clone()
+                .delimited_by(just(Token::LParen), just(Token::RParen)),
+            empty().to(AbsDeclarator::Base),
+        ))
+        .foldl(array_suffix().repeated(), |base, size| {
+            AbsDeclarator::Array(Box::new(base), size)
+        });
+
         choice((
             just(Token::Star)
-                .ignore_then(abs_declarator.clone())
+                .ignore_then(abs_declarator)
                 .map(|abs_declarator| AbsDeclarator::Pointer(Box::new(abs_declarator))),
-            abs_declarator.delimited_by(just(Token::LParen), just(Token::RParen)),
-            empty().to(AbsDeclarator::Base),
+            direct_abs_declarator,
         ))
     })
 }
@@ -212,10 +229,8 @@ fn process_abs_declarator(abs_declarator: AbsDeclarator, base_typ: Type) -> Opti
     use AbsDeclarator::*;
     match abs_declarator {
         Base => Some(base_typ),
-        Pointer(abs_declarator) => Some(Type::Pointer(Box::new(process_abs_declarator(
-            *abs_declarator,
-            base_typ,
-        )?))),
+        Pointer(inner) => process_abs_declarator(*inner, Type::Pointer(Box::new(base_typ))),
+        Array(inner, size) => process_abs_declarator(*inner, Type::Array(Box::new(base_typ), size)),
     }
 }
 

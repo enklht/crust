@@ -17,6 +17,8 @@ pub enum Type {
     Pointer(Box<Type>),
     #[display("fn{_0:?} -> {_1}")]
     Func(Vec<Type>, Box<Type>),
+    #[display("")]
+    Array(Box<Type>, isize),
 }
 
 impl Type {

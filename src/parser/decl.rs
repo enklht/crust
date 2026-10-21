@@ -1,7 +1,9 @@
 use super::Ident;
 use super::ParserError;
 use super::SemicolonExt;
+use super::array_suffix;
 use super::exp;
+use super::ident;
 use super::specifiers;
 use crate::models::ast::*;
 use crate::models::token::Token;
@@ -10,13 +12,32 @@ use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use specifiers::type_specifiers;
 
+pub fn initializer<'tokens, I>()
+-> impl Parser<'tokens, I, Initializer, ParserError<'tokens>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
+{
+    recursive(|initializer| {
+        choice((
+            exp().map(Initializer::Single),
+            initializer
+                .separated_by(just(Token::Comma))
+                .at_least(1)
+                .collect()
+                .then_ignore(just(Token::Comma).or_not())
+                .delimited_by(just(Token::LBrace), just(Token::RBrace))
+                .map(Initializer::Compound),
+        ))
+    })
+}
+
 pub fn var_decl<'tokens, I>() -> impl Parser<'tokens, I, VarDecl, ParserError<'tokens>> + Clone
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
     specifiers()
         .then(declarator())
-        .then(just(Token::Equal).ignore_then(exp()).or_not())
+        .then(just(Token::Equal).ignore_then(initializer()).or_not())
         .semicolon()
         .try_map(|(((base_typ, storage_class), declarator), init), span| {
             let (name, typ, _params) = process_declarator(declarator, base_typ)
@@ -60,6 +81,7 @@ where
 enum Declarator {
     Ident(Ident),
     Pointer(Box<Declarator>),
+    Array(Box<Declarator>, isize),
     Func(Vec<(Type, Declarator)>, Box<Declarator>),
 }
 
@@ -67,11 +89,9 @@ fn declarator<'tokens, I>() -> impl Parser<'tokens, I, Declarator, ParserError<'
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
-    let ident = select! { Token::Ident(ident) => ident };
-
     recursive(|declarator| {
         let simple_declarator = choice((
-            ident.map(Declarator::Ident),
+            ident().map(Declarator::Ident),
             declarator
                 .clone()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
@@ -86,13 +106,18 @@ where
         ))
         .delimited_by(just(Token::LParen), just(Token::RParen));
 
-        let direct_declarator =
+        let direct_declarator = choice((
             simple_declarator
-                .then(param_list.or_not())
-                .map(|(simple, params)| match params {
-                    Some(params) => Declarator::Func(params, Box::new(simple)),
-                    None => simple,
-                });
+                .clone()
+                .then(param_list)
+                .map(|(simple, params)| Declarator::Func(params, Box::new(simple))),
+            simple_declarator
+                .clone()
+                .foldl(array_suffix().repeated().at_least(1), |base_decl, dim| {
+                    Declarator::Array(Box::new(base_decl), dim)
+                }),
+            simple_declarator,
+        ));
 
         choice((
             just(Token::Star)
@@ -106,11 +131,15 @@ where
 fn process_declarator(declarator: Declarator, base_typ: Type) -> Option<(Ident, Type, Vec<Ident>)> {
     match declarator {
         Declarator::Ident(name) => Some((name, base_typ, vec![])),
-        Declarator::Pointer(d) => {
+        Declarator::Pointer(inner) => {
             let derived_type = Type::Pointer(Box::new(base_typ));
-            Some(process_declarator(*d, derived_type)?)
+            Some(process_declarator(*inner, derived_type)?)
         }
-        Declarator::Func(params, d) => match *d {
+        Declarator::Array(inner, size) => {
+            let derived_type = Type::Array(Box::new(base_typ), size);
+            process_declarator(*inner, derived_type)
+        }
+        Declarator::Func(params, inner) => match *inner {
             Declarator::Ident(name) => {
                 let mut param_names = Vec::new();
                 let mut param_types = Vec::new();

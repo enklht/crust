@@ -4,8 +4,8 @@ mod error_reporting;
 mod lexer;
 mod models;
 mod parser;
-mod semantic_analysis;
-mod tacky_generation;
+// mod semantic_analysis;
+// mod tacky_generation;
 mod utils;
 
 use bpaf::*;
@@ -83,45 +83,45 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    let (validated_ast, mut symbols) = match semantic_analysis::validate(ast) {
-        Ok(program) => program,
-        Err(err) => {
-            eprintln!("Validation error: {err}");
-            std::process::exit(1);
-        }
-    };
-
-    if opts.mode == CompilerMode::Validate {
-        println!("{validated_ast:#?}");
-        return Ok(());
-    }
-
-    let tacky = tacky_generation::convert_program(validated_ast, &mut symbols);
-
-    if opts.mode == CompilerMode::Tacky {
-        println!("{tacky:#?}");
-        return Ok(());
-    }
-
-    let (asm_ast, asm_symbols) = asm_generation::codegen(tacky, symbols);
-
-    if opts.mode == CompilerMode::Codegen {
-        println!("{asm_ast:#?}");
-        return Ok(());
-    }
-
-    let asm_text = code_emission::emit(asm_ast, &asm_symbols);
-
-    if opts.mode == CompilerMode::Emit {
-        asm_text
-            .lines()
-            .enumerate()
-            .for_each(|(i, line)| println!("{}\t{}", i + 1, line));
-        return Ok(());
-    }
-
-    let output = opts.output.unwrap_or(opts.input.with_extension("s"));
-    fs::write(&output, asm_text)?;
-
+    // let (validated_ast, mut symbols) = match semantic_analysis::validate(ast) {
+    //     Ok(program) => program,
+    //     Err(err) => {
+    //         eprintln!("Validation error: {err}");
+    //         std::process::exit(1);
+    //     }
+    // };
+    //
+    // if opts.mode == CompilerMode::Validate {
+    //     println!("{validated_ast:#?}");
+    //     return Ok(());
+    // }
+    //
+    // let tacky = tacky_generation::convert_program(validated_ast, &mut symbols);
+    //
+    // if opts.mode == CompilerMode::Tacky {
+    //     println!("{tacky:#?}");
+    //     return Ok(());
+    // }
+    //
+    // let (asm_ast, asm_symbols) = asm_generation::codegen(tacky, symbols);
+    //
+    // if opts.mode == CompilerMode::Codegen {
+    //     println!("{asm_ast:#?}");
+    //     return Ok(());
+    // }
+    //
+    // let asm_text = code_emission::emit(asm_ast, &asm_symbols);
+    //
+    // if opts.mode == CompilerMode::Emit {
+    //     asm_text
+    //         .lines()
+    //         .enumerate()
+    //         .for_each(|(i, line)| println!("{}\t{}", i + 1, line));
+    //     return Ok(());
+    // }
+    //
+    // let output = opts.output.unwrap_or(opts.input.with_extension("s"));
+    // fs::write(&output, asm_text)?;
+    //
     Ok(())
 }
