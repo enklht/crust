@@ -4,7 +4,7 @@ mod error_reporting;
 mod lexer;
 mod models;
 mod parser;
-// mod semantic_analysis;
+mod semantic_analysis;
 // mod tacky_generation;
 mod utils;
 
@@ -83,19 +83,19 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    // let (validated_ast, mut symbols) = match semantic_analysis::validate(ast) {
-    //     Ok(program) => program,
-    //     Err(err) => {
-    //         eprintln!("Validation error: {err}");
-    //         std::process::exit(1);
-    //     }
-    // };
-    //
-    // if opts.mode == CompilerMode::Validate {
-    //     println!("{validated_ast:#?}");
-    //     return Ok(());
-    // }
-    //
+    let (validated_ast, mut symbols) = match semantic_analysis::validate(ast) {
+        Ok(program) => program,
+        Err(err) => {
+            eprintln!("Validation error: {err}");
+            std::process::exit(1);
+        }
+    };
+
+    if opts.mode == CompilerMode::Validate {
+        println!("{validated_ast:#?}");
+        return Ok(());
+    }
+
     // let tacky = tacky_generation::convert_program(validated_ast, &mut symbols);
     //
     // if opts.mode == CompilerMode::Tacky {

@@ -114,7 +114,23 @@ fn resolve_local_var_decl(
     *name = new_name;
 
     if let Some(init) = init {
-        resolve_exp(init, scope_manager)?
+        resolve_initializer(init, scope_manager)?
+    }
+
+    Ok(())
+}
+
+fn resolve_initializer(
+    initializer: &mut Initializer,
+    scope_manager: &mut ScopeManager,
+) -> ValidationResult<()> {
+    match initializer {
+        Initializer::Single(e) => resolve_exp(e, scope_manager)?,
+        Initializer::Compound(v) => {
+            for init in v {
+                resolve_initializer(init, scope_manager)?
+            }
+        }
     }
 
     Ok(())
@@ -287,6 +303,10 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
             for expression in expressions {
                 resolve_exp(expression, scope_manager)?;
             }
+        }
+        ExpKind::Subscript(e1, e2) => {
+            resolve_exp(e1, scope_manager)?;
+            resolve_exp(e2, scope_manager)?;
         }
     }
     Ok(())
