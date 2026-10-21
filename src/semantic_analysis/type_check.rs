@@ -292,7 +292,7 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
                             symbols.insert(
                                 name,
                                 Symbol::StaticVar {
-                                    typ: Type::Int,
+                                    typ: typ.clone(),
                                     init: InitialValue::NoInitializer,
                                     global: true,
                                 },
@@ -355,6 +355,10 @@ fn zero_initializer(typ: &Type) -> ValidationResult<Initializer> {
         Type::Double => Initializer::Single(Exp {
             kind: ExpKind::Const(Const::Double(0.)),
             typ: Some(Type::Double),
+        }),
+        Type::Pointer(_) => Initializer::Single(Exp {
+            kind: ExpKind::Const(Const::ULong(0)),
+            typ: Some(typ.clone()),
         }),
         _ => {
             return Err(Error::Type(format!(
@@ -458,6 +462,12 @@ fn check_stmt(stmt: &mut Stmt, symbols: &mut Symbols, ret_type: &Type) -> Valida
         }
         Stmt::Switch(cond, body, _, _) => {
             check_and_convert_exp(cond, symbols)?;
+            if !cond.typ().is_integer() {
+                return Err(Error::Type(format!(
+                    "Switch condition must have integer type, found {}",
+                    cond.typ()
+                )));
+            }
             check_stmt(body, symbols, ret_type)?;
         }
         // Goto, Break, Continue, Null
@@ -495,6 +505,10 @@ fn check_and_convert_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResu
 }
 
 fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
+    // Update expressions reuse checked operands whose array decay must be preserved.
+    if exp.typ.is_some() {
+        return Ok(());
+    }
     let Exp { kind, typ } = exp;
     match kind {
         ExpKind::Const(c) => *typ = Some(c.typ().clone()),
@@ -629,7 +643,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                     } else if e1_type.is_pointer() && e2_type.is_integer() {
                         convert_to(e2, &Type::Long);
                         *typ = Some(e1_type.clone());
-                    } else if e1_type.is_integer() && e1_type.is_pointer() {
+                    } else if e1_type.is_integer() && e2_type.is_pointer() {
                         convert_to(e1, &Type::Long);
                         *typ = Some(e2_type.clone());
                     } else {
@@ -735,7 +749,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                     "Cannot take the address of a non-lvalue {inner:?}",
                 )));
             }
-            check_and_convert_exp(inner, symbols)?;
+            check_exp(inner, symbols)?;
             *typ = Some(Type::Pointer(Box::new(inner.typ().clone())));
         }
         ExpKind::Update(op, left, right, postfix) => {

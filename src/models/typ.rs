@@ -25,8 +25,9 @@ impl Type {
     pub fn size(&self) -> Option<usize> {
         use Type::*;
         match self {
-            Int | UInt => Some(32),
-            Long | ULong | Pointer(_) => Some(64),
+            Int | UInt => Some(4),
+            Long | ULong | Double | Pointer(_) => Some(8),
+            Array(element_type, size) => element_type.size()?.checked_mul(*size),
             _ => None,
         }
     }

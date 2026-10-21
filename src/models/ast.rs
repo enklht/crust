@@ -120,7 +120,10 @@ impl Exp {
         )
     }
     pub fn is_lvalue(&self) -> bool {
-        matches!(self.kind, ExpKind::Var(_) | ExpKind::Dereference(_))
+        matches!(
+            self.kind,
+            ExpKind::Var(_) | ExpKind::Dereference(_) | ExpKind::Subscript(_, _)
+        )
     }
 }
 

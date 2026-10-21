@@ -70,7 +70,9 @@ fn from_none(typ: &Type) -> StaticInit {
         Type::Long => StaticInit::Long(0),
         Type::UInt => StaticInit::UInt(0),
         Type::ULong => StaticInit::ULong(0),
+        Type::Double => StaticInit::Double(0.),
         Type::Pointer(_) => StaticInit::ULong(0),
+        Type::Array(_, _) => StaticInit::ZeroInit(typ.size().expect("array size fits in usize")),
         _ => unreachable!(),
     }
 }
@@ -84,22 +86,24 @@ impl InitialValue {
         fn inner(init: &Initializer, typ: &Type) -> Option<Vec<StaticInit>> {
             match (typ, init) {
                 (Type::Array(element_type, size), Initializer::Compound(inits)) => {
-                    let mut inits: Vec<StaticInit> =
+                    if inits.len() > *size {
+                        return None;
+                    }
+
+                    let mut flattened: Vec<StaticInit> =
                         inits.iter().try_fold(Vec::new(), |mut acc, init| {
                             acc.extend(inner(init, element_type)?);
                             Some(acc)
                         })?;
 
-                    if *size == inits.len() {
-                    } else if *size > inits.len() {
-                        let zero_bytes = (*size - inits.len()) * typ.size()?;
-                        inits.push(StaticInit::ZeroInit(zero_bytes));
-                    } else {
-                        return None;
+                    let zero_bytes = (*size - inits.len()) * element_type.size()?;
+                    if zero_bytes > 0 {
+                        flattened.push(StaticInit::ZeroInit(zero_bytes));
                     }
 
-                    return Some(inits);
+                    Some(flattened)
                 }
+                (Type::Array(_, _), Initializer::Single(_)) => None,
                 (_, Initializer::Single(exp)) => {
                     if typ.is_pointer() && exp.is_null_pointer_constant() {
                         return Some(vec![from_none(typ)]);
