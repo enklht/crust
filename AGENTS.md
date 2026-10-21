@@ -7,6 +7,28 @@ Simplicity, beauty, and faithfulness to the book guide implementation
 decisions. Prefer clear, direct code and the book’s terminology,
 compiler stages, and intermediate representations.
 
+## Coding style
+
+Prefer code whose names, types, and structure explain the algorithm.
+Use comments for rationale, constraints, and subtle invariants that the
+code cannot express. When code needs an explanation of its structure,
+first improve its naming, decomposition, or control flow.
+
+- Make compiler stages and their order visible in orchestration code.
+- Name meaningful pieces before composing them, as with parser rules.
+- Let modules, functions, and data types follow the language's structure
+  and the book's terminology.
+- Keep each rule close to its implementation. Accept repetition when
+  it preserves that correspondence. A long match can be appropriate
+  when it expresses one coherent case analysis.
+- Introduce small helpers that express domain concepts and improve
+  readability. Avoid generalization solely to remove repeated lines.
+- Use concise names when the surrounding context makes them clear,
+  such as `Exp`, `Decl`, `typ`, `src`, and `dst`.
+- Choose Rust constructs to suit the task: combinators for grammar,
+  iterators for transformations, and loops and explicit mutation for
+  sequential work.
+
 ## Agent skills
 
 ### Issue tracker
