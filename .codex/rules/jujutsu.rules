@@ -1,0 +1,84 @@
+# Jujutsu command policy. Workflow and argument requirements live in
+# AGENTS.md and .agents/skills/jujutsu/SKILL.md.
+
+# Allow
+prefix_rule(pattern = ["jj", "status"], decision = "allow")
+prefix_rule(pattern = ["jj", "log"], decision = "allow")
+prefix_rule(pattern = ["jj", "diff"], decision = "allow")
+prefix_rule(pattern = ["jj", "show"], decision = "allow")
+prefix_rule(pattern = ["jj", "file", "list"], decision = "allow")
+prefix_rule(pattern = ["jj", "root"], decision = "allow")
+prefix_rule(pattern = ["jj", "describe"], decision = "allow")
+prefix_rule(pattern = ["jj", "new"], decision = "allow")
+prefix_rule(pattern = ["jj", "edit"], decision = "allow")
+prefix_rule(pattern = ["jj", "restore"], decision = "allow")
+prefix_rule(pattern = ["jj", "squash"], decision = "allow")
+prefix_rule(pattern = ["jj", "rebase"], decision = "allow")
+prefix_rule(pattern = ["jj", "abandon"], decision = "allow")
+prefix_rule(pattern = ["jj", "evolog"], decision = "allow")
+prefix_rule(pattern = ["jj", "op", "log"], decision = "allow")
+prefix_rule(pattern = ["jj", "operation", "log"], decision = "allow")
+prefix_rule(pattern = ["jj", "undo"], decision = "allow")
+prefix_rule(pattern = ["jj", "bookmark", "list"], decision = "allow")
+prefix_rule(pattern = ["jj", "bookmark", "create"], decision = "allow")
+prefix_rule(pattern = ["jj", "bookmark", "move"], decision = "allow")
+prefix_rule(pattern = ["jj", "bookmark", "advance"], decision = "allow")
+prefix_rule(pattern = ["jj", "bookmark", "set"], decision = "allow")
+prefix_rule(pattern = ["jj", "bookmark", "rename"], decision = "allow")
+prefix_rule(pattern = ["jj", "config", "get"], decision = "allow")
+prefix_rule(pattern = ["jj", "config", "list"], decision = "allow")
+prefix_rule(
+    pattern = ["jj", "git", "fetch"],
+    decision = "allow",
+    justification = "Fetching through Jujutsu is allowed.",
+)
+
+# Forbid
+prefix_rule(
+    pattern = ["git"],
+    decision = "forbidden",
+    justification = "Use jj commands instead of running git directly.",
+)
+prefix_rule(
+    pattern = ["jj", "resolve"],
+    decision = "forbidden",
+    justification = "Resolve conflicts by editing files directly.",
+)
+prefix_rule(
+    pattern = ["jj", "diffedit"],
+    decision = "forbidden",
+    justification = "Leave interactive diff editing to the user.",
+)
+prefix_rule(
+    pattern = ["jj", "arrange"],
+    decision = "forbidden",
+    justification = "Leave interactive change arrangement to the user.",
+)
+
+# Prompt
+prefix_rule(
+    pattern = ["jj", "bookmark", "delete"],
+    decision = "prompt",
+    justification = "Deleting a bookmark requires confirmation.",
+)
+prefix_rule(
+    pattern = ["jj", "bookmark", "forget"],
+    decision = "prompt",
+    justification = "Forgetting a bookmark requires confirmation.",
+)
+prefix_rule(
+    pattern = ["jj", "bookmark", "track"],
+    decision = "prompt",
+    justification = "Tracking a remote bookmark requires confirmation.",
+)
+prefix_rule(
+    pattern = ["jj", "bookmark", "untrack"],
+    decision = "prompt",
+    justification = "Untracking a remote bookmark requires confirmation.",
+)
+prefix_rule(
+    pattern = ["jj", "git", "push"],
+    decision = "prompt",
+    justification = "Pushing to a remote requires confirmation.",
+    match = ["jj git push -b feature-x"],
+)
