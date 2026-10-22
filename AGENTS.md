@@ -46,31 +46,30 @@ See `docs/agents/triage-labels.md`.
 Use a single-context layout: root `GLOSSARY.md` and `docs/adr/`.
 See `docs/agents/domain.md`.
 
-## Version control — required workflow
+## Version control
 
-This project uses Jujutsu (`jj`) for version control. Use `jj` terminology
-and commands. Never run `git` directly; `jj git ...` and `gh` are allowed.
+This project uses Git. Inspect `git status` and `git diff` before editing,
+and preserve unrelated working changes. Stage files explicitly to keep
+commits focused.
 
-Before editing, run `jj status` to snapshot the working copy and inspect
-the working-copy commit (`@`). Reuse `@` only when it has neither a
-description nor a diff; otherwise, create a new change. Write change
-descriptions in English using `<type>: <emoji> <summary>` with the
-types and literal emoji shortcodes in the
-[`jujutsu` skill](.agents/skills/jujutsu/SKILL.md#change-descriptions).
+Unless instructed otherwise, target PRs at `main`.
 
-Always pass `--git` to `jj diff`, `jj show`, and `jj log -p`. Use
-`--ignore-working-copy` only for read-only inspection after confirming
-that the working copy has already been snapshotted.
+### Commit messages
 
-Never run `jj resolve`, `jj diffedit`, or `jj arrange`. Run `jj split`
-only with an explicit fileset and `-m`; invocation without arguments,
-`-i`, and `--tool` are forbidden. These constraints prevent editors from
-opening. After any history-changing operation, run `jj status` and
-resolve any conflicts before continuing.
+Write commit messages in English using `<type>: <emoji> <summary>`.
+Use the literal emoji shortcode paired with the type below, for example:
+`docs: :memo: document commit message conventions`.
 
-Move bookmarks only when publishing changes. Unless instructed otherwise,
-target PRs at `main`. Never squash stacked changes when preparing a PR.
-
-For change descriptions, complex revsets, conflicts, bookmark operations,
-history rewriting or recovery, fetch, push, and PR creation, read the
-[`jujutsu` skill](.agents/skills/jujutsu/SKILL.md).
+| Type | Emoji shortcode | Meaning |
+| --- | --- | --- |
+| `feat` | `:sparkles:` | A new feature |
+| `fix` | `:bug:` | A bug fix |
+| `docs` | `:memo:` | Documentation only changes |
+| `style` | `:lipstick:` | Changes that do not affect the meaning of the code |
+| `refactor` | `:recycle:` | A code change that neither fixes a bug nor adds a feature |
+| `perf` | `:zap:` | A code change that improves performance |
+| `test` | `:white_check_mark:` | Adding missing tests or correcting existing tests |
+| `build` | `:package:` | Changes that affect the build system or external dependencies |
+| `ci` | `:ferris_wheel:` | Changes to CI configuration files and scripts |
+| `chore` | `:hammer:` | Other changes that don't modify src or test files |
+| `revert` | `:rewind:` | Reverts a previous commit |
