@@ -5,7 +5,7 @@ mod lexer;
 mod models;
 mod parser;
 mod semantic_analysis;
-// mod tacky_generation;
+mod tacky_generation;
 mod utils;
 
 use bpaf::*;
@@ -96,12 +96,12 @@ fn main() -> Result<(), CrustError> {
         return Ok(());
     }
 
-    // let tacky = tacky_generation::convert_program(validated_ast, &mut symbols);
-    //
-    // if opts.mode == CompilerMode::Tacky {
-    //     println!("{tacky:#?}");
-    //     return Ok(());
-    // }
+    let tacky = tacky_generation::convert_program(validated_ast, &mut symbols);
+
+    if opts.mode == CompilerMode::Tacky {
+        println!("{tacky:#?}");
+        return Ok(());
+    }
     //
     // let (asm_ast, asm_symbols) = asm_generation::codegen(tacky, symbols);
     //

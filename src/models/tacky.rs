@@ -10,7 +10,7 @@ pub enum Program {
 
 pub enum TopLevel {
     Function(Ident, bool, Vec<Ident>, Vec<Instruction>),
-    StaticVar(Ident, bool, StaticInit),
+    StaticVar(Ident, bool, Vec<StaticInit>),
 }
 
 #[derive(Debug)]
@@ -29,6 +29,8 @@ pub enum Instruction {
     GetAddress(Val, Val),
     Load(Val, Val),
     Store(Val, Val),
+    AddPtr(Val, Val, usize, Val),
+    CopyToOffset(Val, Ident, usize),
     Jump(Ident),
     JumpIfZero(Val, Ident),
     JumpIfNotZero(Val, Ident),

@@ -491,24 +491,23 @@ fn check_for_init(for_init: &mut ForInit, symbols: &mut Symbols) -> ValidationRe
 
 fn check_and_convert_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
     check_exp(exp, symbols)?;
-    match exp.typ().clone() {
-        Type::Array(element_type, _) => {
-            let inner = std::mem::replace(exp, Exp::new(ExpKind::Const(Const::Int(0))));
-            *exp = Exp {
-                kind: ExpKind::AddressOf(Box::new(inner)),
-                typ: Some(Type::Pointer(element_type.clone())),
-            };
-        }
-        _ => {}
+
+    if let Type::Array(element_type, _) = exp.typ().clone() {
+        let inner = std::mem::replace(exp, Exp::new(ExpKind::Const(Const::Int(0))));
+        *exp = Exp {
+            kind: ExpKind::AddressOf(Box::new(inner)),
+            typ: Some(Type::Pointer(element_type.clone())),
+        };
     }
+
     Ok(())
 }
 
 fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
-    // Update expressions reuse checked operands whose array decay must be preserved.
     if exp.typ.is_some() {
         return Ok(());
     }
+
     let Exp { kind, typ } = exp;
     match kind {
         ExpKind::Const(c) => *typ = Some(c.typ().clone()),

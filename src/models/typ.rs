@@ -32,6 +32,14 @@ impl Type {
         }
     }
 
+    pub fn pointer_scale(&self) -> Option<usize> {
+        let Type::Pointer(referenced_type) = self else {
+            return None;
+        };
+
+        referenced_type.size()
+    }
+
     pub fn is_signed(&self) -> bool {
         use Type::*;
         match self {
