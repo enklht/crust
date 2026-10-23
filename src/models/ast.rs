@@ -28,7 +28,7 @@ pub enum VarDecl {
 #[derive(Debug, Clone)]
 pub enum Initializer {
     Single(Exp),
-    Compound(Vec<Initializer>),
+    Compound(Option<Type>, Vec<Initializer>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -38,15 +38,7 @@ fn convert_symbols(symbols: &Symbols) -> Vec<TopLevel> {
                     InitialValue::Tentative => Some(TopLevel::StaticVar(
                         name,
                         *global,
-                        match typ {
-                            Type::Int => StaticInit::Int(0),
-                            Type::Long => StaticInit::Long(0),
-                            Type::UInt => StaticInit::UInt(0),
-                            Type::ULong => StaticInit::ULong(0),
-                            Type::Pointer(_) => StaticInit::ULong(0),
-                            Type::Double => StaticInit::Double(0.),
-                            _ => unreachable!(),
-                        },
+                        vec![StaticInit::ZeroInit(typ.size().unwrap())],
                     )),
                     InitialValue::NoInitializer => None,
                 }
@@ -123,20 +115,33 @@ fn emit_var_decl(var_decl: VarDecl, instructions: &mut Vec<Instruction>, symbols
             let result = emit_exp_and_convert(exp, instructions, symbols);
             instructions.push(Instruction::Copy(result, tacky::Val::Var(name)));
         }
-        VarDecl::VarDecl(name, Some(Initializer::Compound(inits)), _, _) => {
-            emit_compound(inits, name, 0, instructions, symbols);
+        VarDecl::VarDecl(name, Some(init @ Initializer::Compound(_, _)), _, StorageClass::None) => {
+            emit_compound_init(init, name, 0, instructions, symbols);
         }
         _ => {}
     }
 }
 
-fn emit_compound(
-    inits: Vec<Initializer>,
+fn emit_compound_init(
+    init: Initializer,
     name: Ident,
     offset: usize,
     instructions: &mut Vec<Instruction>,
     symbols: &mut Symbols,
 ) {
+    match init {
+        Initializer::Single(e) => {
+            let v = emit_exp_and_convert(e, instructions, symbols);
+            instructions.push(Instruction::CopyToOffset(v, name, offset));
+        }
+        Initializer::Compound(Some(Type::Array(element_type, _)), inits) => {
+            for (i, init) in inits.into_iter().enumerate() {
+                let new_offset = offset + i * element_type.size().unwrap();
+                emit_compound_init(init, name, new_offset, instructions, symbols);
+            }
+        }
+        _ => unreachable!("Compound init has non-array type"),
+    }
 }
 
 fn emit_stmt(stmt: Stmt, instructions: &mut Vec<Instruction>, symbols: &mut Symbols) {
@@ -369,10 +374,10 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
         ExpKind::Binary(BinaryOp::Subtract, e1, e2)
             if e1.typ().is_pointer() && e2.typ().is_pointer() =>
         {
+            let scale = tacky::Val::Const(Const::Long(e1.typ().pointer_scale().unwrap() as i64));
             let v1 = emit_exp_and_convert(*e1, instructions, symbols);
             let v2 = emit_exp_and_convert(*e2, instructions, symbols);
             let ptr_diff = make_temp_var(Type::Long, symbols);
-            let scale = tacky::Val::Const(Const::Long(typ.pointer_scale().unwrap() as i64));
             let dst = make_temp_var(typ, symbols);
             instructions.extend([
                 Instruction::Binary(BinaryOp::Subtract, v1, v2, ptr_diff),
@@ -462,11 +467,13 @@ fn emit_exp(exp: Exp, instructions: &mut Vec<Instruction>, symbols: &mut Symbols
             }
         }
         ExpKind::Subscript(e1, e2) => {
+            let pointer_first = e1.typ().is_pointer();
             let v1 = emit_exp_and_convert(*e1, instructions, symbols);
             let v2 = emit_exp_and_convert(*e2, instructions, symbols);
-            let dst = make_temp_var(typ.clone(), symbols);
-            let scale = typ.pointer_scale().unwrap();
-            instructions.push(Instruction::AddPtr(v1, v2, scale, dst));
+            let (ptr, index) = if pointer_first { (v1, v2) } else { (v2, v1) };
+            let dst = make_temp_var(Type::Pointer(Box::new(typ.clone())), symbols);
+            let scale = typ.size().unwrap();
+            instructions.push(Instruction::AddPtr(ptr, index, scale, dst));
             return ExpResult::DereferencedPointer(dst, typ);
         }
     };
@@ -511,4 +518,113 @@ fn emit_cast(
     }
 
     dst
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chumsky::{Parser, input::Input};
+
+    fn lower(src: &str) -> Vec<TopLevel> {
+        let tokens = crate::lexer::lexer().parse(src).into_result().unwrap();
+        let ast = crate::parser::parser()
+            .parse(
+                tokens
+                    .as_slice()
+                    .map((src.len()..src.len()).into(), |(token, span)| (token, span)),
+            )
+            .into_result()
+            .unwrap();
+        let (ast, mut symbols) = crate::semantic_analysis::validate(ast).unwrap();
+        let tacky::Program::Program(top_levels) = convert_program(ast, &mut symbols);
+        top_levels
+    }
+
+    #[test]
+    fn static_local_array_uses_static_initialization() {
+        let top_levels = lower("int main(void) { static int a[2] = {1, 2}; return 0; }");
+        assert!(top_levels.iter().any(|top_level| matches!(
+            top_level,
+            TopLevel::StaticVar(_, false, init)
+                if matches!(init.as_slice(), [StaticInit::Int(1), StaticInit::Int(2)])
+        )));
+        for top_level in top_levels {
+            if let TopLevel::Function(_, _, _, instructions) = top_level {
+                assert!(
+                    !instructions
+                        .iter()
+                        .any(|instruction| matches!(instruction, Instruction::CopyToOffset(..)))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nested_local_array_uses_byte_offsets_and_zero_padding() {
+        let top_levels = lower("int main(void) { long a[3][2] = {{1L}, {2L, 3L}}; return 0; }");
+        let instructions = top_levels
+            .iter()
+            .find_map(|top_level| match top_level {
+                TopLevel::Function(_, _, _, instructions) => Some(instructions),
+                _ => None,
+            })
+            .unwrap();
+        let stores = instructions
+            .iter()
+            .filter_map(|instruction| match instruction {
+                Instruction::CopyToOffset(tacky::Val::Const(Const::Long(value)), _, offset) => {
+                    Some((*value, *offset))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(stores, [(1, 0), (0, 8), (2, 16), (3, 24), (0, 32), (0, 40)]);
+    }
+
+    #[test]
+    fn subscripts_use_element_sizes_and_accept_reversed_operands() {
+        let top_levels = lower("int read(int (*p)[3]) { return 1L[p][2L]; }");
+        let TopLevel::Function(_, _, params, instructions) = &top_levels[0] else {
+            panic!("expected function");
+        };
+        let additions = instructions
+            .iter()
+            .filter_map(|instruction| match instruction {
+                Instruction::AddPtr(ptr, _, scale, _) => Some((ptr, *scale)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            additions
+                .iter()
+                .map(|(_, scale)| *scale)
+                .collect::<Vec<_>>(),
+            [12, 4]
+        );
+        assert!(matches!(additions[0].0, tacky::Val::Var(name) if *name == params[0]));
+    }
+
+    #[test]
+    fn pointer_difference_uses_the_pointed_to_array_size() {
+        let top_levels = lower("long diff(double (*p)[3][5], double (*q)[3][5]) { return p - q; }");
+        let TopLevel::Function(_, _, _, instructions) = &top_levels[0] else {
+            panic!("expected function");
+        };
+        assert!(instructions.iter().any(|instruction| matches!(
+            instruction,
+            Instruction::Binary(BinaryOp::Divide, _, tacky::Val::Const(Const::Long(120)), _)
+        )));
+    }
+
+    #[test]
+    fn tentative_definitions_zero_initialize_the_full_object() {
+        let top_levels = lower("int a[2][3]; double d; int *p;");
+        for (name, size) in [("a", 24), ("d", 8), ("p", 8)] {
+            assert!(top_levels.iter().any(|top_level| matches!(
+                top_level,
+                TopLevel::StaticVar(var, true, init)
+                    if *var == name && matches!(init.as_slice(), [StaticInit::ZeroInit(bytes)] if *bytes == size)
+            )));
+        }
+    }
 }

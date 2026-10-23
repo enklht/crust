@@ -1,4 +1,4 @@
-mod asm_generation;
+// mod asm_generation;
 mod code_emission;
 mod error_reporting;
 mod lexer;

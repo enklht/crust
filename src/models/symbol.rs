@@ -85,7 +85,7 @@ impl InitialValue {
     pub fn from_initializer(init: &Initializer, typ: &Type) -> Option<InitialValue> {
         fn inner(init: &Initializer, typ: &Type) -> Option<Vec<StaticInit>> {
             match (typ, init) {
-                (Type::Array(element_type, size), Initializer::Compound(inits)) => {
+                (Type::Array(element_type, size), Initializer::Compound(_, inits)) => {
                     if inits.len() > *size {
                         return None;
                     }

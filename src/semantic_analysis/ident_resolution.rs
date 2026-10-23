@@ -126,7 +126,7 @@ fn resolve_initializer(
 ) -> ValidationResult<()> {
     match initializer {
         Initializer::Single(e) => resolve_exp(e, scope_manager)?,
-        Initializer::Compound(v) => {
+        Initializer::Compound(_, v) => {
             for init in v {
                 resolve_initializer(init, scope_manager)?
             }

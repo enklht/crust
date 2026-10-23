@@ -26,7 +26,7 @@ where
                 .collect()
                 .then_ignore(just(Token::Comma).or_not())
                 .delimited_by(just(Token::LBrace), just(Token::RBrace))
-                .map(Initializer::Compound),
+                .map(|inits| Initializer::Compound(None, inits)),
         ))
     })
 }

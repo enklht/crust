@@ -333,9 +333,10 @@ fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> Valida
 
 fn zero_initializer(typ: &Type) -> ValidationResult<Initializer> {
     let init = match typ {
-        Type::Array(element_type, size) => {
-            Initializer::Compound(vec![zero_initializer(element_type)?; *size])
-        }
+        Type::Array(element_type, size) => Initializer::Compound(
+            Some(typ.clone()),
+            vec![zero_initializer(element_type)?; *size],
+        ),
         Type::Int => Initializer::Single(Exp {
             kind: ExpKind::Const(Const::Int(0)),
             typ: Some(Type::Int),
@@ -380,7 +381,7 @@ fn check_init(
             check_and_convert_exp(e, symbols)?;
             convert_by_assignment_to(e, target_type)?;
         }
-        (Type::Array(element_type, size), Initializer::Compound(init_list)) => {
+        (Type::Array(element_type, size), Initializer::Compound(typ, init_list)) => {
             if init_list.len() > *size {
                 return Err(Error::Type(format!("todo")));
             }
@@ -390,6 +391,8 @@ fn check_init(
             while init_list.len() < *size {
                 init_list.push(zero_initializer(element_type)?);
             }
+
+            *typ = Some(target_type.clone());
         }
         _ => {
             return Err(Error::Type(format!(
