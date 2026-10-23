@@ -451,17 +451,23 @@ fn gen_instructions(
                     Instruction::Mov(gen_val(src), Operand::Memory(Reg::AX, 0), src_type),
                 ])
             }
-            AddPtr(ptr, tacky::Val::Const(Const::Long(c)), scale, dst) => {
-                asm_instructions.extend([
-                    Instruction::Mov(gen_val(ptr), reg!(R9), Quadword),
-                    Instruction::Lea(
-                        Operand::Memory(Reg::R9, c as isize * scale as isize),
-                        gen_val(dst),
-                    ),
-                ])
-            }
             AddPtr(ptr, index, scale, dst) => {
-                if [1, 2, 4, 8].contains(&scale) {
+                let displacement = match index {
+                    tacky::Val::Const(Const::Long(i)) => i
+                        .checked_mul(scale as i64)
+                        .and_then(|offset| i32::try_from(offset).ok()),
+                    _ => None,
+                };
+
+                if let Some(displacement) = displacement {
+                    asm_instructions.extend([
+                        Instruction::Mov(gen_val(ptr), reg!(R9), Quadword),
+                        Instruction::Lea(
+                            Operand::Memory(Reg::R9, displacement as isize),
+                            gen_val(dst),
+                        ),
+                    ])
+                } else if [1, 2, 4, 8].contains(&scale) {
                     asm_instructions.extend([
                         Instruction::Mov(gen_val(ptr), reg!(R8), Quadword),
                         Instruction::Mov(gen_val(index), reg!(R9), Quadword),

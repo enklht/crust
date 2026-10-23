@@ -90,6 +90,28 @@ pub fn check_program(program: &mut Program) -> ValidationResult<Symbols> {
     Ok(symbols)
 }
 
+fn check_type(typ: &Type) -> ValidationResult<()> {
+    match typ {
+        Type::Array(element_type, _) => {
+            check_type(element_type)?;
+            if !typ.size().is_some_and(|size| size <= isize::MAX as usize) {
+                return Err(Error::Type(
+                    "Array size exceeds the maximum supported object size".to_string(),
+                ));
+            }
+        }
+        Type::Pointer(referenced_type) => check_type(referenced_type)?,
+        Type::Func(param_types, ret_type) => {
+            for param_type in param_types {
+                check_type(param_type)?;
+            }
+            check_type(ret_type)?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 fn check_file_scope_decl(decl: &mut Decl, symbols: &mut Symbols) -> ValidationResult<()> {
     match decl {
         Decl::FuncDecl(func_decl) => check_func_decl(func_decl, symbols, false),
@@ -111,6 +133,7 @@ fn check_func_decl(
 ) -> ValidationResult<()> {
     match func_decl {
         FuncDecl::FuncDecl(name, params, body, typ, storage_class) => {
+            check_type(typ)?;
             let Type::Func(param_types, ret_type) = typ.clone() else {
                 unreachable!()
             };
@@ -193,6 +216,7 @@ fn check_file_scope_var_decl(
 ) -> ValidationResult<()> {
     match var_decl {
         VarDecl::VarDecl(name, init, typ, storage_class) => {
+            check_type(typ)?;
             let mut init_value = match init {
                 Some(init) => InitialValue::from_initializer(init, typ).ok_or(Error::VarDecl(
                     format!("Static variable '{name}' has a non-constant initializer {init:?}"),
@@ -262,6 +286,7 @@ fn check_file_scope_var_decl(
 fn check_local_var_decl(var_decl: &mut VarDecl, symbols: &mut Symbols) -> ValidationResult<()> {
     match var_decl {
         VarDecl::VarDecl(name, init, typ, storage_class) => {
+            check_type(typ)?;
             match storage_class {
                 StorageClass::Extern => {
                     if init.is_some() {
@@ -540,6 +565,7 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
         }
         ExpKind::Cast(target_type, inner) => {
             use Type::*;
+            check_type(target_type)?;
             check_and_convert_exp(inner, symbols)?;
             if matches!(
                 (inner.typ(), &target_type),
@@ -668,7 +694,13 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                         return Err(Error::Type(format!("Invalid operands for addition")));
                     }
                 }
-                _ => {
+                Multiply | Divide | Remainder | BitAnd | BitOr | BitXor => {
+                    if !e1_type.is_arithmetic() || !e2_type.is_arithmetic() {
+                        return Err(Error::Type(format!(
+                            "Operator {op:?} requires arithmetic operands, found {e1_type} and {e2_type}"
+                        )));
+                    }
+
                     let common_type = common_type_with(e1, e2)?;
 
                     if matches!(op, Remainder | BitAnd | BitOr | BitXor)
@@ -676,14 +708,6 @@ fn check_exp(exp: &mut Exp, symbols: &mut Symbols) -> ValidationResult<()> {
                     {
                         return Err(Error::Type(format!(
                             "Expected integer type, found: {common_type}"
-                        )));
-                    }
-
-                    if matches!(op, Multiply | Divide | Remainder | BitAnd | BitOr | BitXor)
-                        && common_type.is_pointer()
-                    {
-                        return Err(Error::Type(format!(
-                            "Expected non-pointer type, found: {common_type}"
                         )));
                     }
 

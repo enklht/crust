@@ -20,7 +20,7 @@ pub enum AsmType {
     Quadword,
     #[display("sd")]
     Double,
-    #[display("")]
+    #[display("<array type has no instruction suffix>")]
     ByteArray(usize, usize),
 }
 
@@ -28,7 +28,7 @@ impl AsmType {
     pub fn size(&self) -> usize {
         use AsmType::*;
         match self {
-            Byte => todo!(),
+            Byte => 1,
             Longword => 4,
             Quadword | Double => 8,
             ByteArray(size, _) => *size,
@@ -38,7 +38,7 @@ impl AsmType {
     pub fn alignment(&self) -> usize {
         use AsmType::*;
         match self {
-            Byte => todo!(),
+            Byte => 1,
             Longword => 4,
             Quadword | Double => 8,
             ByteArray(_, alignment) => *alignment,
@@ -183,82 +183,39 @@ pub struct OperandFmt<'a> {
     symbols: &'a AsmSymbols,
 }
 
+enum RegSize {
+    Byte,
+    Longword,
+    Quadword,
+}
+
 impl<'a> fmt::Display for OperandFmt<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.typ {
-            AsmType::Byte => self.op.one_byte(f, self.symbols),
-            AsmType::Longword => self.op.four_byte(f, self.symbols),
-            AsmType::Quadword => self.op.eight_byte(f, self.symbols),
-            AsmType::Double => self.op.eight_byte(f, self.symbols),
-            _ => todo!(),
-        }
+        let reg_size = match self.typ {
+            AsmType::Byte => RegSize::Byte,
+            AsmType::Longword => RegSize::Longword,
+            AsmType::Quadword | AsmType::Double => RegSize::Quadword,
+            AsmType::ByteArray(_, _) => {
+                unreachable!("array type cannot format an instruction operand")
+            }
+        };
+        self.op.fmt(f, reg_size, self.symbols)
     }
 }
 
 impl Operand {
-    pub fn one_byte(&self, f: &mut fmt::Formatter<'_>, symbols: &AsmSymbols) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        reg_size: RegSize,
+        symbols: &AsmSymbols,
+    ) -> fmt::Result {
         match self {
-            Operand::Reg(reg) => reg.one_byte(f),
-            Operand::Imm(val) => write!(f, "${}", val),
-            Operand::Memory(reg, offset) => {
-                write!(f, "{}(", offset)?;
-                reg.eight_byte(f)?;
-                write!(f, ")")
-            }
-            Operand::Data(label) => match symbols.get(label).unwrap() {
-                AsmSymbol::ObjEntry(_, _, true) => {
-                    write!(f, ".L{}(%rip)", label)
-                }
-                _ => {
-                    write!(f, "{}(%rip)", label)
-                }
+            Operand::Reg(reg) => match reg_size {
+                RegSize::Byte => reg.one_byte(f),
+                RegSize::Longword => reg.four_byte(f),
+                RegSize::Quadword => reg.eight_byte(f),
             },
-            Operand::Indexed(base, index, scale) => {
-                write!(f, "(")?;
-                base.eight_byte(f)?;
-                write!(f, ", ")?;
-                index.eight_byte(f)?;
-                write!(f, ", {scale})")
-            }
-            Operand::Pseudo(_) | Operand::PseudoMem(_, _) => {
-                unreachable!("pseudo register will never be emit")
-            }
-        }
-    }
-
-    pub fn four_byte(&self, f: &mut fmt::Formatter<'_>, symbols: &AsmSymbols) -> fmt::Result {
-        match self {
-            Operand::Reg(reg) => reg.four_byte(f),
-            Operand::Imm(val) => write!(f, "${}", val),
-            Operand::Memory(reg, offset) => {
-                write!(f, "{}(", offset)?;
-                reg.eight_byte(f)?;
-                write!(f, ")")
-            }
-            Operand::Data(label) => match symbols.get(label).unwrap() {
-                AsmSymbol::ObjEntry(_, _, true) => {
-                    write!(f, ".L{}(%rip)", label)
-                }
-                _ => {
-                    write!(f, "{}(%rip)", label)
-                }
-            },
-            Operand::Indexed(base, index, scale) => {
-                write!(f, "(")?;
-                base.eight_byte(f)?;
-                write!(f, ", ")?;
-                index.eight_byte(f)?;
-                write!(f, ", {scale})")
-            }
-            Operand::Pseudo(_) | Operand::PseudoMem(_, _) => {
-                unreachable!("pseudo register will never be emit")
-            }
-        }
-    }
-
-    pub fn eight_byte(&self, f: &mut fmt::Formatter<'_>, symbols: &AsmSymbols) -> fmt::Result {
-        match self {
-            Operand::Reg(reg) => reg.eight_byte(f),
             Operand::Imm(val) => write!(f, "${}", val),
             Operand::Memory(reg, offset) => {
                 write!(f, "{}(", offset)?;

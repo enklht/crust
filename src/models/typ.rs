@@ -37,7 +37,13 @@ impl Type {
         match self {
             Int | UInt => Some(4),
             Long | ULong | Double | Pointer(_) => Some(8),
-            Array(element_type, _) => Some(element_type.alignment()?),
+            Array(element_type, _) => {
+                if self.size()? >= 16 {
+                    Some(16)
+                } else {
+                    element_type.alignment()
+                }
+            }
             _ => None,
         }
     }
@@ -83,10 +89,7 @@ impl Type {
             Int | UInt => AsmType::Longword,
             Long | ULong | Pointer(_) => AsmType::Quadword,
             Double => AsmType::Double,
-            Array(element_type, size) => AsmType::ByteArray(
-                element_type.size().unwrap() * size,
-                element_type.alignment().unwrap(),
-            ),
+            Array(_, _) => AsmType::ByteArray(self.size().unwrap(), self.alignment().unwrap()),
             _ => unreachable!(),
         }
     }
