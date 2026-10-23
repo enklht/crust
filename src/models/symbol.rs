@@ -148,14 +148,3 @@ pub enum StaticInit {
     Double(f64),
     ZeroInit(usize),
 }
-
-impl StaticInit {
-    pub fn alignment(&self) -> usize {
-        use StaticInit::*;
-        match self {
-            Int(_) | UInt(_) => 4,
-            Long(_) | ULong(_) | Double(_) => 8,
-            _ => todo!(),
-        }
-    }
-}

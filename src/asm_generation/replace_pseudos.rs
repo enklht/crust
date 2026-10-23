@@ -16,16 +16,11 @@ impl State {
         }
     }
 
-    fn longword(&mut self, ident: &str) -> usize {
+    fn get_offset_or_insert(&mut self, ident: &str, asm_type: &AsmType) -> usize {
         *self.offset_map.entry(ident.to_string()).or_insert_with(|| {
-            self.current_offset += 4;
-            self.current_offset
-        })
-    }
-
-    fn quadword(&mut self, ident: &str) -> usize {
-        *self.offset_map.entry(ident.to_string()).or_insert_with(|| {
-            self.current_offset = (self.current_offset + 8).next_multiple_of(8);
+            let size = asm_type.size();
+            let alignment = asm_type.alignment();
+            self.current_offset = (self.current_offset + size).next_multiple_of(alignment);
             self.current_offset
         })
     }
@@ -108,16 +103,35 @@ fn replace_pseudos_in_instruction(
 }
 
 fn replace_operand(operand: &mut Operand, state: &mut State, symbols: &AsmSymbols) {
-    if let Operand::Pseudo(ident) = operand {
-        match symbols.get(ident).unwrap() {
-            AsmSymbol::ObjEntry(_, true, _) => *operand = Operand::Data(ident),
-            AsmSymbol::ObjEntry(AsmType::Longword, false, _) => {
-                *operand = Operand::Memory(Reg::BP, -(state.longword(ident) as isize))
+    match operand {
+        Operand::Pseudo(ident) => match symbols.get(ident).unwrap() {
+            AsmSymbol::ObjEntry(_, true, _) => {
+                *operand = Operand::Data(ident);
             }
-            AsmSymbol::ObjEntry(AsmType::Quadword | AsmType::Double, false, _) => {
-                *operand = Operand::Memory(Reg::BP, -(state.quadword(ident) as isize))
+            AsmSymbol::ObjEntry(asm_type, false, _) => {
+                *operand = Operand::Memory(
+                    Reg::BP,
+                    -(state.get_offset_or_insert(ident, asm_type) as isize),
+                )
             }
             _ => unreachable!(),
-        }
+        },
+        Operand::PseudoMem(ident, offset) => match symbols.get(ident).unwrap() {
+            AsmSymbol::ObjEntry(_, true, _) => {
+                if *offset == 0 {
+                    *operand = Operand::Data(ident);
+                } else {
+                    unreachable!();
+                }
+            }
+            AsmSymbol::ObjEntry(asm_type, false, _) => {
+                *operand = Operand::Memory(
+                    Reg::BP,
+                    -((state.get_offset_or_insert(ident, asm_type) - *offset) as isize),
+                )
+            }
+            _ => unreachable!(),
+        },
+        _ => {}
     }
 }

@@ -1,6 +1,7 @@
 pub use super::constant::Const;
 pub use super::operator::*;
 use super::symbol::StaticInit;
+use super::typ::Type;
 use crate::utils::Ident;
 
 #[derive(Debug)]
@@ -10,7 +11,7 @@ pub enum Program {
 
 pub enum TopLevel {
     Function(Ident, bool, Vec<Ident>, Vec<Instruction>),
-    StaticVar(Ident, bool, Vec<StaticInit>),
+    StaticVar(Ident, bool, Type, Vec<StaticInit>),
 }
 
 #[derive(Debug)]
@@ -56,7 +57,7 @@ impl std::fmt::Debug for TopLevel {
                     crate::utils::PrettyVec(instructions)
                 )
             }
-            TopLevel::StaticVar(name, global, init) => {
+            TopLevel::StaticVar(name, global, typ, init) => {
                 writeln!(f, "\nstatic {name} := {init:?}")?;
                 write!(f, "global: {global}")
             }

@@ -105,8 +105,8 @@ fn gen_top_level(top_level: tacky::TopLevel, symbols: &Symbols, consts: &mut Con
 
             TopLevel::Function(name, global, asm_instructions, None)
         }
-        tacky::TopLevel::StaticVar(name, global, init) => {
-            TopLevel::StaticVar(name, global, init.alignment(), init)
+        tacky::TopLevel::StaticVar(name, global, typ, init) => {
+            TopLevel::StaticVar(name, global, typ.alignment().unwrap(), init)
         }
     }
 }
@@ -122,6 +122,7 @@ fn gen_instructions(
     let mut asm_instructions = Vec::new();
 
     for instruction in instructions {
+        let mut gen_val = |val| gen_val(val, symbols, consts);
         match instruction {
             Return(val) => {
                 let asm_type = type_of_val(&val, symbols).to_asm_type();
@@ -131,60 +132,42 @@ fn gen_instructions(
                 };
 
                 asm_instructions.extend([
-                    Instruction::Mov(gen_val(val, consts), dst, asm_type),
+                    Instruction::Mov(gen_val(val), dst, asm_type),
                     Instruction::Ret,
                 ]);
             }
             SignExtend(src, dst) => {
-                asm_instructions.push(Instruction::Movsx(
-                    gen_val(src, consts),
-                    gen_val(dst, consts),
-                ));
+                asm_instructions.push(Instruction::Movsx(gen_val(src), gen_val(dst)));
             }
             Truncate(src, dst) => {
-                asm_instructions.push(Instruction::Mov(
-                    gen_val(src, consts),
-                    gen_val(dst, consts),
-                    Longword,
-                ));
+                asm_instructions.push(Instruction::Mov(gen_val(src), gen_val(dst), Longword));
             }
             ZeroExtend(src, dst) => {
-                asm_instructions.push(Instruction::MovZeroExtend(
-                    gen_val(src, consts),
-                    gen_val(dst, consts),
-                ));
+                asm_instructions.push(Instruction::MovZeroExtend(gen_val(src), gen_val(dst)));
             }
             IntToDouble(src, dst) => {
                 let src_type = type_of_val(&src, symbols).to_asm_type();
-                asm_instructions.push(Instruction::Cvtsi2sd(
-                    gen_val(src, consts),
-                    gen_val(dst, consts),
-                    src_type,
-                ));
+                asm_instructions.push(Instruction::Cvtsi2sd(gen_val(src), gen_val(dst), src_type));
             }
             DoubleToInt(src, dst) => {
                 let dst_type = type_of_val(&dst, symbols).to_asm_type();
-                asm_instructions.push(Instruction::Cvttsd2si(
-                    gen_val(src, consts),
-                    gen_val(dst, consts),
-                    dst_type,
-                ));
+                asm_instructions.push(Instruction::Cvttsd2si(gen_val(src), gen_val(dst), dst_type));
             }
             UIntToDouble(src, dst) => {
                 let src_type = type_of_val(&src, symbols).to_asm_type();
                 match src_type {
                     Longword => {
                         asm_instructions.extend([
-                            Instruction::MovZeroExtend(gen_val(src, consts), reg!(R8)),
-                            Instruction::Cvtsi2sd(reg!(R8), gen_val(dst, consts), Quadword),
+                            Instruction::MovZeroExtend(gen_val(src), reg!(R8)),
+                            Instruction::Cvtsi2sd(reg!(R8), gen_val(dst), Quadword),
                         ]);
                     }
                     Quadword => {
                         let out_of_range_label = make_label("ul2d_out_of_range");
                         let end_label = make_label("ul2d_end");
 
-                        let src = gen_val(src, consts);
-                        let dst = gen_val(dst, consts);
+                        let src = gen_val(src);
+                        let dst = gen_val(dst);
 
                         asm_instructions.extend([
                             Instruction::Cmp(imm!(0), src, Quadword),
@@ -211,11 +194,14 @@ fn gen_instructions(
                 match dst_type {
                     Longword => {
                         asm_instructions.extend([
-                            Instruction::Cvttsd2si(gen_val(src, consts), reg!(R8), Quadword),
-                            Instruction::Mov(reg!(R8), gen_val(dst, consts), Quadword),
+                            Instruction::Cvttsd2si(gen_val(src), reg!(R8), Quadword),
+                            Instruction::Mov(reg!(R8), gen_val(dst), Quadword),
                         ]);
                     }
                     Quadword => {
+                        let src = gen_val(src);
+                        let dst = gen_val(dst);
+
                         let (_, upper_bound) = consts
                             .entry(9223372036854775808.0f64.to_bits())
                             .or_insert((8, make_label("upper_bound")));
@@ -223,9 +209,6 @@ fn gen_instructions(
 
                         let out_of_range_label = make_label("d2ul_out_of_range");
                         let end_label = make_label("d2ul_end");
-
-                        let src = gen_val(src, consts);
-                        let dst = gen_val(dst, consts);
 
                         asm_instructions.extend([
                             Instruction::Cmp(upper_bound, src, Double),
@@ -252,8 +235,8 @@ fn gen_instructions(
             Unary(op, src, dst) => {
                 let src_type = type_of_val(&src, symbols).to_asm_type();
                 let dst_type = type_of_val(&dst, symbols).to_asm_type();
-                let src = gen_val(src, consts);
-                let dst = gen_val(dst, consts);
+                let src = gen_val(src);
+                let dst = gen_val(dst);
 
                 match op {
                     tacky::UnaryOp::LogicalNot if src_type == Double => {
@@ -295,9 +278,9 @@ fn gen_instructions(
                 let src1_type = type_of_val(&src1, symbols);
                 let (src1_type, signed) = (src1_type.to_asm_type(), src1_type.is_signed());
 
-                let src1 = gen_val(src1, consts);
-                let src2 = gen_val(src2, consts);
-                let dst = gen_val(dst, consts);
+                let src1 = gen_val(src1);
+                let src2 = gen_val(src2);
+                let dst = gen_val(dst);
 
                 use tacky::BinaryOp as TBinOp;
 
@@ -403,7 +386,7 @@ fn gen_instructions(
             }
             JumpIfZero(cond, target) => {
                 let cond_type = type_of_val(&cond, symbols).to_asm_type();
-                let cond = gen_val(cond, consts);
+                let cond = gen_val(cond);
                 match cond_type {
                     Double => {
                         asm_instructions.extend([
@@ -426,7 +409,7 @@ fn gen_instructions(
             }
             JumpIfNotZero(cond, target) => {
                 let cond_type = type_of_val(&cond, symbols).to_asm_type();
-                let cond = gen_val(cond, consts);
+                let cond = gen_val(cond);
                 match cond_type {
                     Double => {
                         asm_instructions.extend([
@@ -449,33 +432,66 @@ fn gen_instructions(
             }
             Copy(src, dst) => {
                 let src_type = type_of_val(&src, symbols).to_asm_type();
-                asm_instructions.push(Instruction::Mov(
-                    gen_val(src, consts),
-                    gen_val(dst, consts),
-                    src_type,
-                ));
+                asm_instructions.push(Instruction::Mov(gen_val(src), gen_val(dst), src_type));
             }
             GetAddress(src, dst) => {
-                asm_instructions.push(Instruction::Lea(gen_val(src, consts), gen_val(dst, consts)))
+                asm_instructions.push(Instruction::Lea(gen_val(src), gen_val(dst)))
             }
             Load(ptr, dst) => {
                 let dst_type = type_of_val(&dst, symbols).to_asm_type();
                 asm_instructions.extend([
-                    Instruction::Mov(gen_val(ptr, consts), reg!(AX), Quadword),
-                    Instruction::Mov(Operand::Memory(Reg::AX, 0), gen_val(dst, consts), dst_type),
+                    Instruction::Mov(gen_val(ptr), reg!(AX), Quadword),
+                    Instruction::Mov(Operand::Memory(Reg::AX, 0), gen_val(dst), dst_type),
                 ])
             }
             Store(src, ptr) => {
                 let src_type = type_of_val(&src, symbols).to_asm_type();
                 asm_instructions.extend([
-                    Instruction::Mov(gen_val(ptr, consts), reg!(AX), Quadword),
-                    Instruction::Mov(gen_val(src, consts), Operand::Memory(Reg::AX, 0), src_type),
+                    Instruction::Mov(gen_val(ptr), reg!(AX), Quadword),
+                    Instruction::Mov(gen_val(src), Operand::Memory(Reg::AX, 0), src_type),
                 ])
             }
+            AddPtr(ptr, tacky::Val::Const(Const::Long(c)), scale, dst) => {
+                asm_instructions.extend([
+                    Instruction::Mov(gen_val(ptr), reg!(R9), Quadword),
+                    Instruction::Lea(
+                        Operand::Memory(Reg::R9, c as isize * scale as isize),
+                        gen_val(dst),
+                    ),
+                ])
+            }
+            AddPtr(ptr, index, scale, dst) => {
+                if [1, 2, 4, 8].contains(&scale) {
+                    asm_instructions.extend([
+                        Instruction::Mov(gen_val(ptr), reg!(R8), Quadword),
+                        Instruction::Mov(gen_val(index), reg!(R9), Quadword),
+                        Instruction::Lea(Operand::Indexed(Reg::R8, Reg::R9, scale), gen_val(dst)),
+                    ])
+                } else {
+                    asm_instructions.extend([
+                        Instruction::Mov(gen_val(ptr), reg!(R8), Quadword),
+                        Instruction::Mov(gen_val(index), reg!(R9), Quadword),
+                        Instruction::Binary(
+                            BinaryOp::Multiply,
+                            Operand::Imm(scale as u64),
+                            reg!(R9),
+                            Quadword,
+                        ),
+                        Instruction::Lea(Operand::Indexed(Reg::R8, Reg::R9, 1), gen_val(dst)),
+                    ])
+                }
+            }
+            CopyToOffset(src, dst, offset) => asm_instructions.push(Instruction::Mov(
+                gen_val(src),
+                Operand::PseudoMem(dst, offset),
+                type_of_val(&src, symbols).to_asm_type(),
+            )),
             Label(label) => {
                 asm_instructions.push(Instruction::Label(label));
             }
             FuncCall(name, args, dst) => {
+                let dst_type = type_of_val(&dst, symbols).to_asm_type();
+                let dst = gen_val(dst);
                 let (int_reg_args, double_reg_args, stack_args) =
                     classify_params(args, symbols, consts);
 
@@ -525,8 +541,6 @@ fn gen_instructions(
                     ));
                 }
 
-                let dst_type = type_of_val(&dst, symbols).to_asm_type();
-                let dst = gen_val(dst, consts);
                 match dst_type {
                     Double => asm_instructions.push(Instruction::Mov(reg!(XMM0), dst, dst_type)),
                     _ => asm_instructions.push(Instruction::Mov(reg!(AX), dst, dst_type)),
@@ -550,7 +564,7 @@ fn classify_params(
 
     for val in vals {
         let typ = type_of_val(&val, symbols).to_asm_type();
-        let op = gen_val(val, consts);
+        let op = gen_val(val, symbols, consts);
         let typed = (op, typ);
 
         if typ == AsmType::Double {
@@ -569,7 +583,7 @@ fn classify_params(
     (int_reg_params, double_reg_params, stack_params)
 }
 
-fn gen_val(val: tacky::Val, consts: &mut Consts) -> Operand {
+fn gen_val(val: tacky::Val, symbols: &Symbols, consts: &mut Consts) -> Operand {
     match val {
         tacky::Val::Const(Const::Double(d)) => {
             let (_, label) = consts
@@ -578,7 +592,10 @@ fn gen_val(val: tacky::Val, consts: &mut Consts) -> Operand {
             Operand::Data(label)
         }
         tacky::Val::Const(c) => imm!(c.to_u64()),
-        tacky::Val::Var(ident) => Operand::Pseudo(ident),
+        tacky::Val::Var(ident) => match symbols.get(ident) {
+            Some(symbol) if symbol.typ().is_array() => Operand::PseudoMem(ident, 0),
+            _ => Operand::Pseudo(ident),
+        },
     }
 }
 

@@ -32,19 +32,28 @@ impl Type {
         }
     }
 
-    pub fn pointer_scale(&self) -> Option<usize> {
-        let Type::Pointer(referenced_type) = self else {
-            return None;
-        };
+    pub fn alignment(&self) -> Option<usize> {
+        use Type::*;
+        match self {
+            Int | UInt => Some(4),
+            Long | ULong | Double | Pointer(_) => Some(8),
+            Array(element_type, _) => Some(element_type.alignment()?),
+            _ => None,
+        }
+    }
 
-        referenced_type.size()
+    pub fn pointer_scale(&self) -> usize {
+        let Type::Pointer(element_type) = &self else {
+            unreachable!()
+        };
+        element_type.size().unwrap()
     }
 
     pub fn is_signed(&self) -> bool {
         use Type::*;
         match self {
-            Int | Long | Double => true,
-            UInt | ULong | Pointer(_) => false,
+            Int | Long => true,
+            UInt | ULong | Pointer(_) | Double => false,
             _ => unreachable!(),
         }
     }
@@ -64,12 +73,20 @@ impl Type {
         )
     }
 
+    pub fn is_array(&self) -> bool {
+        matches!(self, Type::Array(_, _))
+    }
+
     pub fn to_asm_type(&self) -> AsmType {
         use Type::*;
         match self {
             Int | UInt => AsmType::Longword,
             Long | ULong | Pointer(_) => AsmType::Quadword,
             Double => AsmType::Double,
+            Array(element_type, size) => AsmType::ByteArray(
+                element_type.size().unwrap() * size,
+                element_type.alignment().unwrap(),
+            ),
             _ => unreachable!(),
         }
     }

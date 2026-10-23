@@ -20,11 +20,35 @@ pub enum AsmType {
     Quadword,
     #[display("sd")]
     Double,
+    #[display("")]
+    ByteArray(usize, usize),
+}
+
+impl AsmType {
+    pub fn size(&self) -> usize {
+        use AsmType::*;
+        match self {
+            Byte => todo!(),
+            Longword => 4,
+            Quadword | Double => 8,
+            ByteArray(size, _) => *size,
+        }
+    }
+
+    pub fn alignment(&self) -> usize {
+        use AsmType::*;
+        match self {
+            Byte => todo!(),
+            Longword => 4,
+            Quadword | Double => 8,
+            ByteArray(_, alignment) => *alignment,
+        }
+    }
 }
 
 pub enum TopLevel {
     Function(Ident, bool, Vec<Instruction>, Option<usize>),
-    StaticVar(Ident, bool, usize, StaticInit),
+    StaticVar(Ident, bool, usize, Vec<StaticInit>),
     StaticConst(Ident, usize, StaticInit),
 }
 
@@ -58,6 +82,8 @@ pub enum Operand {
     Pseudo(Ident),
     Memory(Reg, isize),
     Data(Ident),
+    PseudoMem(Ident, usize),
+    Indexed(Reg, Reg, usize),
 }
 
 #[derive(Debug, Display)]
@@ -164,6 +190,7 @@ impl<'a> fmt::Display for OperandFmt<'a> {
             AsmType::Longword => self.op.four_byte(f, self.symbols),
             AsmType::Quadword => self.op.eight_byte(f, self.symbols),
             AsmType::Double => self.op.eight_byte(f, self.symbols),
+            _ => todo!(),
         }
     }
 }
@@ -186,7 +213,10 @@ impl Operand {
                     write!(f, "{}(%rip)", label)
                 }
             },
-            Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
+            Operand::Pseudo(_) | Operand::PseudoMem(_, _) => {
+                unreachable!("pseudo register will never be emit")
+            }
+            _ => todo!(),
         }
     }
 
@@ -207,7 +237,10 @@ impl Operand {
                     write!(f, "{}(%rip)", label)
                 }
             },
-            Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
+            Operand::Pseudo(_) | Operand::PseudoMem(_, _) => {
+                unreachable!("pseudo register will never be emit")
+            }
+            _ => todo!(),
         }
     }
 
@@ -229,6 +262,7 @@ impl Operand {
                 }
             },
             Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
+            _ => todo!(),
         }
     }
 }
