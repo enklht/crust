@@ -33,27 +33,31 @@ fn emit_top_level(
             writeln!(acc, "    movq %rsp, %rbp")?;
             emit_instructions(instructions, acc, symbols)
         }
-        TopLevel::StaticVar(name, global, alignment, init) => {
+        TopLevel::StaticVar(name, global, alignment, inits) => {
             use StaticInit::*;
             if global {
                 writeln!(acc, "    .globl {name}")?;
             }
-            match init {
-                Int(0) | Long(0) | UInt(0) | ULong(0) => writeln!(acc, "    .bss")?,
-                _ => writeln!(acc, "    .data")?,
+            if inits.iter().all(StaticInit::is_zero) {
+                writeln!(acc, "    .bss")?;
+            } else {
+                writeln!(acc, "    .data")?;
             }
             writeln!(acc, "    .balign {alignment}")?;
             writeln!(acc, "{name}:")?;
-            match init {
-                Int(0) | UInt(0) => writeln!(acc, "    .zero 4"),
-                Long(0) | ULong(0) => writeln!(acc, "    .zero 8"),
-                Int(i) => writeln!(acc, "    .long {i}"),
-                UInt(i) => writeln!(acc, "    .long {i}"),
-                Long(i) => writeln!(acc, "    .quad {i}"),
-                ULong(i) => writeln!(acc, "    .quad {i}"),
-                Double(i) => writeln!(acc, "    .quad {}", i.to_bits()),
-                _ => todo!(),
+            for init in inits {
+                match init {
+                    Int(0) | UInt(0) => writeln!(acc, "    .zero 4"),
+                    Long(0) | ULong(0) => writeln!(acc, "    .zero 8"),
+                    Int(i) => writeln!(acc, "    .long {i}"),
+                    UInt(i) => writeln!(acc, "    .long {i}"),
+                    Long(i) => writeln!(acc, "    .quad {i}"),
+                    ULong(i) => writeln!(acc, "    .quad {i}"),
+                    Double(i) => writeln!(acc, "    .quad {}", i.to_bits()),
+                    ZeroInit(n) => writeln!(acc, "    .zero {n}"),
+                }?;
             }
+            Ok(())
         }
         TopLevel::StaticConst(name, alignment, init) => {
             use StaticInit::*;

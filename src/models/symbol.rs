@@ -148,3 +148,13 @@ pub enum StaticInit {
     Double(f64),
     ZeroInit(usize),
 }
+
+impl StaticInit {
+    pub fn is_zero(&self) -> bool {
+        use StaticInit::*;
+        match self {
+            Int(0) | Long(0) | UInt(0) | ULong(0) | ZeroInit(_) => true,
+            _ => false,
+        }
+    }
+}

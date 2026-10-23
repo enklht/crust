@@ -213,10 +213,16 @@ impl Operand {
                     write!(f, "{}(%rip)", label)
                 }
             },
+            Operand::Indexed(base, index, scale) => {
+                write!(f, "(")?;
+                base.eight_byte(f)?;
+                write!(f, ", ")?;
+                index.eight_byte(f)?;
+                write!(f, ", {scale})")
+            }
             Operand::Pseudo(_) | Operand::PseudoMem(_, _) => {
                 unreachable!("pseudo register will never be emit")
             }
-            _ => todo!(),
         }
     }
 
@@ -237,10 +243,16 @@ impl Operand {
                     write!(f, "{}(%rip)", label)
                 }
             },
+            Operand::Indexed(base, index, scale) => {
+                write!(f, "(")?;
+                base.eight_byte(f)?;
+                write!(f, ", ")?;
+                index.eight_byte(f)?;
+                write!(f, ", {scale})")
+            }
             Operand::Pseudo(_) | Operand::PseudoMem(_, _) => {
                 unreachable!("pseudo register will never be emit")
             }
-            _ => todo!(),
         }
     }
 
@@ -261,8 +273,16 @@ impl Operand {
                     write!(f, "{}(%rip)", label)
                 }
             },
-            Operand::Pseudo(_) => unreachable!("pseudo register will never be emit"),
-            _ => todo!(),
+            Operand::Indexed(base, index, scale) => {
+                write!(f, "(")?;
+                base.eight_byte(f)?;
+                write!(f, ", ")?;
+                index.eight_byte(f)?;
+                write!(f, ", {scale})")
+            }
+            Operand::Pseudo(_) | Operand::PseudoMem(_, _) => {
+                unreachable!("pseudo register will never be emit")
+            }
         }
     }
 }
