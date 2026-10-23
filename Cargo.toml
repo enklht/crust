@@ -8,5 +8,6 @@ ariadne = "0.6"
 bpaf = { version = "0.9", features = ["derive", "dull-color"] }
 chumsky = { version = "0.13", features = ["pratt", "regex"] }
 derive_more = { version = "2.0", features = ["display"] }
+la-arena = "0.3.1"
 rustc-hash = "2.1"
 thiserror = "2.0"

@@ -3,7 +3,7 @@ use super::array_suffix;
 use super::type_specifiers;
 use crate::models::ast::*;
 use crate::models::token::Token;
-use crate::models::typ::Type;
+use crate::models::typ::{TypeId, TypeKind, Types};
 use chumsky::input::ValueInput;
 use chumsky::pratt::*;
 use chumsky::prelude::*;
@@ -176,19 +176,20 @@ where
             ),
         ))
     })
-    .labelled("expession")
+    .labelled("expression")
     .as_context()
 }
 
-fn cast_op<'tokens, I>() -> impl Parser<'tokens, I, Type, ParserError<'tokens>> + Clone
+fn cast_op<'tokens, I>() -> impl Parser<'tokens, I, TypeId, ParserError<'tokens>> + Clone
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
     type_specifiers()
         .then(abs_declarator())
         .delimited_by(just(Token::LParen), just(Token::RParen))
-        .try_map(|(base_type, abs_declarator), span| {
-            process_abs_declarator(abs_declarator, base_type)
+        .try_map_with(|(base_type, abs_declarator), e| {
+            let span = e.span();
+            process_abs_declarator(abs_declarator, base_type, &mut e.state().0)
                 .ok_or(Rich::custom(span, "invalid abstract declarator"))
         })
 }
@@ -225,12 +226,22 @@ where
     })
 }
 
-fn process_abs_declarator(abs_declarator: AbsDeclarator, base_typ: Type) -> Option<Type> {
+fn process_abs_declarator(
+    abs_declarator: AbsDeclarator,
+    base_typ: TypeId,
+    types: &mut Types,
+) -> Option<TypeId> {
     use AbsDeclarator::*;
     match abs_declarator {
         Base => Some(base_typ),
-        Pointer(inner) => process_abs_declarator(*inner, Type::Pointer(Box::new(base_typ))),
-        Array(inner, size) => process_abs_declarator(*inner, Type::Array(Box::new(base_typ), size)),
+        Pointer(inner) => {
+            let typ = types.intern(TypeKind::Pointer(base_typ));
+            process_abs_declarator(*inner, typ, types)
+        }
+        Array(inner, size) => {
+            let typ = types.intern(TypeKind::Array(base_typ, size));
+            process_abs_declarator(*inner, typ, types)
+        }
     }
 }
 

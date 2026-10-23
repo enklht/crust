@@ -7,7 +7,7 @@ use super::ident;
 use super::specifiers;
 use crate::models::ast::*;
 use crate::models::token::Token;
-use crate::models::typ::Type;
+use crate::models::typ::{TypeId, TypeKind, Types};
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use specifiers::type_specifiers;
@@ -39,11 +39,16 @@ where
         .then(declarator())
         .then(just(Token::Equal).ignore_then(initializer()).or_not())
         .semicolon()
-        .try_map(|(((base_typ, storage_class), declarator), init), span| {
-            let (name, typ, _params) = process_declarator(declarator, base_typ)
+        .try_map_with(|(((base_typ, storage_class), declarator), init), e| {
+            let span = e.span();
+            let types = &mut e.state().0;
+            let (name, typ, _params) = process_declarator(declarator, base_typ, types)
                 .ok_or(Rich::custom(span, "invalid declarator"))?;
-            if matches!(typ, Type::Func(_, _)) {
-                return Err(Rich::custom(span, ""));
+            if matches!(types.kind(typ), TypeKind::Func(_, _)) {
+                return Err(Rich::custom(
+                    span,
+                    "Expected a variable declaration, found a function declaration",
+                ));
             }
             Ok(VarDecl::VarDecl(name, init, typ, storage_class))
         })
@@ -60,13 +65,15 @@ where
     let func_decl = specifiers()
         .then(declarator())
         .then(block.map(Some).or(just(Token::Semicolon).to(None)))
-        .try_map(|(((base_typ, storage_class), declarator), body), span| {
-            let (name, typ, params) = process_declarator(declarator, base_typ)
+        .try_map_with(|(((base_typ, storage_class), declarator), body), e| {
+            let span = e.span();
+            let types = &mut e.state().0;
+            let (name, typ, params) = process_declarator(declarator, base_typ, types)
                 .ok_or(Rich::custom(span, "invalid declarator"))?;
-            if !matches!(typ, Type::Func(_, _)) {
+            if !matches!(types.kind(typ), TypeKind::Func(_, _)) {
                 return Err(Rich::custom(
                     span,
-                    "variable declaration with function type",
+                    "Expected a function declaration before a function body",
                 ));
             }
             Ok(FuncDecl::FuncDecl(name, params, body, typ, storage_class))
@@ -82,7 +89,7 @@ enum Declarator {
     Ident(Ident),
     Pointer(Box<Declarator>),
     Array(Box<Declarator>, usize),
-    Func(Vec<(Type, Declarator)>, Box<Declarator>),
+    Func(Vec<(TypeId, Declarator)>, Box<Declarator>),
 }
 
 fn declarator<'tokens, I>() -> impl Parser<'tokens, I, Declarator, ParserError<'tokens>> + Clone
@@ -128,16 +135,20 @@ where
     })
 }
 
-fn process_declarator(declarator: Declarator, base_typ: Type) -> Option<(Ident, Type, Vec<Ident>)> {
+fn process_declarator(
+    declarator: Declarator,
+    base_typ: TypeId,
+    types: &mut Types,
+) -> Option<(Ident, TypeId, Vec<Ident>)> {
     match declarator {
         Declarator::Ident(name) => Some((name, base_typ, vec![])),
         Declarator::Pointer(inner) => {
-            let derived_type = Type::Pointer(Box::new(base_typ));
-            Some(process_declarator(*inner, derived_type)?)
+            let derived_type = types.intern(TypeKind::Pointer(base_typ));
+            Some(process_declarator(*inner, derived_type, types)?)
         }
         Declarator::Array(inner, size) => {
-            let derived_type = Type::Array(Box::new(base_typ), size);
-            process_declarator(*inner, derived_type)
+            let derived_type = types.intern(TypeKind::Array(base_typ, size));
+            process_declarator(*inner, derived_type, types)
         }
         Declarator::Func(params, inner) => match *inner {
             Declarator::Ident(name) => {
@@ -145,11 +156,11 @@ fn process_declarator(declarator: Declarator, base_typ: Type) -> Option<(Ident, 
                 let mut param_types = Vec::new();
                 for (p_base_type, p_declarator) in params {
                     let (param_name, param_type, _) =
-                        process_declarator(p_declarator, p_base_type)?;
+                        process_declarator(p_declarator, p_base_type, types)?;
                     param_names.push(param_name);
                     param_types.push(param_type)
                 }
-                let derived_type = Type::Func(param_types, Box::new(base_typ));
+                let derived_type = types.intern(TypeKind::Func(param_types, base_typ));
                 Some((name, derived_type, param_names))
             }
             _ => None,

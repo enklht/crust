@@ -75,7 +75,7 @@ pub enum Token {
     Slash,
     #[display("%")]
     Percent,
-    #[display("|")]
+    #[display("~")]
     Tilde,
     #[display("&")]
     Ampersand,

@@ -68,7 +68,7 @@ fn collect_labels(stmt: &Stmt, labels: &mut Labels) -> ValidationResult<()> {
             match labels.get(label) {
                 Some(_) => {
                     return Err(ValidationError::Label(format!(
-                        "Label '{label}' has already been defined",
+                        "Label '{label}' is defined more than once in this function",
                     )));
                 }
                 None => {
@@ -113,7 +113,7 @@ fn resolve_stmt(stmt: Stmt, labels: &Labels) -> ValidationResult<Stmt> {
             }
             None => {
                 return Err(ValidationError::Label(format!(
-                    "Cannot find label '{label}' in this scope",
+                    "Label '{label}' is not defined in this function",
                 )));
             }
         },
@@ -124,7 +124,7 @@ fn resolve_stmt(stmt: Stmt, labels: &Labels) -> ValidationResult<Stmt> {
             Some(label) => Stmt::Goto(label),
             None => {
                 return Err(ValidationError::Label(format!(
-                    "Cannot find label '{label}' in this scope",
+                    "Label '{label}' is not defined in this function",
                 )));
             }
         },

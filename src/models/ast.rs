@@ -1,6 +1,6 @@
 pub use super::constant::Const;
 pub use super::operator::*;
-use super::typ::Type;
+use super::typ::TypeId;
 use crate::utils::Ident;
 use rustc_hash::FxHashMap;
 
@@ -17,18 +17,18 @@ pub enum Decl {
 
 #[derive(Clone)]
 pub enum FuncDecl {
-    FuncDecl(Ident, Vec<Ident>, Option<Block>, Type, StorageClass),
+    FuncDecl(Ident, Vec<Ident>, Option<Block>, TypeId, StorageClass),
 }
 
 #[derive(Debug, Clone)]
 pub enum VarDecl {
-    VarDecl(Ident, Option<Initializer>, Type, StorageClass),
+    VarDecl(Ident, Option<Initializer>, TypeId, StorageClass),
 }
 
 #[derive(Debug, Clone)]
 pub enum Initializer {
     Single(Exp),
-    Compound(Option<Type>, Vec<Initializer>),
+    Compound(Option<TypeId>, Vec<Initializer>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -83,14 +83,14 @@ pub enum Stmt {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Exp {
     pub kind: ExpKind,
-    pub typ: Option<Type>,
+    pub typ: Option<TypeId>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExpKind {
     Const(Const),
     Var(Ident),
-    Cast(Type, Box<Exp>),
+    Cast(TypeId, Box<Exp>),
     Unary(UnaryOp, Box<Exp>),
     Binary(BinaryOp, Box<Exp>, Box<Exp>),
     Assignment(Box<Exp>, Box<Exp>),
@@ -108,8 +108,8 @@ impl Exp {
         Self { kind, typ: None }
     }
 
-    pub fn typ(&self) -> &Type {
-        self.typ.as_ref().expect("the type is not assigned")
+    pub fn typ(&self) -> TypeId {
+        self.typ.expect("the type is not assigned")
     }
 
     pub fn is_null_pointer_constant(&self) -> bool {

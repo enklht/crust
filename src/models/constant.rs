@@ -1,4 +1,4 @@
-use super::typ::Type;
+use super::typ::{TypeId, TypeKind, Types};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Const {
@@ -25,7 +25,7 @@ impl core::hash::Hash for Const {
 }
 
 impl Const {
-    pub fn convert_to(self, typ: &Type) -> Const {
+    pub fn convert_to(self, typ: TypeId, types: &Types) -> Const {
         use Const::*;
         let i = match self {
             Int(i) => i as u64,
@@ -35,24 +35,24 @@ impl Const {
             Double(i) => i.to_bits(),
         };
 
-        match typ {
-            Type::Int => Const::Int(i as i32),
-            Type::Long => Const::Long(i as i64),
-            Type::UInt => Const::UInt(i as u32),
-            Type::ULong => Const::ULong(i),
-            Type::Double => Const::Double(f64::from_bits(i)),
+        match types.kind(typ) {
+            TypeKind::Int => Const::Int(i as i32),
+            TypeKind::Long => Const::Long(i as i64),
+            TypeKind::UInt => Const::UInt(i as u32),
+            TypeKind::ULong => Const::ULong(i),
+            TypeKind::Double => Const::Double(f64::from_bits(i)),
             _ => unreachable!(),
         }
     }
 
-    pub fn typ(&self) -> &Type {
+    pub fn typ(&self, types: &Types) -> TypeId {
         use Const::*;
         match self {
-            Int(_) => &Type::Int,
-            Long(_) => &Type::Long,
-            UInt(_) => &Type::UInt,
-            ULong(_) => &Type::ULong,
-            Double(_) => &Type::Double,
+            Int(_) => types.int,
+            Long(_) => types.long,
+            UInt(_) => types.uint,
+            ULong(_) => types.ulong,
+            Double(_) => types.double,
         }
     }
 

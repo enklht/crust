@@ -59,7 +59,7 @@ fn label_stmt(
             Some(_) => *label = break_label,
             None => {
                 return Err(ValidationError::LoopLabel(
-                    "'break' statement can only be used within a loop".to_string(),
+                    "'break' requires an enclosing loop or switch".to_string(),
                 ));
             }
         },
@@ -67,7 +67,7 @@ fn label_stmt(
             Some(_) => *label = continue_label,
             None => {
                 return Err(ValidationError::LoopLabel(
-                    "'continue' statement can only be used within a loop".to_string(),
+                    "'continue' requires an enclosing loop".to_string(),
                 ));
             }
         },

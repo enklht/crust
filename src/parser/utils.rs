@@ -8,7 +8,12 @@ where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
     fn semicolon(self) -> impl Parser<'tokens, I, T, ParserError<'tokens>> + Clone {
-        self.then_ignore(just(Token::Semicolon))
+        self.then_ignore(just(Token::Semicolon).map_err(|err: Rich<'tokens, Token>| {
+            Rich::custom(
+                *err.span(),
+                "Expected ';' after this statement or declaration",
+            )
+        }))
     }
 }
 

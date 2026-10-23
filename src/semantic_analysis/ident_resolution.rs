@@ -101,7 +101,7 @@ fn resolve_local_var_decl(
         && !(has_linkage && storage_class == &StorageClass::Extern)
     {
         return Err(ValidationError::VarDecl(format!(
-            "Variable '{name}' has already been declared in this scope"
+            "Variable '{name}' is declared more than once in this scope"
         )));
     }
 
@@ -144,7 +144,7 @@ fn resolve_func_decl(
 
     if let Some(&(_, false)) = scope_manager.get_from_current_scope(name) {
         return Err(ValidationError::FuncDecl(format!(
-            "Function '{name}' has already been declared"
+            "Function '{name}' conflicts with a declaration in this scope"
         )));
     }
 
@@ -166,7 +166,7 @@ fn resolve_func_decl(
 fn resolve_param(name: &mut Ident, scope_manager: &mut ScopeManager) -> ValidationResult<()> {
     if scope_manager.is_in_current_scope(name) {
         return Err(ValidationError::VarDecl(format!(
-            "Variable '{name}' has already been declared in this scope"
+            "Variable '{name}' is declared more than once in this scope"
         )));
     }
 
@@ -263,7 +263,7 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
             Some((unique_name, _)) => *name = unique_name,
             None => {
                 return Err(ValidationError::VarDecl(format!(
-                    "Cannot find variable '{name}' in this scope"
+                    "Variable '{name}' is not declared in this scope"
                 )));
             }
         },
@@ -281,7 +281,7 @@ fn resolve_exp(exp: &mut Exp, scope_manager: &mut ScopeManager) -> ValidationRes
         ExpKind::FuncCall(name, args) => {
             let Some((new_name, _)) = scope_manager.get(name) else {
                 return Err(ValidationError::FuncDecl(format!(
-                    "Cannot find function '{name}' in this scope"
+                    "Function '{name}' is not declared in this scope"
                 )));
             };
 

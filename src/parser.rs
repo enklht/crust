@@ -17,7 +17,11 @@ use specifiers::type_specifiers;
 use stmt::stmt;
 use utils::SemicolonExt;
 
-type ParserError<'tokens> = extra::Err<Rich<'tokens, Token>>;
+type ParserError<'tokens> = extra::Full<
+    Rich<'tokens, Token>,
+    chumsky::inspector::SimpleState<crate::models::typ::Types>,
+    (),
+>;
 
 fn array_suffix<'tokens, I>() -> impl Parser<'tokens, I, usize, ParserError<'tokens>> + Clone
 where
@@ -36,7 +40,7 @@ fn ident<'tokens, I>() -> impl Parser<'tokens, I, Ident, ParserError<'tokens>> +
 where
     I: ValueInput<'tokens, Token = Token, Span = SimpleSpan>,
 {
-    select! { Token::Ident(ident) => ident }
+    select! { Token::Ident(ident) => ident }.labelled("identifier")
 }
 
 pub fn parser<'tokens, I>() -> impl Parser<'tokens, I, Program, ParserError<'tokens>>
